@@ -32,6 +32,8 @@ def process_nutritional_data_from_azurite(
                                              delete=False, encoding="utf-8") as handle:
                 temp_name = handle.name
                 json.dump(records, handle, indent=2, allow_nan=False)
+            # Temp files are 0600; make the result readable by the host user (e.g. CI runner).
+            os.chmod(temp_name, 0o644)
             os.replace(temp_name, target)
         finally:
             if temp_name and os.path.exists(temp_name):
