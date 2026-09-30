@@ -1,0 +1,71 @@
+name: Build test and simulated deployment
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+defaults:
+  run:
+    shell: bash
+permissions:
+  contents: read
+jobs:
+  local-simulation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install test dependencies
+        run: pip install -r requirements-dev.txt
+      - name: Build application image
+        run: docker build -t diet-analysis:project1 .
+      - name: Tests and lint
+        run: |
+          python -m pytest -q
+          flake8 .
+      - name: Run batch analysis and Azurite workflow
+        run: |
+          mkdir -p output simulated_nosql evidence
+          chmod a+w output simulated_nosql
+          docker compose run --rm analysis | tee evidence/analysis.log
+          docker compose up -d --wait azurite
+          docker compose run --rm upload | tee evidence/upload.log
+          docker compose run --rm --no-deps function | tee evidence/function.log
+          python scripts/verify_outputs.py
+      - name: Push to local registry (simulation)
+        run: |
+          docker compose --profile registry up -d registry
+          for attempt in {1..30}; do
+            if curl -fsS http://localhost:5001/v2/; then break; fi
+            sleep 2
+          done
+          docker tag diet-analysis:project1 localhost:5001/diet-analysis:${{ github.sha }}
+          docker push localhost:5001/diet-analysis:${{ github.sha }}
+          docker pull localhost:5001/diet-analysis:${{ github.sha }}
+          docker run --rm localhost:5001/diet-analysis:${{ github.sha }}
+      - name: Publish to Docker Hub when configured
+        if: github.event_name != 'pull_request' && vars.DOCKERHUB_USERNAME != ''
+        env:
+          DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          printf '%s' "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+          docker tag diet-analysis:project1 "$DOCKERHUB_USERNAME/diet-analysis:${{ github.sha }}"
+          docker push "$DOCKERHUB_USERNAME/diet-analysis:${{ github.sha }}"
+      - name: Capture service logs
+        if: always()
+        run: docker compose logs --no-color > evidence/compose.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nutritional-insights-evidence
+          path: |
+            output/
+            simulated_nosql/
+            evidence/
+      - name: Clean up
+        if: always()
+        run: docker compose --profile registry down

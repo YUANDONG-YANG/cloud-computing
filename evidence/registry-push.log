@@ -1,0 +1,24 @@
+The push refers to repository [localhost:5001/diet-analysis]
+44136fa355b3: Waiting
+41e7217c2e50: Waiting
+58abdd9670ca: Waiting
+ce5d34fac3cc: Pushed
+41e7217c2e50: Waiting
+0526d5e29bf3: Waiting
+44136fa355b3: Pushed
+9046eb6511e6: Waiting
+fce6eea544f1: Waiting
+9046eb6511e6: Pushed
+fa941109283f: Waiting
+0526d5e29bf3: Pushed
+41e7217c2e50: Pushed
+fa941109283f: Pushed
+3190d0755f57: Waiting
+fce6eea544f1: Pushed
+c697185eccd4: Waiting
+c697185eccd4: Pushed
+58abdd9670ca: Pushed
+3190d0755f57: Pushed
+6b37362b3da7: Pushed
+2a8acfc0df46: Pushed
+project1: digest: sha256:f5595b07f72304299087700bbc2459eed3fe069d3267db0c066a334b177ba8f1 size: 856

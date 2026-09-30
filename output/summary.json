@@ -1,0 +1,23 @@
+{
+  "generated_at": "2026-09-30 22:50:45 UTC",
+  "rows": 7806,
+  "diet_types": 5,
+  "imputed_values": {
+    "Protein(g)": 0,
+    "Carbs(g)": 0,
+    "Fat(g)": 0
+  },
+  "highest_mean_protein_diets": [
+    "keto"
+  ],
+  "highest_mean_protein_g": 101.26650793650794,
+  "highest_total_protein_diets": [
+    "mediterranean"
+  ],
+  "highest_total_protein_g": 177249.89,
+  "undefined_ratios": {
+    "Protein_to_Carbs_ratio": 0,
+    "Carbs_to_Fat_ratio": 38
+  },
+  "interpretation": "Recipe-level values; no serving size or medical inference."
+}

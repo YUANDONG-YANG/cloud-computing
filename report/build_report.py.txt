@@ -1,0 +1,112 @@
+from pathlib import Path
+import csv, json, hashlib
+from datetime import datetime, timezone
+from xml.sax.saxutils import escape
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, PageBreak
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER
+from reportlab.lib.pagesizes import A4
+
+P=Path(__file__).resolve().parents[1]
+R=P/'report'
+now=datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
+styles=getSampleStyleSheet()
+styles.add(ParagraphStyle(name='SmallText',fontName='Helvetica',fontSize=8,leading=11,spaceAfter=5))
+styles['BodyText'].fontSize=10
+styles['BodyText'].leading=14
+styles['BodyText'].spaceAfter=8
+styles['Heading1'].textColor=colors.HexColor('#164e63')
+styles['Heading2'].textColor=colors.HexColor('#0f766e')
+W= A4[0]-84
+
+def para(s,style='BodyText'): return Paragraph(s,styles[style])
+def title(s): return para(s,'Heading1')
+def img(path,width=W,maxheight=420):
+ from PIL import Image as PI
+ w,h=PI.open(path).size
+ scale=min(width/w,maxheight/h)
+ return Image(str(path),width=w*scale,height=h*scale)
+def table(rows,widths=None,small=False):
+ data=[[para(escape(str(x)), 'SmallText' if small else 'BodyText') for x in row] for row in rows]
+ t=Table(data,colWidths=widths,repeatRows=1,hAlign='LEFT')
+ t.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),colors.HexColor('#dceef1')),('VALIGN',(0,0),(-1,-1),'TOP'),('GRID',(0,0),(-1,-1),.4,colors.HexColor('#b4c4cd')),('LEFTPADDING',(0,0),(-1,-1),6),('RIGHTPADDING',(0,0),(-1,-1),6),('TOPPADDING',(0,0),(-1,-1),5),('BOTTOMPADDING',(0,0),(-1,-1),3)]))
+ return t
+def footer(canvas,doc):
+ canvas.setFont('Helvetica',8); canvas.setFillColor(colors.HexColor('#475569'))
+ canvas.drawString(42,26,'CPSY 300 | Project 1 | '+now)
+ canvas.drawRightString(A4[0]-42,26,str(doc.page))
+def build(path,story):
+ SimpleDocTemplate(str(path),pagesize=A4,rightMargin=42,leftMargin=42,topMargin=35,bottomMargin=42,title='Cloud-Native Nutritional Insights Application',author='Team details pending').build(story,onFirstPage=footer,onLaterPages=footer)
+def readcsv(name): return list(csv.DictReader((P/'output'/name).open()))
+summary=json.loads((P/'output/summary.json').read_text())
+bench=json.loads((P/'evidence/benchmark.json').read_text())
+images=json.loads((P/'evidence/image-inspect.json').read_text())
+before,after=[x['Size']/1e6 for x in images]
+reduction=(before-after)/before*100
+sha=hashlib.sha256((P/'data/All_Diets.csv').read_bytes()).hexdigest()
+work=bench['workloads']
+
+def enhancement():
+ rows=[['Measurement','Before','After','Change'],['Image size (decimal MB)',f'{before:.2f}',f'{after:.2f}',f'{reduction:.2f}% smaller']]
+ for x in work:
+  rows.append([f"Aggregation, {x['rows']:,} rows",f"{x['baseline']['median_ms']:.3f} ms",f"{x['optimized']['median_ms']:.3f} ms",f"{x['speedup']:.2f}x faster"])
+ return [title('Task 5 — Enhancement research (one page)'),
+  para('Selected options: (a) smaller Docker images and (c) faster data processing.'),
+  para('<b>Research.</b> Docker documents separating build artifacts from runtime stages [1]. Pandas recommends built-in GroupBy operations over user-defined aggregation where possible [2]. These ideas were applied to Tasks 2 and 1/3 respectively.'),
+  para('<b>Image change.</b> The baseline uses the same Python 3.11 slim base, dependencies, source and dataset, with a conventional pip install that retains downloaded packages. The optimized Dockerfile builds wheels in a separate stage, mounts them only during installation, and disables the runtime pip cache. Neither compiler tools nor wheel archives are copied into runtime layers. Most of the measured saving is cache exclusion; a second stage alone does not guarantee a smaller Python image.'),
+  para('<b>Processing change.</b> Replace one DataFrame filter per diet per nutrient with one built-in groupby mean over all three nutrients. Batch analysis and the simulated function share this implementation. The benchmark asserts matching values and labels before timing; the baseline uses the same cleaned data.'),
+  table(rows,[190,100,100,W-390],True),Spacer(1,9),
+  para('<b>Method.</b> Image sizes are Docker image inspect Size values in decimal MB from the same VM and build base. Timings use perf_counter, one warmup and 15 measured calls per algorithm; medians are shown. The original dataset has 7,806 rows; 156,120 rows is an explicitly replicated 20x workload. Cleaning, file I/O, network download and plotting are excluded. Raw samples, resolved packages and image metadata are included in evidence/.'),
+  para('<b>Expected benefit and limits.</b> Excluding cache reduces image footprint; grouped aggregation avoids repeated scans. End-to-end deployment time and serverless cold starts were not measured. The timing improvements apply to this aggregation workload, and will vary by machine, data and dependencies. No cloud-cost savings are claimed.'),
+  para('[1] Docker, Multi-stage builds: https://docs.docker.com/build/building/multi-stage/<br/>[2] Pandas, Group by: split-apply-combine: https://pandas.pydata.org/docs/user_guide/groupby.html<br/>Sources consulted 2026-09-30.','SmallText')]
+
+story=[title('Cloud-Native Nutritional Insights Application'),para('CPSY 300 — Project 1 | Local Azure simulation'),para('Prepared: '+now),
+ para('<b>Team:</b> names and student IDs pending. <b>Submission status:</b> local implementation and evidence complete; actual GitHub Actions run, team contribution evidence and team video still required.'),
+ para('The application analyzes the course All_Diets.csv dataset using Pandas, packages the workload in Docker, and simulates cloud storage and serverless processing with Azurite. All computation ran inside the Ubuntu VM; no real Azure resources were provisioned.'),
+ title('Architecture and scope'),table([['Path','Execution'],['Batch','Course CSV → cleaning → grouped statistics → CSV/JSON + three PNG charts'],['Storage/function','CSV upload → Azurite datasets/All_Diets.csv → manual Python function → five JSON documents'],['Delivery','Docker build → pytest / flake8 → Compose simulation → local registry push / pull'],['CI definition','GitHub Actions runs its own emulator and exports evidence; remote execution is pending']],[100,W-100]),Spacer(1,12),
+ para('<b>Dataset provenance.</b> Copied from the course Projects/All_Diets.csv. The file contains 7,806 recipes and five normalized diet types. Source rows were retained. SHA-256:','BodyText'),para(sha,'SmallText'),
+ para('<b>Key results.</b> Keto has the highest mean protein (101.27 g/recipe); Mediterranean has the highest total protein (177,249.89 g). These answer different questions: totals depend on the number of recipes. Values are recipe-level, with no serving-size standardization.'),
+ para('<b>Verification.</b> Ten unit tests passed. Flake8 passed. The real Blob download and JSON pipeline produced the same mean values as batch analysis. A local registry push and pull succeeded. Screenshots show actual local execution/logs with visible date and time.'),PageBreak(),
+ title('Task 1 — Data preparation and statistics'),
+ para('Diet and cuisine labels are trimmed and case-normalized. Invalid nutrient values are replaced with the valid column mean; an entirely unusable column is rejected. This supplied dataset needed zero nutrient imputations. There are 38 undefined carbs-to-fat ratios caused by zero fat; these remain blank in the CSV. No infinite ratios are emitted.'),
+ table([['Diet','Protein (g)','Carbs (g)','Fat (g)']]+[[r['Diet_type']]+[f"{float(r[c]):.2f}" for c in ['Protein(g)','Carbs(g)','Fat(g)']] for r in readcsv('average_macros.csv')],[155,110,110,W-375],True),Spacer(1,8),
+ img(P/'output/average_macros.png',maxheight=330),
+ para('The bar chart compares mean protein, carbohydrate and fat quantities in all recipes within each normalized diet. Vegan recipes have the highest mean carbohydrates; keto recipes have the highest mean fat in this dataset.'),PageBreak(),
+ title('Task 1 — Heatmap and cuisine distribution'),img(P/'output/macronutrient_heatmap.png',maxheight=265),Spacer(1,8),img(P/'output/top5_cuisine_scatter.png',maxheight=320),
+ para('Each scatter marker is one of the five highest-protein recipes in its diet. Overlapping points may occur. Large values are retained because serving counts are unavailable; these charts do not establish individual nutritional recommendations.','SmallText'),PageBreak(),
+ title('Task 1 — Top five protein recipes per diet'),
+ table([['Diet','Recipe','Cuisine','Protein g']]+[[r['Diet_type'],r['Recipe_name'],r['Cuisine_type'],f"{float(r['Protein(g)']):.2f}"] for r in readcsv('top5_protein_recipes.csv')],[77,275,90,W-442],True),PageBreak(),
+ title('Task 1 — Common cuisines and execution evidence'),
+ table([['Diet','Most common cuisine','Recipe count']]+[[r['Diet_type'],r['Cuisine_type'],r['count']] for r in readcsv('common_cuisines.csv')],[160,210,W-370],True),Spacer(1,12),img(P/'evidence/task1-analysis.png',maxheight=350),
+ para('Screenshot of the saved batch execution log and current output, including date/time. Full console output is in evidence/analysis.log. Both ratios are exported in output/cleaned_recipes.csv. Cuisine ties, if any, are retained; protein ties use stable source ordering.'),PageBreak(),
+ title('Task 2 — Docker and simulated deployment'),
+ para('The runtime image uses python:3.11-slim, pinned direct dependencies, a non-root UID, and the Agg plotting backend. Docker Compose coordinates analysis, Azurite, upload and function services. Host mounts preserve generated charts and JSON after one-shot containers exit.'),
+ img(P/'evidence/task2-registry.png',maxheight=375),
+ para('Actual local registry push and pull succeeded at localhost:5001/diet-analysis:project1. The registry is a local Docker Distribution service; Docker Hub publishing was not performed. Azurite and registry ports bind only to loopback.'),
+ para(f'Image footprint: baseline {before:.2f} MB; optimized {after:.2f} MB ({reduction:.2f}% smaller). Image tags and metadata are saved in evidence/image-inspect.json. See the one-page enhancement section for comparison methodology.'),PageBreak(),
+ title('Task 3 — Azurite and serverless simulation'),
+ para('upload_dataset.py creates the datasets container and uploads the course CSV. lambda_function.py obtains a BlobServiceClient from the official emulator connection string, downloads the bytes, applies shared cleaning/aggregation, and atomically writes five JSON records. This is a manual invocation simulation; Azurite is not an event-trigger or Azure Functions runtime.'),
+ img(P/'evidence/task3-azurite.png',maxheight=375),
+ para('Within Compose, the Blob endpoint uses the azurite service hostname. Host execution uses 127.0.0.1:10000. The emulator account key is public test data, not an Azure subscription secret. A failed download leaves the previous output untouched; unit tests verify this behavior.'),
+ para('The JSON file represents a simulated NoSQL collection, one document per diet. It is not a Cosmos DB deployment. scripts/verify_outputs.py checks every mean against the independent batch output.'),PageBreak(),
+ title('Task 4 — CI/CD implementation and local checks'),
+ para('The workflow builds the image, runs pytest and flake8, executes analysis and a fresh Azurite upload/function pipeline, verifies matching outputs, pushes/pulls to a runner-local registry, then runs the retrieved image. Artifacts include charts, JSON and logs. Optional Docker Hub publishing reads a username variable and token secret, and is disabled for pull requests.'),
+ img(P/'evidence/task4-local-checks.png',maxheight=350),
+ para('<b>Evidence boundary:</b> this screenshot documents local tests and integration checks, not a GitHub-hosted Actions run. A repository URL and authenticated push are still needed to demonstrate the remote workflow.'),
+ para('Tests cover normalization, mean imputation, zero denominators, invalid/negative/infinite values, missing labels, schema validation, empty/all-invalid input, top-five ordering, cuisine ties, Blob download/JSON persistence and failure preservation.'),
+ para('To finish: configure the real team Git identity; commit and push the project to main; monitor Actions; capture successful build/test/push logs with date/time visible. Attach the repository and run URLs to the final report.'),PageBreak()]
+story+=enhancement()+[PageBreak(),title('Submission checklist and team evidence'),
+ table([['Deliverable','Status'],['Python analysis + serverless code','Implemented and locally validated'],['Dockerfile + Compose + local registry','Built and demonstrated'],['CI/CD workflow file','Implemented; real GitHub run pending'],['Charts + screenshots + enhancement report','Included with timestamps'],['Names / student IDs / contributions','Must be completed from real team activity'],['Team video with every member visible','Must be recorded by the team'],['Final submission ZIP','Prepared locally; add remaining team/GitHub evidence before submission']],[230,W-230]),Spacer(1,12),
+ para('Contribution-Report.html is an editable template for actual names, tasks, hours, commit/PR links, meetings and communication methods. Video-Guide.html provides a demonstration sequence and speaking prompts. These templates are preparation aids and do not claim completed student contributions.'),
+ para('Before submission, have each member review and understand their code and explanations. Update this report with the successful Actions run and real team details. Export the completed contribution report to PDF and add the team video or the course-approved video link.'),
+ title('References'),
+ para('Microsoft Azure / Azurite: https://github.com/Azure/Azurite<br/>Docker multi-stage builds: https://docs.docker.com/build/building/multi-stage/<br/>Pandas GroupBy: https://pandas.pydata.org/docs/user_guide/groupby.html<br/>GitHub publishing container images: https://docs.github.com/en/actions/tutorials/publish-packages/publish-docker-images','SmallText'),
+ para('Assignment requirements: instructor-provided Project 1 Cloud-Native Nutritional Insights Application.html and accompanying AGENTS.md. Dataset: course-provided All_Diets.csv. Research sources accessed 2026-09-30. All numerical results and screenshots were generated from local execution.')]
+build(R/'Project1-Report.pdf',story)
+build(R/'Enhancement-Report.pdf',enhancement())
+css='body{font:16px/1.55 Arial;max-width:1000px;margin:40px auto;color:#17324d}table{border-collapse:collapse;width:100%}td,th{border:1px solid #aab;padding:10px;text-align:left}h1,h2{color:#0f766e}.pending{background:#fff1cc;padding:15px}@media print{body{margin:0;font-size:11pt}}'
+(R/'Contribution-Report.html').write_text('''<!doctype html><meta charset="utf-8"><title>Contribution Report — complete with real records</title><style>'''+css+'''</style><h1>Project 1 — Team Contribution Report</h1><p class="pending">TEMPLATE — fill with actual records before submitting. No member contributions have been verified.</p><p contenteditable="true">Team name: [fill in] | Course: CPSY 300 | Date: [fill in]<br>Repository: [URL] | Successful Actions run: [URL]</p><h2>Individual work</h2><table contenteditable="true"><tr><th>Name / student ID</th><th>Tasks and concrete changes</th><th>Hours</th><th>Commit / PR / review links</th></tr><tr><td>[Member]</td><td>[Describe actual work]</td><td>[Actual hours]</td><td>[Evidence links]</td></tr><tr><td>[Member]</td><td></td><td></td><td></td></tr><tr><td>[Member]</td><td></td><td></td><td></td></tr><tr><td>[Member]</td><td></td><td></td><td></td></tr></table><h2>Meetings and agreements</h2><table contenteditable="true"><tr><th>Date / duration</th><th>Attendance</th><th>Decisions / assigned tasks</th><th>Evidence</th></tr><tr><td>[Actual meeting]</td><td></td><td></td><td></td></tr></table><h2>Communication</h2><p contenteditable="true">[Actual tools, frequency, issue tracking and review process]</p><h2>Assistance and review</h2><p contenteditable="true">[Disclose AI/tool assistance as required by your course. Record who checked and understood the generated code, tests and report.]</p><p>Edit the fields and print to PDF. Browser contenteditable changes are temporary unless you save/export them. Add or remove member rows in the HTML source as needed.</p>''')
+(R/'Video-Guide.html').write_text('''<!doctype html><meta charset="utf-8"><title>Project 1 Video Guide</title><style>'''+css+'''</style><h1>Team video — demonstration guide</h1><p>Suggested 7–9 minutes; adapt to the instructor’s presentation requirements. Each member must appear on camera and explain their actual work. Start with names, course and project title.</p><ol><li><b>Architecture (45 seconds):</b> explain the CSV → analysis and Blob → function → JSON paths. Say explicitly that Azure services are simulated locally.</li><li><b>Analysis (2 minutes):</b> run <code>docker compose run --rm analysis</code>; show all three charts, the top-five CSV, cleaning rules and undefined ratios. Explain why keto wins the mean comparison while Mediterranean wins the total comparison.</li><li><b>Container deployment (1 minute):</b> show Dockerfile and Compose; run <code>docker compose ps</code>. Explain output mounts and the local registry push/pull.</li><li><b>Function (1 minute):</b> run upload, then the function; show five JSON documents. Explain why the Compose endpoint is azurite, and why this manual function is not a real Azure trigger.</li><li><b>CI/CD (1 minute):</b> show workflow stages and a REAL successful GitHub Actions run after pushing. Show pytest and the batch/Blob comparison. Do not present local logs as remote Actions evidence.</li><li><b>Enhancements (1 minute):</b> show the one-page report and actual size/timing data. Explain benchmark scope and the replicated workload.</li><li><b>Contributions and close (45 seconds):</b> each person identifies their own changes and reviews, supported by real commits/PRs.</li></ol><p>Recording checklist: faces visible; terminal date/time visible; readable text; microphone checked; no account tokens displayed; video plays after export; include the file or approved link in the final submission.</p>''')
+(P/'evidence/dataset-provenance.json').write_text(json.dumps({'source':'Course Projects/All_Diets.csv','sha256':sha,'bytes':(P/'data/All_Diets.csv').stat().st_size,'rows':summary['rows'],'captured_at':now},indent=2))
+print('Created report PDFs, contribution template, and video guide')

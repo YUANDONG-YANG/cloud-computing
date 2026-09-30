@@ -1,0 +1,10 @@
+azurite-1  | Azurite Blob service is starting on 0.0.0.0:10000
+azurite-1  | Azurite Blob service successfully listens on http://0.0.0.0:10000
+azurite-1  | 172.18.0.2 - - [30/Sep/2026:22:47:23 +0000] "PUT /devstoreaccount1/datasets?restype=container HTTP/1.1" 201 -
+azurite-1  | 172.18.0.2 - - [30/Sep/2026:22:47:23 +0000] "PUT /devstoreaccount1/datasets/All_Diets.csv HTTP/1.1" 201 -
+azurite-1  | 172.18.0.2 - - [30/Sep/2026:22:47:23 +0000] "GET /devstoreaccount1/datasets?restype=container&comp=list HTTP/1.1" 200 -
+azurite-1  | 172.18.0.2 - - [30/Sep/2026:22:47:46 +0000] "GET /devstoreaccount1/datasets/All_Diets.csv HTTP/1.1" 206 702514
+azurite-1  | 172.18.0.4 - - [30/Sep/2026:22:50:56 +0000] "PUT /devstoreaccount1/datasets?restype=container HTTP/1.1" 409 -
+azurite-1  | 172.18.0.4 - - [30/Sep/2026:22:50:56 +0000] "PUT /devstoreaccount1/datasets/All_Diets.csv HTTP/1.1" 201 -
+azurite-1  | 172.18.0.4 - - [30/Sep/2026:22:50:56 +0000] "GET /devstoreaccount1/datasets?restype=container&comp=list HTTP/1.1" 200 -
+azurite-1  | 172.18.0.4 - - [30/Sep/2026:22:50:58 +0000] "GET /devstoreaccount1/datasets/All_Diets.csv HTTP/1.1" 206 702514

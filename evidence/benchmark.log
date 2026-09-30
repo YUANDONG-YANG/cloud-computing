@@ -1,0 +1,2 @@
+7806 rows: repeated filtering 13.722 ms -> groupby 1.245 ms; 11.02x
+156120 rows: repeated filtering 90.752 ms -> groupby 11.964 ms; 7.59x

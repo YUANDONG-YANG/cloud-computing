@@ -1,0 +1,6 @@
+ Container nutritional-insights-azurite-1 Running 
+ Container nutritional-insights-azurite-1 Waiting 
+ Container nutritional-insights-azurite-1 Healthy 
+ Container nutritional-insights-upload-run-cffeba3a8e5a Creating 
+ Container nutritional-insights-upload-run-cffeba3a8e5a Created 
+2026-09-30T22:50:56.384987+00:00 Uploaded datasets/All_Diets.csv: 702514 bytes
