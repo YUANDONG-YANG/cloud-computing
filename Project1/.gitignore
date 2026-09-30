@@ -1,0 +1,14 @@
+# Python
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+
+# Generated at run time (CI uploads these as artifacts)
+output/
+evidence/
+simulated_nosql/*.json
+
+# Local secrets and archives
+.env
+*.zip
