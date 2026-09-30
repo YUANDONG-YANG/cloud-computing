@@ -7,6 +7,7 @@ on:
 defaults:
   run:
     shell: bash
+    working-directory: Project1
 permissions:
   contents: read
 jobs:
@@ -63,9 +64,9 @@ jobs:
         with:
           name: nutritional-insights-evidence
           path: |
-            output/
-            simulated_nosql/
-            evidence/
+            Project1/output/
+            Project1/simulated_nosql/
+            Project1/evidence/
       - name: Clean up
         if: always()
         run: docker compose --profile registry down
