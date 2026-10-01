@@ -35,7 +35,7 @@ th{background:var(--bg)}
 pre{background:var(--code);color:var(--codeink);padding:.8rem 1rem;border-radius:8px;overflow-x:auto;font-size:.82rem}
 code{font-family:Consolas,monospace;font-size:.9em}
 ol li,ul li{margin:.2rem 0}
-figure{margin:.5rem 0}figcaption{font-size:.82rem;color:var(--mute);margin-top:.3rem}img{max-width:100%;height:auto;border:1px solid var(--line);border-radius:8px}details{background:var(--card);border:1px solid var(--line);border-radius:8px;margin:.35rem 0;padding:.3rem .7rem}summary{cursor:pointer;padding:.2rem 0}details pre{max-height:32rem;overflow:auto}h4{margin:.8rem 0 .3rem}
+figure{margin:.5rem 0}figcaption{font-size:.82rem;color:var(--mute);margin-top:.3rem}img{max-width:100%;height:auto;border:1px solid var(--line);border-radius:8px}details{background:var(--card);border:1px solid var(--line);border-radius:8px;margin:.35rem 0;padding:.3rem .7rem}summary{padding:.2rem 0}details pre{max-height:32rem;overflow:auto}h4{margin:.8rem 0 .3rem}
 footer{margin:2rem 0 1rem;color:var(--mute);font-size:.8rem}
 @media print{body{background:#fff}.find,table{break-inside:avoid}}
 </style>
@@ -45,7 +45,8 @@ footer{margin:2rem 0 1rem;color:var(--mute);font-size:.8rem}
 
 <header class="hero">
   <h1>Project 1 — Cloud-Native Nutritional Insights: Master Overview</h1>
-  <p class="sub">CPSY 300 Cloud Computing · Fall 2026 · Reviewer role: senior cloud engineer · Review date: 2026-09-30</p>
+  <p class="sub">GitHub: <a href="https://github.com/YUANDONG-YANG/cloud-computing/tree/main/Project1">https://github.com/YUANDONG-YANG/cloud-computing/tree/main/Project1</a></p>
+  <p class="sub">CPSY 300 Cloud Computing · Fall 2026 · Team: Yuandong Yang, Ethan Bayarsaikhan, Justin Norman-Rance · Review date: 2026-09-30</p>
   <p>Analyse the course <code>All_Diets.csv</code> (7,806 recipes, 5 diets) with Pandas, containerise it with Docker, simulate Azure Blob Storage and a serverless function with Azurite, automate with GitHub Actions, and document two measured optimisations. Every Azure service is emulated locally; no real cloud resources are used.</p>
   <div class="cards">
     <div class="card"><b>100</b>marks: T1–T4 20 each, T5 5, video 10, contribution 5</div>
@@ -55,6 +56,26 @@ footer{margin:2rem 0 1rem;color:var(--mute);font-size:.8rem}
   </div>
 </header>
 
+<div class="find ok" id="repo"><h4>Source repository (for verification)</h4>
+<table>
+<tr><th>What</th><th>Link</th></tr>
+<tr><td>Repository</td><td><a href="https://github.com/YUANDONG-YANG/cloud-computing">https://github.com/YUANDONG-YANG/cloud-computing</a></td></tr>
+<tr><td>Project folder (all code, tests, docs)</td><td><a href="https://github.com/YUANDONG-YANG/cloud-computing/tree/main/Project1">https://github.com/YUANDONG-YANG/cloud-computing/tree/main/Project1</a></td></tr>
+<tr><td>CI/CD workflow file</td><td><a href="https://github.com/YUANDONG-YANG/cloud-computing/blob/main/.github/workflows/deploy.yml">https://github.com/YUANDONG-YANG/cloud-computing/blob/main/.github/workflows/deploy.yml</a></td></tr>
+<tr><td>GitHub Actions (all runs)</td><td><a href="https://github.com/YUANDONG-YANG/cloud-computing/actions">https://github.com/YUANDONG-YANG/cloud-computing/actions</a></td></tr>
+<tr><td>Green run #4 (Task 4 evidence)</td><td><a href="https://github.com/YUANDONG-YANG/cloud-computing/actions/runs/36793291529">https://github.com/YUANDONG-YANG/cloud-computing/actions/runs/36793291529</a></td></tr>
+<tr><td>Commit history</td><td><a href="https://github.com/YUANDONG-YANG/cloud-computing/commits/main">https://github.com/YUANDONG-YANG/cloud-computing/commits/main</a></td></tr>
+<tr><td>Contributors</td><td><a href="https://github.com/YUANDONG-YANG/cloud-computing/graphs/contributors">https://github.com/YUANDONG-YANG/cloud-computing/graphs/contributors</a></td></tr>
+</table>
+<p class="sub">The page you are reading is self-contained; these links let you check the same files, test run and commits online. Repository access may need to be granted to the reviewer if it is private.</p></div>
+<h2>Team</h2>
+<div class="scroll"><table>
+<tr><th>Member</th><th>Role in this document</th><th>Section presented in the video</th><th>Own contributions (commits, reviews, hours)</th></tr>
+<tr><td><b>Yuandong Yang</b> (GitHub: YUANDONG-YANG)</td><td>Team member, repository owner</td><td>to be assigned</td><td>to be filled with real data</td></tr>
+<tr><td><b>Ethan Bayarsaikhan</b></td><td>Team member</td><td>to be assigned</td><td>to be filled with real data</td></tr>
+<tr><td><b>Justin Norman-Rance</b></td><td>Team member</td><td>to be assigned</td><td>to be filled with real data</td></tr>
+</table></div>
+<p class="sub">All three are contributors of this project. Task division, hours, meetings, commits and pull requests must be entered from real records (see the contribution report); nothing here is invented. Student IDs and the other members’ GitHub accounts are not recorded yet.</p>
 <h2>1. Introduction</h2>
 <p>The assignment asks for a cloud-native application that processes and analyses the <code>All_Diets.csv</code> dataset and extracts nutritional insights (protein, carbs, fat) per diet type and cuisine, using Azure-style services, a NoSQL store, serverless processing, cloud storage and CI/CD. This page follows the order of the assignment document: Introduction, Prerequisites, Dataset overview, Tasks 1–5, Marking criteria, Submission requirements. For each task it shows the requirement, what was built, the screenshot evidence in the place where the assignment shows an empty screenshot box, and the status.</p>
 <p><b>Result in one line:</b> 7,806 recipes were analysed; results were produced in a Docker container, through an Azurite Blob and a manually invoked function into a JSON “NoSQL” store; 10 tests and a benchmark passed locally. The GitHub Actions pipeline ran green (run #4); the team video and the contribution evidence are still open.</p>

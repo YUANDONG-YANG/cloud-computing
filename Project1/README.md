@@ -14,6 +14,11 @@ All_Diets.csv
 Shared cleaning and aggregation: nutrition.py (batch and function must agree)
 ```
 
+## Team
+
+Yuandong Yang, Ethan Bayarsaikhan, Justin Norman-Rance. Repository: https://github.com/YUANDONG-YANG/cloud-computing (project folder `Project1`).
+Per-member contributions, hours and meetings are recorded in [`docs/reports/Contribution-Report.html`](docs/reports/Contribution-Report.html).
+
 ## Assignment overview
 
 Full illustrated overview (all tasks, screenshots, source code, logs and results embedded in one file):
