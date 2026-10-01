@@ -14,6 +14,39 @@ All_Diets.csv
 Shared cleaning and aggregation: nutrition.py (batch and function must agree)
 ```
 
+## Assignment overview
+
+Full illustrated overview (all tasks, screenshots, source code, logs and results embedded in one file):
+[`docs/reports/Project1-Master-Overview.html`](docs/reports/Project1-Master-Overview.html).
+GitHub shows HTML as source, so open it through the
+[browser preview](https://htmlpreview.github.io/?https://github.com/YUANDONG-YANG/cloud-computing/blob/main/Project1/docs/reports/Project1-Master-Overview.html)
+or download the file and open it locally.
+
+| Task | Requirement | Status | Evidence |
+|------|-------------|--------|----------|
+| 1 (20) | Pandas analysis, ratios, cleaning, bar chart, heatmap, scatter | Done | [`docs/results/`](docs/results/), [`docs/evidence/task1-analysis.png`](docs/evidence/task1-analysis.png) |
+| 2 (20) | Dockerfile, build and run, registry push, Compose | Done (local registry; Docker Hub not used) | [`docs/evidence/task2-registry.png`](docs/evidence/task2-registry.png) |
+| 3 (20) | Azurite Blob upload, function, simulated NoSQL | Done (CSV uploaded by script, not Storage Explorer) | [`docs/evidence/task3-azurite.png`](docs/evidence/task3-azurite.png) |
+| 4 (20) | GitHub Actions build, test, registry push | Done, run #4 green | [`docs/evidence/github-actions-run-4.png`](docs/evidence/github-actions-run-4.png) |
+| 5 (5) | Two enhancements, one-page report | Done | [`docs/reports/Enhancement-Report.pdf`](docs/reports/Enhancement-Report.pdf) |
+| Video (10) | Team presentation | Pending | [`docs/reports/Video-Guide.html`](docs/reports/Video-Guide.html) |
+| Contribution (5) | Per-member contributions | Pending | [`docs/reports/Contribution-Report.html`](docs/reports/Contribution-Report.html) |
+
+### Evidence
+
+GitHub Actions run #4 (workflow "Build test and simulated deployment", status Success, 1m 23s):
+
+![GitHub Actions run 4](docs/evidence/github-actions-run-4.png)
+
+Task 1 analysis run, Task 3 Azurite and function run (virtual machine, clock visible):
+
+![Task 1 analysis](docs/evidence/task1-analysis.png)
+![Task 3 Azurite](docs/evidence/task3-azurite.png)
+
+Charts: ![Average macros](docs/results/average_macros.png)
+![Heatmap](docs/results/macronutrient_heatmap.png)
+![Scatter](docs/results/top5_cuisine_scatter.png)
+
 ## Repository layout
 
 | Path | Purpose |
