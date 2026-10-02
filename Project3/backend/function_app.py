@@ -25,7 +25,7 @@ from auth import (
     hash_password, verify_password,
     create_token, get_current_user,
     create_state, state_cookie, clear_state_cookie,
-    verify_state_request, verify_state,
+    verify_state_request,
     google_auth_url, google_exchange_code,
     github_auth_url, github_exchange_code,
 )
