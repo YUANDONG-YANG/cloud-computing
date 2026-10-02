@@ -1,66 +1,102 @@
 ###############################################################################
 # Project 3 (Phase 3) — Local Development Stack
 #
-# Services:
-#   - azurite:  Azure Storage emulator (Blob, Queue, Table)
-#   - redis:    Redis Cache for pre-computed analytics
-#   - cosmosdb: Cosmos DB emulator (Linux) for users and cache fallback
-#   - backend:  Azure Functions (Python) running locally via func start
+# Only one service is required locally: Azurite. Everything else the backend
+# needs either has a working in-process fallback or is opt-in.
+#
+#   azurite  (default)          Azure Storage emulator. REQUIRED.
+#   redis    (profile "redis")  Optional read-through cache layer. OFF by
+#                               default, because the deployed app does not use
+#                               Redis either.
+#
+# The Cosmos DB emulator is deliberately NOT a service here. The Linux
+# emulator image is several gigabytes, needs its self-signed certificate
+# trusted before the Python SDK will talk to it, and frequently fails to start
+# on Windows. For local work the in-process fallback below is enough; when you
+# need to exercise the real Cosmos code path, point COSMOS_ENDPOINT /
+# COSMOS_KEY at the serverless Cosmos account that deploy.sh creates.
+#
+# What runs without Cosmos and without Redis:
+#   With neither COSMOS_ENDPOINT nor REDIS_HOST set, cache.py falls back to an
+#   in-process Python dict (_memory_store) and function_app.py keeps users in
+#   an in-process dict too. That is enough for a single `func start` on one
+#   machine: the blob trigger and the HTTP handlers share the same process, so
+#   the HTTP handlers can see what the trigger computed. It is NOT valid on
+#   Azure — there the blob trigger and the HTTP handlers may run in different
+#   processes or on different instances, so a dict written by the trigger is
+#   invisible to the request that needs it and /api/insights would answer 503.
+#   That is exactly why Cosmos DB is the durable store in the deployed app.
 #
 # Usage:
-#   docker-compose up -d          # Start infrastructure
-#   cd backend && func start      # Start the Azure Functions host
-#   # Open frontend/login.html in a browser
+#   docker compose up -d                      # Azurite only (what you want)
+#   docker compose --profile redis up -d      # Azurite + optional Redis
+#   docker compose down                       # stop
+#   docker compose down -v                    # stop and discard emulated data
+#
+# Then see README.md -> Local Development for the `func start` steps and for
+# seeding the raw-data container, which is what fires the blob trigger.
 ###############################################################################
 
 services:
   # ---------------------------------------------------------------------------
-  # Azurite — Azure Storage Emulator (Blob / Queue / Table)
+  # Azurite — Azure Storage emulator (Blob / Queue / Table). REQUIRED.
+  #
+  # Backs both AzureWebJobsStorage and BLOB_CONNECTION_STRING when they are set
+  # to "UseDevelopmentStorage=true" (see backend/local.settings.json.example).
+  #
+  # Without it: `func start` cannot reach its storage account, so the host
+  # fails to start the blob trigger at all. Nothing gets cleaned, nothing gets
+  # cached, and /api/insights and /api/recipes answer 503 (with the default
+  # ENABLE_DEMO_FALLBACK=false). The blob trigger on raw-data/All_Diets.csv is
+  # the whole Phase 3 ingestion path, so this service is not optional.
   # ---------------------------------------------------------------------------
   azurite:
     image: mcr.microsoft.com/azure-storage/azurite:latest
     container_name: p3-azurite
     ports:
-      - "10000:10000"   # Blob
-      - "10001:10001"   # Queue
-      - "10002:10002"   # Table
+      - "10000:10000"   # Blob   — raw-data and clean-data containers
+      - "10001:10001"   # Queue  — used internally by the Functions host
+      - "10002:10002"   # Table  — used internally by the Functions host
     volumes:
       - azurite-data:/data
     command: "azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0"
 
   # ---------------------------------------------------------------------------
-  # Redis — Cache for pre-computed insights and recipe data
+  # Redis — OPTIONAL read-through cache layer in front of Cosmos DB.
+  #
+  # Started only with:  docker compose --profile redis up -d
+  #
+  # cache.py skips Redis entirely unless REDIS_HOST is set, so this container
+  # does nothing until you add these to backend/local.settings.json:
+  #
+  #     "REDIS_HOST": "localhost",
+  #     "REDIS_PORT": "6379",
+  #     "REDIS_SSL":  "false"
+  #
+  # Note the two overrides: cache.py defaults to port 6380 with TLS on, which
+  # is what Azure Cache for Redis uses. This plain container speaks 6379
+  # without TLS, so leaving the defaults in place makes every connection
+  # attempt fail (it degrades to Cosmos-only, but you lose five seconds per
+  # cold start to the connect timeout).
+  #
+  # Without it: nothing breaks. Redis is a performance layer, not a store of
+  # record — reads fall through to Cosmos DB, and the deployed app runs this
+  # way on purpose. Azure Cache for Redis has no free tier (~$16/month), and
+  # the rubric accepts "an external cache (like Redis) or a database (like
+  # Cosmos)", so deploy.sh provisions serverless Cosmos instead. Run this
+  # container only if you want to demonstrate the Redis path or see the
+  # "Served from Redis" status pill.
   # ---------------------------------------------------------------------------
   redis:
     image: redis:7-alpine
     container_name: p3-redis
+    profiles: ["redis"]
     ports:
       - "6379:6379"
     volumes:
       - redis-data:/data
     command: "redis-server --appendonly yes"
 
-  # ---------------------------------------------------------------------------
-  # Cosmos DB Emulator (Linux)
-  # ---------------------------------------------------------------------------
-  cosmosdb:
-    image: mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:latest
-    container_name: p3-cosmosdb
-    ports:
-      - "8081:8081"
-      - "10250:10250"
-      - "10251:10251"
-      - "10252:10252"
-      - "10253:10253"
-      - "10254:10254"
-    environment:
-      - AZURE_COSMOS_EMULATOR_PARTITION_COUNT=10
-      - AZURE_COSMOS_EMULATOR_ENABLE_DATA_PERSISTENCE=true
-      - AZURE_COSMOS_EMULATOR_IP_ADDRESS_OVERRIDE=127.0.0.1
-    volumes:
-      - cosmos-data:/tmp/cosmos/appdata
-
 volumes:
   azurite-data:
   redis-data:
-  cosmos-data:

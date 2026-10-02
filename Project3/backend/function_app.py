@@ -187,7 +187,7 @@ def blob_trigger_clean(myblob: func.InputStream):
 
     1. Reads and cleans the raw CSV data.
     2. Pre-computes all aggregations (average macros, top recipes, etc.).
-    3. Stores results in Redis cache (with Cosmos DB / memory fallback).
+    3. Stores results in Cosmos DB (mirrored to Redis when it is in use).
     4. Saves cleaned CSV back to a separate blob container.
     """
     logger.info("Blob trigger fired: %s (%d bytes)", myblob.name, myblob.length or 0)
@@ -251,7 +251,7 @@ def blob_trigger_clean(myblob: func.InputStream):
 def get_insights_api(req: func.HttpRequest) -> func.HttpResponse:
     """Return pre-computed visualization data from cache.
 
-    All data is served from Redis/Cosmos cache, NOT re-computed on each request.
+    Served from the cache the blob trigger wrote, NOT re-computed per request.
     """
     if req.method == "OPTIONS":
         return func.HttpResponse(status_code=204, headers=_cors_headers())

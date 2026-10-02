@@ -58,14 +58,14 @@ echo " Project 3 (Phase 3) — Azure Deployment"
 echo "============================================"
 
 # ---- 1. Resource Group ----
-echo "[1/7] Creating resource group..."
+echo "[1/6] Creating resource group..."
 az group create \
   --name "$RESOURCE_GROUP" \
   --location "$LOCATION" \
   --output none
 
 # ---- 2. Storage Account ----
-echo "[2/7] Creating storage account..."
+echo "[2/6] Creating storage account..."
 az storage account create \
   --name "$STORAGE_ACCOUNT" \
   --resource-group "$RESOURCE_GROUP" \
