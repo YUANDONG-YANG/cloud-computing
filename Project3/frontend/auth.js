@@ -59,18 +59,19 @@ function getUser() {
 }
 
 /**
- * Decode the JWT payload (base64url) without verification.
- * Used client-side only — the server always verifies the signature.
+ * Decode the JWT payload (base64url) WITHOUT verifying the signature.
+ *
+ * Only ever used to display a name and to pre-empt an expired token. It is
+ * not access control: the signature is checked by the API, which rejects
+ * anything it did not sign with 401.
  */
 function decodeJWT(token) {
   try {
     const parts = token.split(".");
     if (parts.length !== 3) return null;
-    const payload = parts[1]
-      .replace(/-/g, "+")
-      .replace(/_/g, "/");
-    const decoded = atob(payload);
-    return JSON.parse(decoded);
+    let payload = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    while (payload.length % 4) payload += "=";
+    return JSON.parse(atob(payload));
   } catch (e) {
     return null;
   }
@@ -147,7 +148,12 @@ function logout() {
  * ----------------------------------------------------------------*/
 
 function handleOAuthRedirect() {
-  const params = new URLSearchParams(window.location.search);
+  // The backend returns the token in the URL fragment so it never reaches a
+  // server log or a referrer header.
+  const hash = window.location.hash.startsWith("#")
+    ? window.location.hash.slice(1)
+    : window.location.hash;
+  const params = new URLSearchParams(hash);
   const token = params.get("token");
   if (token) {
     saveToken(token);

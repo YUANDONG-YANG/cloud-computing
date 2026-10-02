@@ -42,64 +42,10 @@ const DIET_COLORS = {
 const DIET_BG = Object.values(DIET_COLORS).map(c => c.bg);
 const DIET_BORDER = Object.values(DIET_COLORS).map(c => c.border);
 
-/* ------------------------------------------------------------------
- * Fallback / Demo Data
- * ----------------------------------------------------------------*/
-const FALLBACK_INSIGHTS = {
-  total_recipes: 7806,
-  diet_types: ["dash", "keto", "mediterranean", "paleo", "vegan"],
-  average_macros: {
-    dash:          { Protein: 69.28,  Carbs: 160.54, Fat: 101.15 },
-    keto:          { Protein: 101.27, Carbs: 57.97,  Fat: 153.12 },
-    mediterranean: { Protein: 101.11, Carbs: 152.91, Fat: 101.42 },
-    paleo:         { Protein: 88.67,  Carbs: 129.55, Fat: 135.67 },
-    vegan:         { Protein: 56.16,  Carbs: 254.00, Fat: 103.30 },
-  },
-  recipe_counts: { dash: 1546, keto: 1580, mediterranean: 1564, paleo: 1543, vegan: 1573 },
-  heatmap: {
-    diets: ["dash", "keto", "mediterranean", "paleo", "vegan"],
-    nutrients: ["Protein(g)", "Carbs(g)", "Fat(g)"],
-    values: [
-      [69.28, 160.54, 101.15],
-      [101.27, 57.97, 153.12],
-      [101.11, 152.91, 101.42],
-      [88.67, 129.55, 135.67],
-      [56.16, 254.00, 103.30],
-    ],
-  },
-  top_recipes: [
-    { diet: "dash", recipe: "Grilled Chicken Salad", cuisine: "american", protein: 35.0, carbs: 12.5, fat: 8.2 },
-    { diet: "keto", recipe: "Keto Butter Chicken", cuisine: "indian", protein: 42.5, carbs: 8.3, fat: 28.7 },
-    { diet: "keto", recipe: "Bacon Cheese Burger Bowl", cuisine: "american", protein: 38.2, carbs: 5.1, fat: 35.4 },
-    { diet: "mediterranean", recipe: "Greek Lemon Chicken", cuisine: "greek", protein: 38.5, carbs: 15.2, fat: 22.1 },
-    { diet: "paleo", recipe: "Paleo Pumpkin Pie", cuisine: "american", protein: 30.91, carbs: 302.59, fat: 96.76 },
-    { diet: "vegan", recipe: "Tofu Stir Fry", cuisine: "chinese", protein: 22.1, carbs: 28.5, fat: 14.6 },
-  ],
-  common_cuisines: {},
-};
-
-const FALLBACK_RECIPES = [
-  { Diet_type: "keto", Recipe_name: "Keto Butter Chicken", Cuisine_type: "indian", "Protein(g)": 42.5, "Carbs(g)": 8.3, "Fat(g)": 28.7 },
-  { Diet_type: "keto", Recipe_name: "Bacon Cheese Burger Bowl", Cuisine_type: "american", "Protein(g)": 38.2, "Carbs(g)": 5.1, "Fat(g)": 35.4 },
-  { Diet_type: "keto", Recipe_name: "Grilled Salmon with Avocado", Cuisine_type: "american", "Protein(g)": 45.0, "Carbs(g)": 4.2, "Fat(g)": 32.1 },
-  { Diet_type: "keto", Recipe_name: "Low-Carb Cauliflower Mac", Cuisine_type: "american", "Protein(g)": 22.5, "Carbs(g)": 12.3, "Fat(g)": 18.9 },
-  { Diet_type: "paleo", Recipe_name: "Bone Broth From Nom Nom Paleo", Cuisine_type: "american", "Protein(g)": 5.22, "Carbs(g)": 1.29, "Fat(g)": 3.2 },
-  { Diet_type: "paleo", Recipe_name: "Paleo Pumpkin Pie", Cuisine_type: "american", "Protein(g)": 30.91, "Carbs(g)": 302.59, "Fat(g)": 96.76 },
-  { Diet_type: "paleo", Recipe_name: "Strawberry Guacamole", Cuisine_type: "mexican", "Protein(g)": 9.62, "Carbs(g)": 75.78, "Fat(g)": 59.89 },
-  { Diet_type: "paleo", Recipe_name: "Sweet Potato Hash", Cuisine_type: "american", "Protein(g)": 18.3, "Carbs(g)": 42.5, "Fat(g)": 15.6 },
-  { Diet_type: "vegan", Recipe_name: "Vegan Black Bean Tacos", Cuisine_type: "mexican", "Protein(g)": 18.5, "Carbs(g)": 45.2, "Fat(g)": 12.3 },
-  { Diet_type: "vegan", Recipe_name: "Tofu Stir Fry", Cuisine_type: "chinese", "Protein(g)": 22.1, "Carbs(g)": 28.5, "Fat(g)": 14.6 },
-  { Diet_type: "vegan", Recipe_name: "Chickpea Curry", Cuisine_type: "indian", "Protein(g)": 15.8, "Carbs(g)": 42.3, "Fat(g)": 18.9 },
-  { Diet_type: "vegan", Recipe_name: "Quinoa Buddha Bowl", Cuisine_type: "american", "Protein(g)": 16.4, "Carbs(g)": 52.1, "Fat(g)": 14.2 },
-  { Diet_type: "dash", Recipe_name: "Grilled Chicken Salad", Cuisine_type: "american", "Protein(g)": 35.0, "Carbs(g)": 12.5, "Fat(g)": 8.2 },
-  { Diet_type: "dash", Recipe_name: "Salmon with Quinoa", Cuisine_type: "american", "Protein(g)": 40.2, "Carbs(g)": 38.1, "Fat(g)": 15.6 },
-  { Diet_type: "dash", Recipe_name: "Turkey Meatball Soup", Cuisine_type: "italian", "Protein(g)": 28.7, "Carbs(g)": 22.4, "Fat(g)": 11.3 },
-  { Diet_type: "dash", Recipe_name: "Mediterranean Wrap", Cuisine_type: "middle eastern", "Protein(g)": 24.1, "Carbs(g)": 35.6, "Fat(g)": 12.8 },
-  { Diet_type: "mediterranean", Recipe_name: "Greek Lemon Chicken", Cuisine_type: "greek", "Protein(g)": 38.5, "Carbs(g)": 15.2, "Fat(g)": 22.1 },
-  { Diet_type: "mediterranean", Recipe_name: "Falafel Wrap", Cuisine_type: "middle eastern", "Protein(g)": 18.9, "Carbs(g)": 42.5, "Fat(g)": 16.8 },
-  { Diet_type: "mediterranean", Recipe_name: "Grilled Sea Bass", Cuisine_type: "greek", "Protein(g)": 44.2, "Carbs(g)": 5.8, "Fat(g)": 18.5 },
-  { Diet_type: "mediterranean", Recipe_name: "Hummus Plate", Cuisine_type: "middle eastern", "Protein(g)": 12.5, "Carbs(g)": 28.3, "Fat(g)": 14.1 },
-];
+/* There is deliberately no sample dataset here.  Sample numbers that mirror
+ * the real result set make an empty cache look identical to a working one,
+ * and proving that results come from the cache is the point of this phase.
+ * When the API has nothing cached it says so, and the page shows that. */
 
 /* ------------------------------------------------------------------
  * Initialization
@@ -154,35 +100,37 @@ async function initDashboard() {
  * Load Insights (charts)
  * ----------------------------------------------------------------*/
 async function loadInsights() {
-  let data = null;
-  let source = "fallback";
+  let json = null;
   let responseTime = 0;
 
   try {
     const start = performance.now();
-    const resp = await fetch(API_BASE + "/insights");
+    const resp = await authFetch(API_BASE + "/insights");
     responseTime = Math.round(performance.now() - start);
 
-    if (resp.ok) {
-      const json = await resp.json();
-      data = json.data || json;
-      source = json.source || "api";
-      responseTime = json.response_time_ms || responseTime;
+    if (resp.status === 401) return redirectToLogin();
+
+    json = await resp.json();
+    if (!resp.ok) {
+      showBanner(json.error || `Insights unavailable (${resp.status}).`);
+      updateStatusBar("unavailable", responseTime, 0);
+      return;
     }
   } catch (err) {
-    console.warn("Insights API unavailable, using fallback data:", err.message);
+    console.error("Insights request failed:", err);
+    showBanner("Cannot reach the API. Check that it is running and that " +
+               "CORS allows this origin.");
+    updateStatusBar("unreachable", 0, 0);
+    return;
   }
 
-  if (!data) {
-    data = FALLBACK_INSIGHTS;
-    source = "demo";
-    responseTime = 0;
-  }
+  const data = json.data || {};
+  clearBanner();
+  updateStatusBar(json.source || "cache",
+                  json.response_time_ms || responseTime,
+                  data.total_recipes || 0);
+  populateDietFilter(data.diet_types || []);
 
-  // Update status pills
-  updateStatusBar(source, responseTime, data.total_recipes || 7806);
-
-  // Render charts
   renderBarChart(data);
   renderPieChart(data);
   renderHeatmap(data);
@@ -190,66 +138,89 @@ async function loadInsights() {
   chartsInitialized = true;
 }
 
+/**
+ * Fill the diet dropdown from the cached dataset rather than a hardcoded
+ * list, so the filter stays correct if the dataset changes.
+ */
+function populateDietFilter(dietTypes) {
+  const select = document.getElementById("dietFilter");
+  if (!select || !dietTypes.length) return;
+
+  const previous = select.value;
+  select.innerHTML = '<option value="">All Diet Types</option>' +
+    dietTypes.map(d =>
+      `<option value="${escapeHtml(d)}">${escapeHtml(
+        d.charAt(0).toUpperCase() + d.slice(1))}</option>`
+    ).join("");
+  if (dietTypes.includes(previous)) select.value = previous;
+}
+
 /* ------------------------------------------------------------------
  * Load Recipes (table with search/filter/pagination)
  * ----------------------------------------------------------------*/
 async function loadRecipes() {
+  const params = new URLSearchParams();
+  if (currentDiet) params.set("diet", currentDiet);
+  if (currentSearch) params.set("search", currentSearch);
+  params.set("page", currentPage);
+  params.set("pageSize", currentPageSize);
+
   let result = null;
-
   try {
-    const params = new URLSearchParams();
-    if (currentDiet) params.set("diet", currentDiet);
-    if (currentSearch) params.set("search", currentSearch);
-    params.set("page", currentPage);
-    params.set("pageSize", currentPageSize);
+    const resp = await authFetch(API_BASE + "/recipes?" + params.toString());
+    if (resp.status === 401) return redirectToLogin();
 
-    const resp = await fetch(API_BASE + "/recipes?" + params.toString());
-    if (resp.ok) {
-      result = await resp.json();
+    result = await resp.json();
+    if (!resp.ok) {
+      showTableMessage(result.error || `Recipes unavailable (${resp.status}).`);
+      renderPagination({ page: 1, totalPages: 1, total: 0 });
+      return;
     }
   } catch (err) {
-    console.warn("Recipes API unavailable, using fallback data:", err.message);
-  }
-
-  if (!result) {
-    // Use fallback with client-side filter/search/pagination
-    result = clientSideFilter(FALLBACK_RECIPES);
+    console.error("Recipes request failed:", err);
+    showTableMessage("Cannot reach the API.");
+    renderPagination({ page: 1, totalPages: 1, total: 0 });
+    return;
   }
 
   renderRecipeTable(result.results || []);
   renderPagination(result);
 }
 
-function clientSideFilter(recipes) {
-  let filtered = [...recipes];
+/* ------------------------------------------------------------------
+ * Error surfaces
+ * ----------------------------------------------------------------*/
 
-  if (currentDiet) {
-    filtered = filtered.filter(r => (r.Diet_type || "").toLowerCase() === currentDiet);
+function showBanner(message) {
+  let el = document.getElementById("dataBanner");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "dataBanner";
+    el.className = "data-banner";
+    const body = document.querySelector(".dashboard-body");
+    const status = document.getElementById("statusBar");
+    if (body) body.insertBefore(el, status ? status.nextSibling : body.firstChild);
   }
-  if (currentSearch) {
-    const q = currentSearch.toLowerCase();
-    filtered = filtered.filter(r =>
-      (r.Recipe_name || "").toLowerCase().includes(q) ||
-      (r.Cuisine_type || "").toLowerCase().includes(q) ||
-      (r.Diet_type || "").toLowerCase().includes(q)
-    );
+  el.textContent = message;
+  el.style.display = "block";
+}
+
+function clearBanner() {
+  const el = document.getElementById("dataBanner");
+  if (el) el.style.display = "none";
+}
+
+function showTableMessage(message) {
+  const tbody = document.getElementById("recipeBody");
+  if (tbody) {
+    tbody.innerHTML = '<tr><td colspan="7" class="no-results"></td></tr>';
+    tbody.querySelector("td").textContent = message;
   }
+}
 
-  const total = filtered.length;
-  const totalPages = Math.max(1, Math.ceil(total / currentPageSize));
-  const page = Math.min(currentPage, totalPages);
-  const offset = (page - 1) * currentPageSize;
-  const results = filtered.slice(offset, offset + currentPageSize);
-
-  return {
-    total,
-    page,
-    pageSize: currentPageSize,
-    totalPages,
-    hasNext: page < totalPages,
-    hasPrev: page > 1,
-    results,
-  };
+function redirectToLogin() {
+  clearToken();
+  window.location.replace("login.html");
 }
 
 /* ------------------------------------------------------------------
@@ -481,7 +452,7 @@ function renderRecipeTable(recipes) {
   if (!tbody) return;
 
   if (!recipes || recipes.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" class="no-results">No recipes found. Try adjusting your search or filter.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="no-results">No recipes found. Try adjusting your search or filter.</td></tr>';
     return;
   }
 
@@ -563,46 +534,65 @@ function goToPage(p) {
 /* ------------------------------------------------------------------
  * Status Bar
  * ----------------------------------------------------------------*/
+/**
+ * The source pill is the evidence that a request was served from the cache
+ * rather than recalculated, so it names the store the API actually read.
+ */
 function updateStatusBar(source, responseTime, totalRecipes) {
   const el = document.getElementById("statusBar");
   if (!el) return;
 
+  const label = {
+    redis: "Served from Redis",
+    cosmosdb: "Served from Cosmos DB",
+    memory: "Served from in-process cache",
+    fallback: "Sample data (ENABLE_DEMO_FALLBACK is on)",
+    unavailable: "Cache empty",
+    unreachable: "API unreachable",
+  }[source] || `Served from ${source}`;
+
   el.innerHTML = `
-    <span class="status-pill"><span class="dot"></span> ${source === "demo" || source === "fallback" ? "Demo Mode" : "Cache: " + source}</span>
+    <span class="status-pill"><span class="dot"></span> ${escapeHtml(label)}</span>
     <span class="status-pill">${responseTime}ms response</span>
-    <span class="status-pill">${totalRecipes.toLocaleString()} recipes</span>
+    <span class="status-pill">${Number(totalRecipes || 0).toLocaleString()} recipes</span>
   `;
 }
 
 /* ------------------------------------------------------------------
  * Security Status
  * ----------------------------------------------------------------*/
-function updateSecurityStatus() {
+/**
+ * Fill the security cards from /api/health so they report the backend's live
+ * configuration. Asserting "AES-256" in the markup proves nothing; if no
+ * database is configured, this says so.
+ */
+async function updateSecurityStatus() {
   const user = getCurrentUser();
   const token = getToken();
 
-  // Auth method
-  setSecurityCard("secAuth", user ? "Authenticated" : "Not authenticated");
+  setSecurityCard("secAuth", user
+    ? `Signed in as ${user.email || user.name}`
+    : "Not authenticated");
 
-  // JWT status
-  if (token) {
-    const claims = decodeJWT(token);
-    if (claims && claims.exp) {
-      const expires = new Date(claims.exp * 1000);
-      const hoursLeft = Math.round((expires - Date.now()) / 3600000);
-      setSecurityCard("secJWT", `Valid (${hoursLeft}h remaining)`);
-    } else {
-      setSecurityCard("secJWT", "Active");
-    }
+  const claims = token ? decodeJWT(token) : null;
+  if (claims && claims.exp) {
+    const hoursLeft = Math.round((claims.exp * 1000 - Date.now()) / 3600000);
+    setSecurityCard("secJWT", `Valid (${hoursLeft}h remaining)`);
   } else {
-    setSecurityCard("secJWT", "None");
+    setSecurityCard("secJWT", token ? "Active" : "None");
   }
 
-  // Encryption
-  setSecurityCard("secEncrypt", "AES-256 (Cosmos DB)");
-
-  // Password hashing
-  setSecurityCard("secHash", "bcrypt (12 rounds)");
+  try {
+    const resp = await authFetch(API_BASE + "/health");
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const security = (await resp.json()).security || {};
+    setSecurityCard("secEncrypt", security.encryption_at_rest || "Unknown");
+    setSecurityCard("secHash", security.password_hashing || "Unknown");
+  } catch (err) {
+    console.warn("Could not read backend security status:", err.message);
+    setSecurityCard("secEncrypt", "Unknown (API unreachable)");
+    setSecurityCard("secHash", "Unknown (API unreachable)");
+  }
 }
 
 function setSecurityCard(id, value) {

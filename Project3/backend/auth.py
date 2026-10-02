@@ -19,9 +19,21 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
-JWT_SECRET = os.environ.get("JWT_SECRET", "dev-secret-change-in-production")
+JWT_SECRET = os.environ.get("JWT_SECRET", "")
 JWT_EXPIRY_HOURS = int(os.environ.get("JWT_EXPIRY_HOURS", "24"))
 JWT_ALGORITHM = "HS256"
+
+# WEBSITE_INSTANCE_ID is set by the Functions host on Azure and absent under
+# `func start`, so an unset secret is a hard failure in a deployment and only a
+# warning locally.  A known default signing key would let anyone mint a token.
+if not JWT_SECRET:
+    if os.environ.get("WEBSITE_INSTANCE_ID"):
+        raise RuntimeError(
+            "JWT_SECRET app setting is required. Generate one with "
+            "`openssl rand -base64 32` and set it on the Function App."
+        )
+    JWT_SECRET = "local-development-only-do-not-deploy"
+    logger.warning("JWT_SECRET unset; using the local development key")
 
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
@@ -93,12 +105,42 @@ def verify_token(token: str) -> Optional[dict]:
         return None
 
 
+def create_state() -> str:
+    """Mint a short-lived signed OAuth `state` value.
+
+    Signing it keeps the check stateless: the callback can tell its own
+    redirect apart from one a third party initiated, without a session store.
+    """
+    now = datetime.now(timezone.utc)
+    return jwt.encode(
+        {"purpose": "oauth_state", "iat": now,
+         "exp": now + timedelta(minutes=10)},
+        JWT_SECRET, algorithm=JWT_ALGORITHM,
+    )
+
+
+def verify_state(state: str) -> bool:
+    """Check a `state` value returned by an OAuth provider."""
+    if not state:
+        return False
+    try:
+        claims = jwt.decode(state, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return claims.get("purpose") == "oauth_state"
+    except jwt.InvalidTokenError as exc:
+        logger.warning("Rejected OAuth state: %s", exc)
+        return False
+
+
 def extract_token(req) -> Optional[str]:
-    """Extract the bearer token from an Azure Functions HTTP request."""
+    """Extract the bearer token from an Azure Functions HTTP request.
+
+    Header only: a token in the query string would end up in browser history,
+    referrer headers and server access logs.
+    """
     auth_header = req.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
         return auth_header[7:]
-    return req.params.get("token")
+    return None
 
 
 def get_current_user(req) -> Optional[dict]:
@@ -151,6 +193,7 @@ def google_exchange_code(code: str) -> Optional[dict]:
             "provider": "google",
             "provider_id": info.get("sub", ""),
             "email": info.get("email", ""),
+            "email_verified": bool(info.get("email_verified")),
             "name": info.get("name", ""),
         }
     except Exception:
@@ -194,22 +237,28 @@ def github_exchange_code(code: str) -> Optional[dict]:
         user_resp.raise_for_status()
         user_data = user_resp.json()
 
-        email = user_data.get("email", "")
+        # The profile email is whatever the user chose to make public, and it
+        # carries no verification status, so always ask for the primary one.
+        email = ""
+        email_verified = False
+        emails_resp = requests.get(GITHUB_EMAILS_URL, headers={
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/json",
+        }, timeout=10)
+        if emails_resp.status_code == 200:
+            for entry in emails_resp.json():
+                if entry.get("primary"):
+                    email = entry.get("email", "")
+                    email_verified = bool(entry.get("verified"))
+                    break
         if not email:
-            emails_resp = requests.get(GITHUB_EMAILS_URL, headers={
-                "Authorization": f"Bearer {access_token}",
-                "Accept": "application/json",
-            }, timeout=10)
-            if emails_resp.status_code == 200:
-                for entry in emails_resp.json():
-                    if entry.get("primary"):
-                        email = entry.get("email", "")
-                        break
+            email = user_data.get("email", "") or ""
 
         return {
             "provider": "github",
             "provider_id": str(user_data.get("id", "")),
             "email": email,
+            "email_verified": email_verified,
             "name": user_data.get("name") or user_data.get("login", ""),
         }
     except Exception:

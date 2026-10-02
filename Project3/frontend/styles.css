@@ -601,3 +601,18 @@ body {
 .table-overflow {
   overflow-x: auto;
 }
+
+/* Shown when the API reports an empty cache or cannot be reached, so a
+   missing result set is never mistaken for a real one. */
+.data-banner {
+  display: none;
+  margin-bottom: 1.25rem;
+  padding: 0.875rem 1.125rem;
+  border: 1.5px solid var(--color-warning);
+  border-left-width: 4px;
+  border-radius: var(--radius);
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}

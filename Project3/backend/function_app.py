@@ -24,6 +24,7 @@ from nutrition import clean_data, precompute_all, df_to_records
 from auth import (
     hash_password, verify_password,
     create_token, get_current_user,
+    create_state, verify_state,
     google_auth_url, google_exchange_code,
     github_auth_url, github_exchange_code,
 )
@@ -151,6 +152,27 @@ def _error(msg, status=400):
     return _json_response({"error": msg}, status)
 
 
+def _demo_fallback_enabled() -> bool:
+    """Whether to serve hardcoded sample data when the cache is empty.
+
+    Off by default.  The sample data mirrors the real result set, so leaving it
+    on makes a broken cache indistinguishable from a working one -- which is
+    exactly what the Phase 3 demo has to prove.
+    """
+    return os.environ.get("ENABLE_DEMO_FALLBACK", "false").lower() == "true"
+
+
+def _reject_unauthenticated(req: func.HttpRequest):
+    """Return a 401 response when the request carries no valid JWT, else None.
+
+    The dashboard is behind a login, so the data endpoints it calls have to
+    verify the token themselves; a client-side redirect is not access control.
+    """
+    if get_current_user(req) is None:
+        return _error("Authentication required. Please log in.", 401)
+    return None
+
+
 # ===================================================================
 # BLOB TRIGGER: Automatic data cleaning on CSV upload/change
 # ===================================================================
@@ -234,6 +256,10 @@ def get_insights_api(req: func.HttpRequest) -> func.HttpResponse:
     if req.method == "OPTIONS":
         return func.HttpResponse(status_code=204, headers=_cors_headers())
 
+    denied = _reject_unauthenticated(req)
+    if denied:
+        return denied
+
     start = time.time()
     cached = get_insights()
 
@@ -248,17 +274,22 @@ def get_insights_api(req: func.HttpRequest) -> func.HttpResponse:
         }
         return _json_response(result)
 
-    # No cache available -- return fallback demo data
-    fallback = _get_fallback_insights()
+    if not _demo_fallback_enabled():
+        return _json_response({
+            "error": "No pre-computed results are cached yet. Upload "
+                     "All_Diets.csv to the raw-data container to run the "
+                     "blob trigger.",
+            "source": "empty",
+        }, 503)
+
     elapsed = round((time.time() - start) * 1000, 1)
-    result = {
+    return _json_response({
         "status": "ok",
         "source": "fallback",
         "updated_at": datetime.now(timezone.utc).isoformat(),
         "response_time_ms": elapsed,
-        "data": fallback,
-    }
-    return _json_response(result)
+        "data": _get_fallback_insights(),
+    })
 
 
 def _get_fallback_insights():
@@ -314,12 +345,24 @@ def get_recipes_api(req: func.HttpRequest) -> func.HttpResponse:
     if req.method == "OPTIONS":
         return func.HttpResponse(status_code=204, headers=_cors_headers())
 
+    denied = _reject_unauthenticated(req)
+    if denied:
+        return denied
+
     start = time.time()
 
-    # Get recipes from cache
     recipes = get_recipes()
+    source = "cache"
     if not recipes:
+        if not _demo_fallback_enabled():
+            return _json_response({
+                "error": "No cleaned recipes are cached yet. Upload "
+                         "All_Diets.csv to the raw-data container to run the "
+                         "blob trigger.",
+                "source": "empty",
+            }, 503)
         recipes = _get_fallback_recipes()
+        source = "fallback"
 
     # Apply diet filter
     diet = req.params.get("diet", "").strip().lower()
@@ -355,6 +398,7 @@ def get_recipes_api(req: func.HttpRequest) -> func.HttpResponse:
     elapsed = round((time.time() - start) * 1000, 1)
     return _json_response({
         "status": "ok",
+        "source": source,
         "response_time_ms": elapsed,
         "total": total,
         "page": page,
@@ -398,11 +442,22 @@ def health_check(req: func.HttpRequest) -> func.HttpResponse:
     if req.method == "OPTIONS":
         return func.HttpResponse(status_code=204, headers=_cors_headers())
 
-    status = get_cache_status()
+    using_cosmos = _get_users() is not None
     return _json_response({
         "status": "healthy",
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "cache": status,
+        "cache": get_cache_status(),
+        "security": {
+            # Reported from live configuration so the dashboard displays what
+            # is actually in effect instead of a hardcoded claim.
+            "password_hashing": "bcrypt (12 rounds)",
+            "user_store": "Cosmos DB" if using_cosmos else "in-memory (dev)",
+            "encryption_at_rest": (
+                "AES-256 (Cosmos DB, service-managed)" if using_cosmos
+                else "not applicable -- no database configured"
+            ),
+            "token": f"JWT HS256, {os.environ.get('JWT_EXPIRY_HOURS', '24')}h",
+        },
         "version": "3.0.0",
         "phase": "Phase 3 - Improved Cloud Dashboard",
     })
@@ -550,7 +605,7 @@ def oauth_google(req: func.HttpRequest) -> func.HttpResponse:
     if req.method == "OPTIONS":
         return func.HttpResponse(status_code=204, headers=_cors_headers())
 
-    url = google_auth_url()
+    url = google_auth_url(create_state())
     return func.HttpResponse(
         status_code=302,
         headers={**_cors_headers(), "Location": url},
@@ -562,6 +617,9 @@ def oauth_google_callback(req: func.HttpRequest) -> func.HttpResponse:
     """Handle Google OAuth callback, create or find user, return JWT."""
     if req.method == "OPTIONS":
         return func.HttpResponse(status_code=204, headers=_cors_headers())
+
+    if not verify_state(req.params.get("state", "")):
+        return _error("Invalid or expired OAuth state", 400)
 
     code = req.params.get("code", "")
     if not code:
@@ -584,7 +642,7 @@ def oauth_github(req: func.HttpRequest) -> func.HttpResponse:
     if req.method == "OPTIONS":
         return func.HttpResponse(status_code=204, headers=_cors_headers())
 
-    url = github_auth_url()
+    url = github_auth_url(create_state())
     return func.HttpResponse(
         status_code=302,
         headers={**_cors_headers(), "Location": url},
@@ -596,6 +654,9 @@ def oauth_github_callback(req: func.HttpRequest) -> func.HttpResponse:
     """Handle GitHub OAuth callback, create or find user, return JWT."""
     if req.method == "OPTIONS":
         return func.HttpResponse(status_code=204, headers=_cors_headers())
+
+    if not verify_state(req.params.get("state", "")):
+        return _error("Invalid or expired OAuth state", 400)
 
     code = req.params.get("code", "")
     if not code:
@@ -618,12 +679,12 @@ def _handle_oauth_user(info: dict) -> func.HttpResponse:
     # Check if user exists by provider + provider_id
     user = _find_user_by_provider(provider, provider_id)
 
-    if not user and email:
-        # Check if email is already registered
+    # Only an email the provider says it verified may claim an existing
+    # account; otherwise anyone able to set an unverified address at the
+    # provider could take over that account.
+    if not user and email and info.get("email_verified"):
         user = _find_user_by_email(email)
         if user:
-            # Link this OAuth provider to the existing account
-            user.provider = provider
             user.provider_id = provider_id
             user.last_login = datetime.now(timezone.utc).isoformat()
             _save_user(user)
@@ -641,7 +702,9 @@ def _handle_oauth_user(info: dict) -> func.HttpResponse:
 
     token = create_token(user.id, user.email, user.name)
     frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:8080")
-    redirect_url = f"{frontend_url}/index.html?token={token}"
+    # The token goes in the fragment, which browsers do not send to the server
+    # and do not record in referrer headers or access logs.
+    redirect_url = f"{frontend_url}/index.html#token={token}"
     return func.HttpResponse(
         status_code=302,
         headers={**_cors_headers(), "Location": redirect_url},

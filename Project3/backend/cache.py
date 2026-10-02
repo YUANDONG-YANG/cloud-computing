@@ -1,9 +1,18 @@
 """Caching layer for Project 3 (Phase 3).
 
-Provides a unified interface for storing and retrieving pre-computed
-analytics results.  Supports Redis (primary) with Cosmos DB fallback.
-When neither is available, falls back to an in-memory dict for local
-development.
+Stores the results that the blob trigger pre-computes so that HTTP requests
+never recalculate them.
+
+Cosmos DB is the durable store: on Azure Functions the blob trigger and the
+HTTP handlers are not guaranteed to share a process, so anything kept only in
+module state is invisible to the request that needs it.  Redis is supported as
+an optional read-through layer in front of Cosmos and is skipped entirely when
+REDIS_HOST is unset, which is the default -- Azure Cache for Redis has no free
+tier, and the rubric allows "an external cache (like Redis) or a database
+(like Cosmos)".
+
+The in-memory dict is a convenience for `func start` on one machine only.  It
+is never a substitute for Cosmos in a deployed app.
 """
 import json
 import os
@@ -13,56 +22,82 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+CACHE_KEY = "insights_cache"
+RECIPES_META_KEY = "recipes_meta"
+
+# A Cosmos document may not exceed 2 MB.  The full cleaned dataset serializes
+# to roughly 1.2 MB, so it is split across documents of this many records.
+CHUNK_SIZE = 2000
+
+
 # ---------------------------------------------------------------------------
-# Redis connection
+# Redis (optional read-through layer)
 # ---------------------------------------------------------------------------
 
 _redis_client = None
+_redis_tried = False
 
 
 def _get_redis():
-    """Lazy-init Redis client."""
-    global _redis_client
-    if _redis_client is not None:
+    """Return a connected Redis client, or None when Redis is not in use.
+
+    A failed connection is remembered: without that, every call pays the
+    connect timeout again and a single page load can stall for tens of
+    seconds.
+    """
+    global _redis_client, _redis_tried
+    if _redis_tried:
         return _redis_client
+    _redis_tried = True
+
+    host = os.environ.get("REDIS_HOST", "").strip()
+    if not host:
+        logger.info("REDIS_HOST unset; using Cosmos DB only")
+        return None
+
     try:
         import redis as _redis
-        host = os.environ.get("REDIS_HOST", "localhost")
-        port = int(os.environ.get("REDIS_PORT", "6379"))
-        password = os.environ.get("REDIS_PASSWORD", "") or None
-        use_ssl = os.environ.get("REDIS_SSL", "false").lower() == "true"
         _redis_client = _redis.Redis(
-            host=host, port=port, password=password,
-            ssl=use_ssl, decode_responses=True,
-            socket_connect_timeout=5, socket_timeout=5,
+            host=host,
+            port=int(os.environ.get("REDIS_PORT", "6380")),
+            password=os.environ.get("REDIS_PASSWORD", "") or None,
+            ssl=os.environ.get("REDIS_SSL", "true").lower() == "true",
+            decode_responses=True,
+            socket_connect_timeout=5,
+            socket_timeout=5,
         )
         _redis_client.ping()
-        logger.info("Redis connected at %s:%s", host, port)
-        return _redis_client
+        logger.info("Redis connected at %s", host)
     except Exception as exc:
-        logger.warning("Redis unavailable (%s), using fallback", exc)
+        logger.warning("Redis unavailable (%s); using Cosmos DB only", exc)
         _redis_client = None
-        return None
+    return _redis_client
 
 
 # ---------------------------------------------------------------------------
-# Cosmos DB connection (fallback cache store)
+# Cosmos DB (durable store)
 # ---------------------------------------------------------------------------
 
 _cosmos_container = None
+_cosmos_tried = False
 
 
-def _get_cosmos_cache():
-    """Lazy-init Cosmos DB cache container."""
-    global _cosmos_container
-    if _cosmos_container is not None:
+def _get_cosmos():
+    """Return the Cosmos cache container, or None when it is not configured."""
+    global _cosmos_container, _cosmos_tried
+    if _cosmos_tried:
         return _cosmos_container
+    _cosmos_tried = True
+
+    endpoint = os.environ.get("COSMOS_ENDPOINT", "").strip()
+    key = os.environ.get("COSMOS_KEY", "").strip()
+    if not endpoint or not key:
+        logger.warning("Cosmos DB not configured; cache will not survive "
+                       "across function instances")
+        return None
+
     try:
         from azure.cosmos import CosmosClient, PartitionKey
-        endpoint = os.environ.get("COSMOS_ENDPOINT", "")
-        key = os.environ.get("COSMOS_KEY", "")
-        if not endpoint or not key:
-            return None
         client = CosmosClient(endpoint, credential=key)
         db = client.create_database_if_not_exists(
             os.environ.get("COSMOS_DATABASE", "nutritiondb")
@@ -72,68 +107,83 @@ def _get_cosmos_cache():
             partition_key=PartitionKey(path="/partitionKey"),
         )
         logger.info("Cosmos DB cache container ready")
-        return _cosmos_container
     except Exception as exc:
         logger.warning("Cosmos DB cache unavailable (%s)", exc)
+        _cosmos_container = None
+    return _cosmos_container
+
+
+def _cosmos_read(doc_id: str) -> Optional[dict]:
+    container = _get_cosmos()
+    if not container:
+        return None
+    try:
+        return container.read_item(item=doc_id, partition_key="cache")
+    except Exception as exc:
+        logger.info("Cosmos read miss for %s (%s)", doc_id, exc)
         return None
 
 
+def _cosmos_write(doc: dict) -> bool:
+    container = _get_cosmos()
+    if not container:
+        return False
+    try:
+        container.upsert_item(doc)
+        return True
+    except Exception as exc:
+        logger.warning("Cosmos write failed for %s: %s", doc.get("id"), exc)
+        return False
+
+
+def _cosmos_delete(doc_id: str) -> None:
+    container = _get_cosmos()
+    if not container:
+        return
+    try:
+        container.delete_item(item=doc_id, partition_key="cache")
+    except Exception:
+        pass  # Already gone, which is the desired state.
+
+
 # ---------------------------------------------------------------------------
-# In-memory fallback for local development
+# Local-only fallback
 # ---------------------------------------------------------------------------
 
 _memory_store: dict = {}
 
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
 
-CACHE_KEY = "insights_cache"
-RECIPES_KEY = "recipes_cache"
-
+# ---------------------------------------------------------------------------
+# Insights
+# ---------------------------------------------------------------------------
 
 def store_insights(data: dict) -> bool:
-    """Store pre-computed analytics insights."""
-    payload = json.dumps({
-        "data": data,
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-    })
+    """Persist the pre-computed analytics.  Called only by the blob trigger."""
+    updated_at = datetime.now(timezone.utc).isoformat()
+    payload = {"data": data, "updated_at": updated_at}
 
-    # Try Redis first
+    wrote = _cosmos_write({
+        "id": CACHE_KEY,
+        "partitionKey": "cache",
+        **payload,
+    })
+    if wrote:
+        logger.info("Insights stored in Cosmos DB")
+
     r = _get_redis()
     if r:
         try:
-            r.set(CACHE_KEY, payload)
-            logger.info("Insights cached in Redis (%d bytes)", len(payload))
-            return True
+            r.set(CACHE_KEY, json.dumps(payload))
+            logger.info("Insights mirrored to Redis")
         except Exception as exc:
             logger.warning("Redis write failed: %s", exc)
 
-    # Try Cosmos DB
-    cosmos = _get_cosmos_cache()
-    if cosmos:
-        try:
-            doc = {
-                "id": CACHE_KEY,
-                "partitionKey": "cache",
-                "data": data,
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            }
-            cosmos.upsert_item(doc)
-            logger.info("Insights cached in Cosmos DB")
-            return True
-        except Exception as exc:
-            logger.warning("Cosmos write failed: %s", exc)
-
-    # In-memory fallback
     _memory_store[CACHE_KEY] = payload
-    logger.info("Insights cached in memory")
-    return True
+    return wrote or bool(r)
 
 
 def get_insights() -> Optional[dict]:
-    """Retrieve pre-computed analytics insights."""
-    # Try Redis
+    """Read the pre-computed analytics.  Never recalculates."""
     r = _get_redis()
     if r:
         try:
@@ -145,88 +195,119 @@ def get_insights() -> Optional[dict]:
         except Exception as exc:
             logger.warning("Redis read failed: %s", exc)
 
-    # Try Cosmos DB
-    cosmos = _get_cosmos_cache()
-    if cosmos:
-        try:
-            doc = cosmos.read_item(item=CACHE_KEY, partition_key="cache")
-            result = {
-                "data": doc.get("data", {}),
-                "updated_at": doc.get("updated_at", ""),
-                "cache_source": "cosmosdb",
-            }
-            return result
-        except Exception as exc:
-            logger.warning("Cosmos read failed: %s", exc)
+    doc = _cosmos_read(CACHE_KEY)
+    if doc:
+        return {
+            "data": doc.get("data", {}),
+            "updated_at": doc.get("updated_at", ""),
+            "cache_source": "cosmosdb",
+        }
 
-    # In-memory fallback
-    raw = _memory_store.get(CACHE_KEY)
-    if raw:
-        parsed = json.loads(raw)
-        parsed["cache_source"] = "memory"
-        return parsed
+    payload = _memory_store.get(CACHE_KEY)
+    if payload:
+        return {**payload, "cache_source": "memory"}
     return None
 
 
+# ---------------------------------------------------------------------------
+# Recipes
+# ---------------------------------------------------------------------------
+
 def store_recipes(recipes_list: list) -> bool:
-    """Store the full cleaned recipes list for search/filter/pagination."""
-    payload = json.dumps(recipes_list)
+    """Persist the cleaned recipe records for search, filter and pagination.
+
+    Written to Cosmos in chunks so the dataset is readable from any function
+    instance, not just the one that handled the blob trigger.
+    """
+    updated_at = datetime.now(timezone.utc).isoformat()
+    total = len(recipes_list)
+    chunks = [recipes_list[i:i + CHUNK_SIZE]
+              for i in range(0, total, CHUNK_SIZE)] or [[]]
+
+    previous = _cosmos_read(RECIPES_META_KEY) or {}
+    previous_count = int(previous.get("chunk_count", 0))
+
+    wrote = True
+    for index, chunk in enumerate(chunks):
+        if not _cosmos_write({
+            "id": f"recipes_chunk_{index:03d}",
+            "partitionKey": "cache",
+            "records": chunk,
+        }):
+            wrote = False
+            break
+
+    if wrote:
+        # Drop chunks left over from a larger previous dataset before
+        # publishing the new count, so a reader never sees a mixed set.
+        for index in range(len(chunks), previous_count):
+            _cosmos_delete(f"recipes_chunk_{index:03d}")
+
+        wrote = _cosmos_write({
+            "id": RECIPES_META_KEY,
+            "partitionKey": "cache",
+            "chunk_count": len(chunks),
+            "record_count": total,
+            "updated_at": updated_at,
+        })
+        if wrote:
+            logger.info("Stored %d recipes across %d Cosmos documents",
+                        total, len(chunks))
 
     r = _get_redis()
     if r:
         try:
-            r.set(RECIPES_KEY, payload)
-            logger.info("Recipes cached in Redis (%d records)", len(recipes_list))
-            return True
+            r.set("recipes_cache", json.dumps(recipes_list))
+            logger.info("Recipes mirrored to Redis (%d records)", total)
         except Exception as exc:
             logger.warning("Redis recipe write failed: %s", exc)
 
-    _memory_store[RECIPES_KEY] = payload
-    logger.info("Recipes cached in memory (%d records)", len(recipes_list))
-    return True
+    _memory_store["recipes_cache"] = recipes_list
+    return wrote or bool(r)
 
 
 def get_recipes() -> Optional[list]:
-    """Retrieve the full cleaned recipes list."""
+    """Read the cleaned recipe records, or None when nothing is cached."""
     r = _get_redis()
     if r:
         try:
-            raw = r.get(RECIPES_KEY)
+            raw = r.get("recipes_cache")
             if raw:
                 return json.loads(raw)
         except Exception as exc:
             logger.warning("Redis recipe read failed: %s", exc)
 
-    raw = _memory_store.get(RECIPES_KEY)
-    if raw:
-        return json.loads(raw)
-    return None
+    meta = _cosmos_read(RECIPES_META_KEY)
+    if meta:
+        records: list = []
+        for index in range(int(meta.get("chunk_count", 0))):
+            doc = _cosmos_read(f"recipes_chunk_{index:03d}")
+            if doc is None:
+                logger.warning("Recipe chunk %d missing; cache is incomplete",
+                               index)
+                records = []
+                break
+            records.extend(doc.get("records", []))
+        if records:
+            return records
 
+    return _memory_store.get("recipes_cache")
+
+
+# ---------------------------------------------------------------------------
+# Health
+# ---------------------------------------------------------------------------
 
 def get_cache_status() -> dict:
-    """Return current cache health for the /api/health endpoint."""
-    status = {
-        "redis": "disconnected",
-        "cosmosdb": "disconnected",
-        "memory_keys": len(_memory_store),
-        "insights_cached": False,
-        "recipes_cached": False,
+    """Report cache health for /api/health."""
+    insights = get_insights()
+    recipes = get_recipes()
+    return {
+        "redis": "connected" if _get_redis() else "not in use",
+        "cosmosdb": "connected" if _get_cosmos() else "not configured",
+        "insights_cached": insights is not None,
+        "recipes_cached": recipes is not None,
+        "recipe_count": len(recipes) if recipes else 0,
+        "insights_updated_at": (insights or {}).get("updated_at", ""),
+        "source": (insights or {}).get("cache_source", "none"),
     }
-    r = _get_redis()
-    if r:
-        try:
-            r.ping()
-            status["redis"] = "connected"
-        except Exception:
-            pass
-
-    cosmos = _get_cosmos_cache()
-    if cosmos:
-        status["cosmosdb"] = "connected"
-
-    if get_insights() is not None:
-        status["insights_cached"] = True
-    if get_recipes() is not None:
-        status["recipes_cached"] = True
-
-    return status

@@ -169,9 +169,9 @@
           showError(data.error || "Login failed. Please try again.");
         }
       } catch (err) {
-        // Demo mode: if backend is not reachable, simulate login
-        console.warn("Backend not reachable, using demo mode:", err.message);
-        simulateDemoLogin(email);
+        console.error("Login request failed:", err);
+        showError("Cannot reach the server. Check that the API is running " +
+                  "and that CORS allows this origin.");
       } finally {
         btn.disabled = false;
         btn.textContent = "Sign In";
@@ -222,8 +222,9 @@
           showError(data.error || "Registration failed. Please try again.");
         }
       } catch (err) {
-        console.warn("Backend not reachable, using demo mode:", err.message);
-        simulateDemoLogin(email, name);
+        console.error("Registration request failed:", err);
+        showError("Cannot reach the server. Check that the API is running " +
+                  "and that CORS allows this origin.");
       } finally {
         btn.disabled = false;
         btn.textContent = "Create Account";
@@ -231,47 +232,13 @@
       return false;
     }
 
-    /* ---------- Demo Mode (no backend) ---------- */
-    function simulateDemoLogin(email, name) {
-      // Create a simple demo token (not cryptographically valid, just for UI)
-      const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }));
-      const now = Math.floor(Date.now() / 1000);
-      const payload = btoa(JSON.stringify({
-        sub: "demo-user-001",
-        email: email || "demo@example.com",
-        name: name || email.split("@")[0] || "Demo User",
-        iat: now,
-        exp: now + 86400,
-      }));
-      const sig = btoa("demo-signature");
-      const token = header + "." + payload + "." + sig;
-
-      saveToken(token);
-      saveUser({
-        id: "demo-user-001",
-        email: email || "demo@example.com",
-        name: name || email.split("@")[0] || "Demo User",
-      });
-      showSuccess("Demo mode: logged in without backend.");
-      setTimeout(() => { window.location.href = "dashboard.html"; }, 500);
-    }
-
     /* ---------- OAuth ---------- */
     function oauthGoogle() {
-      try {
-        window.location.href = API_BASE + "/auth/oauth/google";
-      } catch (e) {
-        // Demo mode fallback
-        simulateDemoLogin("google-user@gmail.com", "Google User");
-      }
+      window.location.href = API_BASE + "/auth/oauth/google";
     }
 
     function oauthGitHub() {
-      try {
-        window.location.href = API_BASE + "/auth/oauth/github";
-      } catch (e) {
-        simulateDemoLogin("github-user@github.com", "GitHub User");
-      }
+      window.location.href = API_BASE + "/auth/oauth/github";
     }
   </script>
 </body>
