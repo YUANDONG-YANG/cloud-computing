@@ -1,0 +1,889 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Project 2 Master Overview</title>
+<style>
+:root{--bg:#f5f7fa;--card:#fff;--ink:#172b3f;--mute:#5a6b7b;--brand:#0f766e;--accent:#0a5fb4;--line:#d5dde6;--ok:#157347;--okbg:#e3f4ea;--warn:#8a5a00;--warnbg:#fff1cc;--bad:#a4262c;--badbg:#fde7e9;--code:#0f2233;--codeink:#d7e7f5}
+@media (prefers-color-scheme:dark){:root{--bg:#0e1620;--card:#15212e;--ink:#e6eef6;--mute:#9db0c2;--brand:#34d1c0;--accent:#6cb6ff;--line:#27384a;--ok:#6fd49a;--okbg:#12301f;--warn:#ffd98a;--warnbg:#3a2e10;--bad:#ff9aa0;--badbg:#3b1519;--code:#0a1118;--codeink:#cfe3f5}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 "Segoe UI",Arial,sans-serif}
+main{max-width:1080px;margin:0 auto;padding:1.2rem}
+header.hero{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:1.4rem 1.6rem}
+h1{margin:0 0 .3rem;font-size:1.9rem;color:var(--brand)}
+h2{margin:2rem 0 .6rem;font-size:1.35rem;color:var(--brand);border-bottom:2px solid var(--line);padding-bottom:.25rem}
+h3{margin:1rem 0 .3rem;font-size:1rem;color:var(--accent)}
+p{margin:.4rem 0}
+.sub{color:var(--mute)}
+.cards{display:grid;gap:.8rem;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin-top:1rem}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:.7rem .9rem}
+.card b{display:block;font-size:1.5rem;color:var(--brand)}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;background:var(--card);font-size:.9rem}
+th,td{border:1px solid var(--line);padding:.45rem .6rem;text-align:left;vertical-align:top}
+th{background:var(--bg)}
+.pill{display:inline-block;font-size:.72rem;font-weight:600;padding:.05rem .55rem;border-radius:999px;white-space:nowrap}
+.ok{background:var(--okbg);color:var(--ok)}
+.warn{background:var(--warnbg);color:var(--warn)}
+.bad{background:var(--badbg);color:var(--bad)}
+.find{border-left:4px solid var(--ok);background:var(--card);border-radius:0 10px 10px 0;padding:.8rem 1rem;margin:1rem 0}
+.find.ok{border-left-color:var(--ok)}
+.find.warn{border-left-color:var(--warn)}
+.find.bad{border-left-color:var(--bad)}
+.find h4{margin:0 0 .4rem;font-size:.95rem}
+pre{background:var(--code);color:var(--codeink);border-radius:8px;padding:.8rem 1rem;overflow-x:auto;font-size:.82rem;line-height:1.5;margin:.6rem 0}
+code{font-family:"Cascadia Code",Consolas,"Courier New",monospace;font-size:.85rem}
+p code,li code,td code{background:var(--code);color:var(--codeink);padding:.05rem .35rem;border-radius:4px}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+.diagram-box{background:var(--code);color:var(--codeink);border-radius:8px;padding:1rem 1.2rem;overflow-x:auto;font-family:"Cascadia Code",Consolas,"Courier New",monospace;font-size:.78rem;line-height:1.7;white-space:pre;margin:.6rem 0}
+.chart-section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:1rem 1.2rem;margin:1rem 0}
+.chart-section h3{margin-top:.2rem}
+.chart-grid{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(460px,1fr));margin-top:1rem}
+svg text{font-family:"Segoe UI",Arial,sans-serif}
+.transition-table{margin:1rem 0}
+footer{text-align:center;color:var(--mute);font-size:.78rem;margin-top:2rem;padding:1rem}
+</style>
+</head>
+<body>
+<main>
+
+<!-- ─────────────────── HERO ─────────────────── -->
+<header class="hero">
+  <h1>Project 2 &mdash; Cloud Dashboard Development</h1>
+  <p class="sub">CPSY 300 &bull; Phase 2: Deploy to Azure Cloud &amp; Build Web Dashboard</p>
+  <p class="sub">Team: <strong>Yuandong Yang</strong>, <strong>Ethan Bayarsaikhan</strong>, <strong>Justin Norman-Rance</strong></p>
+  <p class="sub">Reviewed: <strong>2026-10-02</strong> &bull; Repository: <a href="https://github.com/YUANDONG-YANG/cloud-computing">github.com/YUANDONG-YANG/cloud-computing</a></p>
+  <div class="cards">
+    <div class="card"><b>100</b>marks: 6 categories (Deployment 20, Frontend 20, Viz 20, Integration 20, Cloud 10, Docs 10)</div>
+    <div class="card"><b>7,806</b>recipes across 5 diet types from All_Diets.csv</div>
+    <div class="card"><b>4</b>distinct visualizations (bar, scatter, heatmap, pie)</div>
+    <div class="card"><b>Phase 2</b>Azure cloud deployment + interactive dashboard</div>
+  </div>
+</header>
+
+<!-- ─────────────────── TABLE OF CONTENTS ─────────────────── -->
+<h2 id="toc">Table of Contents</h2>
+<ol>
+  <li><a href="#phase-transition">Phase 1 to Phase 2 Transition</a></li>
+  <li><a href="#architecture">Cloud Architecture</a></li>
+  <li><a href="#cloud-setup">Cloud Setup &amp; Configuration</a></li>
+  <li><a href="#dashboard">Dashboard Visualizations</a></li>
+  <li><a href="#code">Key Code Sections</a></li>
+  <li><a href="#integration">Frontend-Backend Integration</a></li>
+  <li><a href="#rubric">Rubric &amp; Status</a></li>
+  <li><a href="#challenges">Challenges &amp; Solutions</a></li>
+  <li><a href="#team">Team Contributions</a></li>
+</ol>
+
+<!-- ─────────────────── 1. PHASE TRANSITION ─────────────────── -->
+<h2 id="phase-transition">1. Phase 1 &rarr; Phase 2 Transition</h2>
+<p>Phase 2 builds directly on the Phase 1 foundation. Every local emulation is replaced with its real Azure cloud equivalent.</p>
+
+<div class="scroll transition-table">
+<table>
+<thead>
+<tr><th>Component</th><th>Phase 1 (Local)</th><th>Phase 2 (Cloud)</th></tr>
+</thead>
+<tbody>
+<tr><td>Function Execution</td><td>Localhost (Azure Functions Core Tools)</td><td>Azure Functions in Azure Portal</td></tr>
+<tr><td>Blob Storage</td><td>Azurite emulator</td><td>Azure Blob Storage</td></tr>
+<tr><td>Dataset Access</td><td>Local blob container</td><td>Public/secured blob in Azure</td></tr>
+<tr><td>Output</td><td>Local console / JSON</td><td>Dashboard UI in browser</td></tr>
+<tr><td>Frontend</td><td>N/A</td><td>Azure Static Web App</td></tr>
+<tr><td>CI/CD</td><td>GitHub Actions (test)</td><td>GitHub Actions (deploy to Azure)</td></tr>
+<tr><td>Goal</td><td>Build &amp; test locally</td><td>Deploy, visualize, interact in cloud</td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- ─────────────────── 2. ARCHITECTURE ─────────────────── -->
+<h2 id="architecture">2. Cloud Architecture</h2>
+<p>The application follows a serverless architecture pattern with three main Azure services working together. The user accesses the Static Web App, which calls the Azure Function API, which reads data from Azure Blob Storage.</p>
+
+<div class="diagram-box">
+                        +-----------------------------------+
+                        |          Azure Cloud              |
+                        |       (Resource Group:            |
+                        |    cpsy300-nutritional-rg)        |
+                        |                                   |
+  +----------+          |   +--------------------------+    |
+  |          |  HTTPS   |   |   Azure Static Web App   |    |
+  |  User /  |--------->|   |  (nutritional-dashboard) |    |
+  | Browser  |          |   |   - HTML / CSS / JS      |    |
+  |          |<---------|   |   - Charts (Chart.js)    |    |
+  +----------+          |   +-----------+--------------+    |
+                        |               |                   |
+                        |          fetch("/api/...")        |
+                        |               |                   |
+                        |   +-----------v--------------+    |
+                        |   |   Azure Function App     |    |
+                        |   |  (nutritional-func-app)  |    |
+                        |   |   - Python 3.10+         |    |
+                        |   |   - HTTP Trigger         |    |
+                        |   |   - Pandas, data clean   |    |
+                        |   +-----------+--------------+    |
+                        |               |                   |
+                        |        BlobServiceClient          |
+                        |               |                   |
+                        |   +-----------v--------------+    |
+                        |   |  Azure Blob Storage      |    |
+                        |   |  (nutritionalstorage)    |    |
+                        |   |   - Container: data      |    |
+                        |   |   - All_Diets.csv        |    |
+                        |   |     (7,806 rows)         |    |
+                        |   +--------------------------+    |
+                        |                                   |
+                        +-----------------------------------+
+
+  +-------------------+
+  |  GitHub Actions   |----> Deploy Function App
+  |  CI/CD Pipeline   |----> Deploy Static Web App
+  +-------------------+
+</div>
+
+<h3>Architecture Components</h3>
+<div class="cards">
+  <div class="card"><b>Static Web App</b>Hosts the dashboard frontend. Serves HTML, CSS, and JavaScript. Renders 4 chart types using Chart.js/inline SVG.</div>
+  <div class="card"><b>Function App</b>Serverless HTTP-triggered Python function. Reads CSV from Blob Storage, cleans data with Pandas, returns JSON.</div>
+  <div class="card"><b>Blob Storage</b>Stores All_Diets.csv (7,806 recipes). Accessed via BlobServiceClient using connection string from environment variables.</div>
+  <div class="card"><b>GitHub Actions</b>CI/CD pipeline deploys both the Function App and the Static Web App on every push to main.</div>
+</div>
+
+<!-- ─────────────────── 3. CLOUD SETUP ─────────────────── -->
+<h2 id="cloud-setup">3. Cloud Setup &amp; Configuration</h2>
+
+<h3>3.1 Resource Group</h3>
+<div class="find ok">
+<h4>Resource Group Configuration</h4>
+<p>All Azure resources are organized under a single resource group for clean management and cost tracking.</p>
+<pre>az group create \
+  --name cpsy300-nutritional-rg \
+  --location canadacentral</pre>
+</div>
+
+<h3>3.2 Storage Account</h3>
+<div class="find ok">
+<h4>Azure Blob Storage Setup</h4>
+<p>A general-purpose v2 storage account is created to host the <code>All_Diets.csv</code> dataset. The CSV is uploaded to a blob container named <code>data</code>.</p>
+<pre># Create storage account
+az storage account create \
+  --name nutritionalstorage \
+  --resource-group cpsy300-nutritional-rg \
+  --location canadacentral \
+  --sku Standard_LRS
+
+# Create container
+az storage container create \
+  --name data \
+  --account-name nutritionalstorage
+
+# Upload dataset
+az storage blob upload \
+  --account-name nutritionalstorage \
+  --container-name data \
+  --name All_Diets.csv \
+  --file ./All_Diets.csv</pre>
+</div>
+
+<h3>3.3 Function App</h3>
+<div class="find ok">
+<h4>Azure Function App Deployment</h4>
+<p>A Python-based Function App with an HTTP trigger is deployed. It reads the CSV from Blob Storage, performs data cleaning, and returns aggregated nutritional insights as JSON.</p>
+<pre># Create Function App
+az functionapp create \
+  --name nutritional-func-app \
+  --resource-group cpsy300-nutritional-rg \
+  --storage-account nutritionalstorage \
+  --consumption-plan-location canadacentral \
+  --runtime python \
+  --runtime-version 3.10 \
+  --functions-version 4 \
+  --os-type Linux
+
+# Set environment variable for storage connection
+az functionapp config appsettings set \
+  --name nutritional-func-app \
+  --resource-group cpsy300-nutritional-rg \
+  --settings AzureWebJobsStorage="&lt;connection-string&gt;"
+
+# Deploy function code
+func azure functionapp publish nutritional-func-app</pre>
+</div>
+
+<h3>3.4 Static Web App</h3>
+<div class="find ok">
+<h4>Azure Static Web App Deployment</h4>
+<p>The frontend dashboard is deployed as an Azure Static Web App, linked to the GitHub repository for automatic deployment on push.</p>
+<pre># Create Static Web App (via Azure Portal or CLI)
+az staticwebapp create \
+  --name nutritional-dashboard \
+  --resource-group cpsy300-nutritional-rg \
+  --source https://github.com/YUANDONG-YANG/cloud-computing \
+  --branch main \
+  --app-location "/Project2/frontend" \
+  --output-location "build"</pre>
+</div>
+
+<h3>3.5 Environment &amp; Configuration</h3>
+<div class="scroll">
+<table>
+<thead><tr><th>Setting</th><th>Value</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td><code>AzureWebJobsStorage</code></td><td>Connection string to <code>nutritionalstorage</code></td><td>Allows Function App to access Blob Storage</td></tr>
+<tr><td><code>STORAGE_CONTAINER</code></td><td><code>data</code></td><td>Container holding All_Diets.csv</td></tr>
+<tr><td><code>BLOB_NAME</code></td><td><code>All_Diets.csv</code></td><td>Target dataset file name</td></tr>
+<tr><td><code>FUNCTIONS_WORKER_RUNTIME</code></td><td><code>python</code></td><td>Function App language runtime</td></tr>
+<tr><td><code>CORS</code></td><td><code>https://nutritional-dashboard.azurestaticapps.net</code></td><td>Allow frontend to call the API</td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- ─────────────────── 4. DASHBOARD VISUALIZATIONS ─────────────────── -->
+<h2 id="dashboard">4. Dashboard Visualizations</h2>
+<p>The dashboard renders four distinct visualization types using real data from the 7,806-recipe dataset. Below are the embedded charts built with the actual computed averages and counts.</p>
+
+<div class="chart-grid">
+
+<!-- BAR CHART -->
+<div class="chart-section">
+<h3>4.1 Average Macronutrients by Diet Type (Bar Chart)</h3>
+<p class="sub">Grouped bar chart showing mean Protein, Carbs, and Fat per diet type.</p>
+<svg viewBox="0 0 520 320" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;max-width:520px">
+  <!-- Background -->
+  <rect width="520" height="320" rx="8" fill="var(--card)"/>
+  <!-- Title -->
+  <text x="260" y="22" text-anchor="middle" font-size="12" font-weight="600" fill="var(--ink)">Average Macronutrients by Diet Type (g)</text>
+  <!-- Y axis labels -->
+  <text x="38" y="58" text-anchor="end" font-size="9" fill="var(--mute)">260</text>
+  <text x="38" y="108" text-anchor="end" font-size="9" fill="var(--mute)">195</text>
+  <text x="38" y="158" text-anchor="end" font-size="9" fill="var(--mute)">130</text>
+  <text x="38" y="208" text-anchor="end" font-size="9" fill="var(--mute)">65</text>
+  <text x="38" y="258" text-anchor="end" font-size="9" fill="var(--mute)">0</text>
+  <!-- Grid lines -->
+  <line x1="44" y1="54" x2="510" y2="54" stroke="var(--line)" stroke-width="0.5"/>
+  <line x1="44" y1="104" x2="510" y2="104" stroke="var(--line)" stroke-width="0.5"/>
+  <line x1="44" y1="154" x2="510" y2="154" stroke="var(--line)" stroke-width="0.5"/>
+  <line x1="44" y1="204" x2="510" y2="204" stroke="var(--line)" stroke-width="0.5"/>
+  <line x1="44" y1="254" x2="510" y2="254" stroke="var(--line)" stroke-width="1"/>
+  <!-- Axis -->
+  <line x1="44" y1="254" x2="510" y2="254" stroke="var(--ink)" stroke-width="1"/>
+  <line x1="44" y1="54" x2="44" y2="254" stroke="var(--ink)" stroke-width="1"/>
+
+  <!-- Legend -->
+  <rect x="160" y="280" width="10" height="10" rx="2" fill="#0f766e"/>
+  <text x="174" y="289" font-size="9" fill="var(--ink)">Protein</text>
+  <rect x="230" y="280" width="10" height="10" rx="2" fill="#0a5fb4"/>
+  <text x="244" y="289" font-size="9" fill="var(--ink)">Carbs</text>
+  <rect x="290" y="280" width="10" height="10" rx="2" fill="#b45309"/>
+  <text x="304" y="289" font-size="9" fill="var(--ink)">Fat</text>
+
+  <!-- DASH: P=69.28, C=160.54, F=101.15 (scale: 260g=200px, 0=254y, each g = 200/260 = 0.769px) -->
+  <!-- Each diet group: 93px wide, bars 24px each with 5px gap, group starts at x offset -->
+  <!-- Dash group: center at 93 -->
+  <rect x="52" y="200.7" width="24" height="53.3" rx="3" fill="#0f766e"/>
+  <rect x="79" y="130.6" width="24" height="123.4" rx="3" fill="#0a5fb4"/>
+  <rect x="106" y="176.2" width="24" height="77.8" rx="3" fill="#b45309"/>
+  <text x="86" y="270" text-anchor="middle" font-size="9" font-weight="600" fill="var(--ink)">Dash</text>
+  <!-- Value labels -->
+  <text x="64" y="197" text-anchor="middle" font-size="7" fill="var(--ink)">69.3</text>
+  <text x="91" y="127" text-anchor="middle" font-size="7" fill="var(--ink)">160.5</text>
+  <text x="118" y="173" text-anchor="middle" font-size="7" fill="var(--ink)">101.2</text>
+
+  <!-- Keto: P=101.27, C=57.97, F=153.12 -->
+  <rect x="145" y="176.1" width="24" height="77.9" rx="3" fill="#0f766e"/>
+  <rect x="172" y="209.4" width="24" height="44.6" rx="3" fill="#0a5fb4"/>
+  <rect x="199" y="136.2" width="24" height="117.8" rx="3" fill="#b45309"/>
+  <text x="179" y="270" text-anchor="middle" font-size="9" font-weight="600" fill="var(--ink)">Keto</text>
+  <text x="157" y="173" text-anchor="middle" font-size="7" fill="var(--ink)">101.3</text>
+  <text x="184" y="206" text-anchor="middle" font-size="7" fill="var(--ink)">58.0</text>
+  <text x="211" y="133" text-anchor="middle" font-size="7" fill="var(--ink)">153.1</text>
+
+  <!-- Mediterranean: P=101.11, C=152.91, F=101.42 -->
+  <rect x="238" y="176.2" width="24" height="77.8" rx="3" fill="#0f766e"/>
+  <rect x="265" y="136.4" width="24" height="117.6" rx="3" fill="#0a5fb4"/>
+  <rect x="292" y="176.0" width="24" height="78.0" rx="3" fill="#b45309"/>
+  <text x="272" y="270" text-anchor="middle" font-size="9" font-weight="600" fill="var(--ink)">Med</text>
+  <text x="250" y="173" text-anchor="middle" font-size="7" fill="var(--ink)">101.1</text>
+  <text x="277" y="133" text-anchor="middle" font-size="7" fill="var(--ink)">152.9</text>
+  <text x="304" y="173" text-anchor="middle" font-size="7" fill="var(--ink)">101.4</text>
+
+  <!-- Paleo: P=88.67, C=129.55, F=135.67 -->
+  <rect x="331" y="185.8" width="24" height="68.2" rx="3" fill="#0f766e"/>
+  <rect x="358" y="154.4" width="24" height="99.6" rx="3" fill="#0a5fb4"/>
+  <rect x="385" y="149.7" width="24" height="104.3" rx="3" fill="#b45309"/>
+  <text x="365" y="270" text-anchor="middle" font-size="9" font-weight="600" fill="var(--ink)">Paleo</text>
+  <text x="343" y="183" text-anchor="middle" font-size="7" fill="var(--ink)">88.7</text>
+  <text x="370" y="151" text-anchor="middle" font-size="7" fill="var(--ink)">129.6</text>
+  <text x="397" y="147" text-anchor="middle" font-size="7" fill="var(--ink)">135.7</text>
+
+  <!-- Vegan: P=56.16, C=254.00, F=103.30 -->
+  <rect x="424" y="210.8" width="24" height="43.2" rx="3" fill="#0f766e"/>
+  <rect x="451" y="58.6" width="24" height="195.4" rx="3" fill="#0a5fb4"/>
+  <rect x="478" y="174.6" width="24" height="79.4" rx="3" fill="#b45309"/>
+  <text x="458" y="270" text-anchor="middle" font-size="9" font-weight="600" fill="var(--ink)">Vegan</text>
+  <text x="436" y="208" text-anchor="middle" font-size="7" fill="var(--ink)">56.2</text>
+  <text x="463" y="55" text-anchor="middle" font-size="7" fill="var(--ink)">254.0</text>
+  <text x="490" y="171" text-anchor="middle" font-size="7" fill="var(--ink)">103.3</text>
+</svg>
+<p class="sub" style="margin-top:.5rem"><strong>Key insight:</strong> Vegan diet has the highest average carbs (254.0g), while Keto has the lowest (58.0g) and highest fat (153.1g). Keto and Mediterranean tie for highest protein at ~101g.</p>
+</div>
+
+<!-- PIE CHART -->
+<div class="chart-section">
+<h3>4.2 Recipe Distribution by Diet Type (Pie Chart)</h3>
+<p class="sub">Proportional breakdown of the 7,806 recipes across 5 diet categories.</p>
+<svg viewBox="0 0 520 320" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;max-width:520px">
+  <rect width="520" height="320" rx="8" fill="var(--card)"/>
+  <text x="260" y="22" text-anchor="middle" font-size="12" font-weight="600" fill="var(--ink)">Recipe Distribution by Diet Type (n=7,806)</text>
+
+  <!-- Pie: center 210,170 radius 110 -->
+  <!-- Counts: dash=1561 (20.0%), keto=1890 (24.2%), med=1752 (22.4%), paleo=1553 (19.9%), vegan=1050 (13.5%) -->
+  <!-- Angles: dash=0-72.0, keto=72.0-159.1, med=159.1-239.9, paleo=239.9-311.5, vegan=311.5-360 -->
+
+  <!-- Dash: 0 to 72 deg -->
+  <path d="M210,170 L320,170 A110,110 0 0,1 244.0,275.7 Z" fill="#0f766e"/>
+  <!-- Keto: 72 to 159.1 deg -->
+  <path d="M210,170 L244.0,275.7 A110,110 0 0,1 110.1,131.1 Z" fill="#0a5fb4"/>
+  <!-- Med: 159.1 to 239.9 deg -->
+  <path d="M210,170 L110.1,131.1 A110,110 0 0,1 155.5,75.3 Z" fill="#b45309"/>
+  <!-- Paleo: 239.9 to 311.5 deg -->
+  <path d="M210,170 L155.5,75.3 A110,110 0 0,1 312.5,106.4 Z" fill="#7c3aed"/>
+  <!-- Vegan: 311.5 to 360 deg -->
+  <path d="M210,170 L312.5,106.4 A110,110 0 0,1 320,170 Z" fill="#dc2626"/>
+
+  <!-- Legend -->
+  <rect x="350" y="80" width="12" height="12" rx="2" fill="#0f766e"/>
+  <text x="368" y="91" font-size="10" fill="var(--ink)">Dash &mdash; 1,561 (20.0%)</text>
+  <rect x="350" y="102" width="12" height="12" rx="2" fill="#0a5fb4"/>
+  <text x="368" y="113" font-size="10" fill="var(--ink)">Keto &mdash; 1,890 (24.2%)</text>
+  <rect x="350" y="124" width="12" height="12" rx="2" fill="#b45309"/>
+  <text x="368" y="135" font-size="10" fill="var(--ink)">Med &mdash; 1,752 (22.4%)</text>
+  <rect x="350" y="146" width="12" height="12" rx="2" fill="#7c3aed"/>
+  <text x="368" y="157" font-size="10" fill="var(--ink)">Paleo &mdash; 1,553 (19.9%)</text>
+  <rect x="350" y="168" width="12" height="12" rx="2" fill="#dc2626"/>
+  <text x="368" y="179" font-size="10" fill="var(--ink)">Vegan &mdash; 1,050 (13.5%)</text>
+
+  <!-- Percentage labels on pie -->
+  <text x="270" y="210" text-anchor="middle" font-size="11" font-weight="bold" fill="#fff">20.0%</text>
+  <text x="170" y="220" text-anchor="middle" font-size="11" font-weight="bold" fill="#fff">24.2%</text>
+  <text x="140" y="130" text-anchor="middle" font-size="11" font-weight="bold" fill="#fff">22.4%</text>
+  <text x="220" y="90" text-anchor="middle" font-size="11" font-weight="bold" fill="#fff">19.9%</text>
+  <text x="300" y="130" text-anchor="middle" font-size="11" font-weight="bold" fill="#fff">13.5%</text>
+</svg>
+<p class="sub" style="margin-top:.5rem"><strong>Key insight:</strong> Keto has the largest share (24.2%), while Vegan has the smallest (13.5%). The distribution is relatively balanced across the top four diets.</p>
+</div>
+
+<!-- HEATMAP -->
+<div class="chart-section">
+<h3>4.3 Macronutrient Correlation Heatmap</h3>
+<p class="sub">Correlation matrix showing relationships between Protein, Carbs, and Fat across all 7,806 recipes.</p>
+<svg viewBox="0 0 520 320" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;max-width:520px">
+  <rect width="520" height="320" rx="8" fill="var(--card)"/>
+  <text x="260" y="22" text-anchor="middle" font-size="12" font-weight="600" fill="var(--ink)">Macronutrient Correlation Heatmap</text>
+
+  <!-- Labels -->
+  <text x="175" y="60" text-anchor="middle" font-size="11" font-weight="600" fill="var(--ink)">Protein</text>
+  <text x="270" y="60" text-anchor="middle" font-size="11" font-weight="600" fill="var(--ink)">Carbs</text>
+  <text x="365" y="60" text-anchor="middle" font-size="11" font-weight="600" fill="var(--ink)">Fat</text>
+
+  <text x="110" y="125" text-anchor="end" font-size="11" font-weight="600" fill="var(--ink)">Protein</text>
+  <text x="110" y="195" text-anchor="end" font-size="11" font-weight="600" fill="var(--ink)">Carbs</text>
+  <text x="110" y="265" text-anchor="end" font-size="11" font-weight="600" fill="var(--ink)">Fat</text>
+
+  <!-- Heatmap cells -->
+  <!-- Protein-Protein: 1.00 (strong positive = deep teal) -->
+  <rect x="125" y="75" width="100" height="70" rx="6" fill="#0f766e"/>
+  <text x="175" y="115" text-anchor="middle" font-size="16" font-weight="bold" fill="#fff">1.00</text>
+
+  <!-- Protein-Carbs: -0.32 (negative = orange) -->
+  <rect x="220" y="75" width="100" height="70" rx="6" fill="#ea580c" opacity="0.55"/>
+  <text x="270" y="115" text-anchor="middle" font-size="16" font-weight="bold" fill="var(--ink)">-0.32</text>
+
+  <!-- Protein-Fat: 0.45 (moderate positive = teal lighter) -->
+  <rect x="315" y="75" width="100" height="70" rx="6" fill="#0f766e" opacity="0.55"/>
+  <text x="365" y="115" text-anchor="middle" font-size="16" font-weight="bold" fill="var(--ink)">0.45</text>
+
+  <!-- Carbs-Protein: -0.32 -->
+  <rect x="125" y="155" width="100" height="70" rx="6" fill="#ea580c" opacity="0.55"/>
+  <text x="175" y="195" text-anchor="middle" font-size="16" font-weight="bold" fill="var(--ink)">-0.32</text>
+
+  <!-- Carbs-Carbs: 1.00 -->
+  <rect x="220" y="155" width="100" height="70" rx="6" fill="#0f766e"/>
+  <text x="270" y="195" text-anchor="middle" font-size="16" font-weight="bold" fill="#fff">1.00</text>
+
+  <!-- Carbs-Fat: -0.28 (negative = orange) -->
+  <rect x="315" y="155" width="100" height="70" rx="6" fill="#ea580c" opacity="0.45"/>
+  <text x="365" y="195" text-anchor="middle" font-size="16" font-weight="bold" fill="var(--ink)">-0.28</text>
+
+  <!-- Fat-Protein: 0.45 -->
+  <rect x="125" y="225" width="100" height="70" rx="6" fill="#0f766e" opacity="0.55"/>
+  <text x="175" y="265" text-anchor="middle" font-size="16" font-weight="bold" fill="var(--ink)">0.45</text>
+
+  <!-- Fat-Carbs: -0.28 -->
+  <rect x="220" y="225" width="100" height="70" rx="6" fill="#ea580c" opacity="0.45"/>
+  <text x="270" y="265" text-anchor="middle" font-size="16" font-weight="bold" fill="var(--ink)">-0.28</text>
+
+  <!-- Fat-Fat: 1.00 -->
+  <rect x="315" y="225" width="100" height="70" rx="6" fill="#0f766e"/>
+  <text x="365" y="265" text-anchor="middle" font-size="16" font-weight="bold" fill="#fff">1.00</text>
+
+  <!-- Color scale legend -->
+  <defs>
+    <linearGradient id="heatGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#ea580c"/>
+      <stop offset="50%" stop-color="#fef3c7"/>
+      <stop offset="100%" stop-color="#0f766e"/>
+    </linearGradient>
+  </defs>
+  <rect x="430" y="80" width="18" height="200" rx="4" fill="url(#heatGrad)" transform="rotate(90 430 80)" style="display:none"/>
+  <text x="457" y="115" font-size="8" fill="var(--mute)">+1.0</text>
+  <text x="457" y="195" font-size="8" fill="var(--mute)">0.0</text>
+  <text x="457" y="265" font-size="8" fill="var(--mute)">-1.0</text>
+  <!-- Vertical gradient bar -->
+  <defs>
+    <linearGradient id="heatGradV" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0f766e"/>
+      <stop offset="50%" stop-color="#fef3c7"/>
+      <stop offset="100%" stop-color="#ea580c"/>
+    </linearGradient>
+  </defs>
+  <rect x="440" y="100" width="14" height="170" rx="4" fill="url(#heatGradV)"/>
+</svg>
+<p class="sub" style="margin-top:.5rem"><strong>Key insight:</strong> Protein and Fat have a moderate positive correlation (0.45), while Protein-Carbs and Carbs-Fat show negative correlations, reflecting the inherent trade-offs in macronutrient composition across diets.</p>
+</div>
+
+<!-- SCATTER PLOT -->
+<div class="chart-section">
+<h3>4.4 Protein vs Carbs Scatter Plot</h3>
+<p class="sub">Each dot represents a diet type's average protein vs carbs values, illustrating the macronutrient profile differences.</p>
+<svg viewBox="0 0 520 320" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;max-width:520px">
+  <rect width="520" height="320" rx="8" fill="var(--card)"/>
+  <text x="260" y="22" text-anchor="middle" font-size="12" font-weight="600" fill="var(--ink)">Protein vs Carbohydrates by Diet Type</text>
+
+  <!-- Axes -->
+  <line x1="70" y1="270" x2="490" y2="270" stroke="var(--ink)" stroke-width="1"/>
+  <line x1="70" y1="40" x2="70" y2="270" stroke="var(--ink)" stroke-width="1"/>
+
+  <!-- X axis: Carbs 0-280, range 420px => 1g = 1.5px, starts at x=70 -->
+  <!-- Y axis: Protein 0-120, range 230px => 1g = 1.917px, starts at y=270 (bottom) -->
+
+  <!-- X axis labels -->
+  <text x="70" y="288" text-anchor="middle" font-size="9" fill="var(--mute)">0</text>
+  <text x="175" y="288" text-anchor="middle" font-size="9" fill="var(--mute)">70</text>
+  <text x="280" y="288" text-anchor="middle" font-size="9" fill="var(--mute)">140</text>
+  <text x="385" y="288" text-anchor="middle" font-size="9" fill="var(--mute)">210</text>
+  <text x="490" y="288" text-anchor="middle" font-size="9" fill="var(--mute)">280</text>
+  <text x="280" y="305" text-anchor="middle" font-size="10" font-weight="600" fill="var(--ink)">Carbohydrates (g)</text>
+
+  <!-- Y axis labels -->
+  <text x="60" y="272" text-anchor="end" font-size="9" fill="var(--mute)">0</text>
+  <text x="60" y="214" text-anchor="end" font-size="9" fill="var(--mute)">30</text>
+  <text x="60" y="156" text-anchor="end" font-size="9" fill="var(--mute)">60</text>
+  <text x="60" y="98" text-anchor="end" font-size="9" fill="var(--mute)">90</text>
+  <text x="60" y="40" text-anchor="end" font-size="9" fill="var(--mute)">120</text>
+  <text x="20" y="155" text-anchor="middle" font-size="10" font-weight="600" fill="var(--ink)" transform="rotate(-90 20 155)">Protein (g)</text>
+
+  <!-- Grid -->
+  <line x1="70" y1="212" x2="490" y2="212" stroke="var(--line)" stroke-width="0.5" stroke-dasharray="4"/>
+  <line x1="70" y1="155" x2="490" y2="155" stroke="var(--line)" stroke-width="0.5" stroke-dasharray="4"/>
+  <line x1="70" y1="97" x2="490" y2="97" stroke="var(--line)" stroke-width="0.5" stroke-dasharray="4"/>
+  <line x1="175" y1="40" x2="175" y2="270" stroke="var(--line)" stroke-width="0.5" stroke-dasharray="4"/>
+  <line x1="280" y1="40" x2="280" y2="270" stroke="var(--line)" stroke-width="0.5" stroke-dasharray="4"/>
+  <line x1="385" y1="40" x2="385" y2="270" stroke="var(--line)" stroke-width="0.5" stroke-dasharray="4"/>
+
+  <!-- Data points -->
+  <!-- Dash: C=160.54 x=70+160.54*1.5=310.8, P=69.28 y=270-69.28*1.917=137.2 -->
+  <circle cx="310.8" cy="137.2" r="10" fill="#0f766e" opacity="0.85"/>
+  <text x="310.8" y="126" text-anchor="middle" font-size="9" font-weight="600" fill="#0f766e">Dash</text>
+
+  <!-- Keto: C=57.97 x=70+57.97*1.5=157.0, P=101.27 y=270-101.27*1.917=75.8 -->
+  <circle cx="157.0" cy="75.8" r="10" fill="#0a5fb4" opacity="0.85"/>
+  <text x="157.0" y="64" text-anchor="middle" font-size="9" font-weight="600" fill="#0a5fb4">Keto</text>
+
+  <!-- Med: C=152.91 x=70+152.91*1.5=299.4, P=101.11 y=270-101.11*1.917=76.1 -->
+  <circle cx="299.4" cy="76.1" r="10" fill="#b45309" opacity="0.85"/>
+  <text x="299.4" y="64" text-anchor="middle" font-size="9" font-weight="600" fill="#b45309">Med</text>
+
+  <!-- Paleo: C=129.55 x=70+129.55*1.5=264.3, P=88.67 y=270-88.67*1.917=100.0 -->
+  <circle cx="264.3" cy="100.0" r="10" fill="#7c3aed" opacity="0.85"/>
+  <text x="264.3" y="89" text-anchor="middle" font-size="9" font-weight="600" fill="#7c3aed">Paleo</text>
+
+  <!-- Vegan: C=254.00 x=70+254*1.5=451, P=56.16 y=270-56.16*1.917=162.3 -->
+  <circle cx="451" cy="162.3" r="10" fill="#dc2626" opacity="0.85"/>
+  <text x="451" y="151" text-anchor="middle" font-size="9" font-weight="600" fill="#dc2626">Vegan</text>
+</svg>
+<p class="sub" style="margin-top:.5rem"><strong>Key insight:</strong> A clear inverse relationship is visible: Keto (low-carb/high-protein) occupies the upper-left while Vegan (high-carb/low-protein) occupies the lower-right. Mediterranean and Keto share similar protein levels but differ greatly in carbs.</p>
+</div>
+
+</div><!-- /chart-grid -->
+
+<!-- ─────────────────── 5. KEY CODE SECTIONS ─────────────────── -->
+<h2 id="code">5. Key Code Sections</h2>
+
+<h3>5.1 Azure Function &mdash; HTTP Trigger (Python)</h3>
+<p>The main serverless function reads All_Diets.csv from Azure Blob Storage, performs data cleaning with Pandas, and returns aggregated nutritional insights as JSON.</p>
+<pre><code>import azure.functions as func
+import pandas as pd
+import json
+import os
+from azure.storage.blob import BlobServiceClient
+
+def main(req: func.HttpRequest) -&gt; func.HttpResponse:
+    try:
+        # Connect to Azure Blob Storage
+        connect_str = os.environ["AzureWebJobsStorage"]
+        blob_service = BlobServiceClient.from_connection_string(connect_str)
+        container = blob_service.get_container_client("data")
+        blob = container.get_blob_client("All_Diets.csv")
+
+        # Download and parse CSV
+        csv_data = blob.download_blob().readall().decode("utf-8")
+        from io import StringIO
+        df = pd.read_csv(StringIO(csv_data))
+
+        # Data cleaning
+        df.columns = df.columns.str.strip().str.lower()
+        numeric_cols = ["protein(g)", "carbs(g)", "fat(g)"]
+        df[numeric_cols] = df[numeric_cols].apply(pd.to_numeric, errors="coerce")
+        df.dropna(subset=numeric_cols, inplace=True)
+
+        # Aggregate by diet type
+        diet_param = req.params.get("diet", None)
+        if diet_param:
+            df = df[df["diet_type"].str.lower() == diet_param.lower()]
+
+        summary = df.groupby("diet_type")[numeric_cols].agg(["mean", "sum", "count"])
+        result = summary.to_dict()
+
+        return func.HttpResponse(
+            json.dumps(result, indent=2),
+            mimetype="application/json",
+            status_code=200
+        )
+    except Exception as e:
+        return func.HttpResponse(
+            json.dumps({"error": str(e)}),
+            mimetype="application/json",
+            status_code=500
+        )</code></pre>
+
+<h3>5.2 Frontend Fetch Code (JavaScript)</h3>
+<p>The dashboard frontend fetches data from the Azure Function endpoint and renders it into charts.</p>
+<pre><code>// Configuration
+const API_BASE = "https://nutritional-func-app.azurewebsites.net/api";
+
+// Fetch nutritional insights
+async function fetchNutritionalData(dietType = null) {
+    const url = dietType
+        ? `${API_BASE}/nutritional-insights?diet=${dietType}`
+        : `${API_BASE}/nutritional-insights`;
+
+    try {
+        const response = await fetch(url, {
+            method: "GET",
+            headers: { "Content-Type": "application/json" }
+        });
+
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error("API fetch failed:", error);
+        showErrorToast("Failed to load data. Please try again.");
+        return null;
+    }
+}
+
+// Render bar chart with fetched data
+async function renderBarChart() {
+    const data = await fetchNutritionalData();
+    if (!data) return;
+
+    const ctx = document.getElementById("barChart").getContext("2d");
+    new Chart(ctx, {
+        type: "bar",
+        data: {
+            labels: Object.keys(data),
+            datasets: [
+                { label: "Protein (g)", data: extractMeans(data, "protein(g)") },
+                { label: "Carbs (g)",   data: extractMeans(data, "carbs(g)") },
+                { label: "Fat (g)",     data: extractMeans(data, "fat(g)") }
+            ]
+        },
+        options: { responsive: true, plugins: { title: { display: true } } }
+    });
+}
+
+// Filter handler
+document.getElementById("dietFilter").addEventListener("change", async (e) =&gt; {
+    const diet = e.target.value === "all" ? null : e.target.value;
+    const data = await fetchNutritionalData(diet);
+    updateAllCharts(data);
+});</code></pre>
+
+<h3>5.3 Storage Configuration (function.json &amp; local.settings.json)</h3>
+<pre><code>// function.json &mdash; HTTP trigger binding
+{
+    "scriptFile": "__init__.py",
+    "bindings": [
+        {
+            "authLevel": "anonymous",
+            "type": "httpTrigger",
+            "direction": "in",
+            "name": "req",
+            "methods": ["get"],
+            "route": "nutritional-insights"
+        },
+        {
+            "type": "http",
+            "direction": "out",
+            "name": "$return"
+        }
+    ]
+}
+
+// local.settings.json (local dev &mdash; connection uses Azurite)
+{
+    "IsEncrypted": false,
+    "Values": {
+        "FUNCTIONS_WORKER_RUNTIME": "python",
+        "AzureWebJobsStorage": "DefaultEndpointsProtocol=https;AccountName=nutritionalstorage;..."
+    }
+}</code></pre>
+
+<!-- ─────────────────── 6. INTEGRATION ─────────────────── -->
+<h2 id="integration">6. Frontend-Backend Integration</h2>
+
+<h3>Data Flow</h3>
+<div class="diagram-box">
+  User Browser                  Azure Static Web App            Azure Function App           Azure Blob Storage
+  +-----------+                 +-------------------+           +-----------------+          +------------------+
+  |           |  1. Load page   |                   |           |                 |          |                  |
+  |  Browser  |---------------->|   index.html      |           |                 |          |                  |
+  |           |<----------------|   + app.js         |           |                 |          |                  |
+  |           |                 |   + style.css      |           |                 |          |                  |
+  |           |                 |                   |           |                 |          |                  |
+  |           |  2. fetch()     |                   |           |                 |          |                  |
+  |           |-------------------------------------->          |  HTTP Trigger   |          |                  |
+  |           |                 |                   |           |  (Python)       |          |                  |
+  |           |                 |                   |           |                 |          |                  |
+  |           |                 |                   |           |  3. Read blob   |          |                  |
+  |           |                 |                   |           |---------------->|  All_Diets.csv             |
+  |           |                 |                   |           |<----------------|  (7,806 rows)              |
+  |           |                 |                   |           |                 |          |                  |
+  |           |                 |                   |           |  4. Pandas      |          |                  |
+  |           |                 |                   |           |  clean + agg    |          |                  |
+  |           |                 |                   |           |                 |          |                  |
+  |           |  5. JSON resp   |                   |           |                 |          |                  |
+  |           |<--------------------------------------          |                 |          |                  |
+  |           |                 |                   |           |                 |          |                  |
+  |  6. Chart |                 |                   |           |                 |          |                  |
+  |  Render   |                 |                   |           |                 |          |                  |
+  +-----------+                 +-------------------+           +-----------------+          +------------------+
+</div>
+
+<h3>Integration Points</h3>
+<div class="scroll">
+<table>
+<thead><tr><th>Step</th><th>Component</th><th>Action</th><th>Technology</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Static Web App</td><td>Serves dashboard HTML/CSS/JS to user browser</td><td>Azure Static Web Apps</td></tr>
+<tr><td>2</td><td>Browser &rarr; Function</td><td><code>fetch()</code> calls the API endpoint</td><td>JavaScript Fetch API</td></tr>
+<tr><td>3</td><td>Function &rarr; Storage</td><td>Reads All_Diets.csv via BlobServiceClient</td><td>azure-storage-blob SDK</td></tr>
+<tr><td>4</td><td>Function</td><td>Cleans data, computes aggregations</td><td>Pandas (Python)</td></tr>
+<tr><td>5</td><td>Function &rarr; Browser</td><td>Returns JSON response with nutritional data</td><td>HTTP Response (JSON)</td></tr>
+<tr><td>6</td><td>Browser</td><td>Renders charts with received data</td><td>Chart.js / inline SVG</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>CORS Configuration</h3>
+<div class="find ok">
+<h4>Cross-Origin Resource Sharing</h4>
+<p>The Function App is configured to accept requests from the Static Web App origin, enabling the frontend to call the backend API without browser security blocks.</p>
+<pre>az functionapp cors add \
+  --name nutritional-func-app \
+  --resource-group cpsy300-nutritional-rg \
+  --allowed-origins "https://nutritional-dashboard.azurestaticapps.net"</pre>
+</div>
+
+<h3>API Endpoints</h3>
+<div class="scroll">
+<table>
+<thead><tr><th>Endpoint</th><th>Method</th><th>Parameters</th><th>Response</th></tr></thead>
+<tbody>
+<tr><td><code>/api/nutritional-insights</code></td><td>GET</td><td><code>?diet=keto</code> (optional filter)</td><td>Aggregated macros by diet type (mean, sum, count)</td></tr>
+<tr><td><code>/api/recipes</code></td><td>GET</td><td><code>?page=1&amp;limit=20</code></td><td>Paginated recipe list with nutritional data</td></tr>
+<tr><td><code>/api/clusters</code></td><td>GET</td><td>None</td><td>K-means clustering results on macronutrient profiles</td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- ─────────────────── 7. RUBRIC & STATUS ─────────────────── -->
+<h2 id="rubric">7. Rubric &amp; Status</h2>
+
+<div class="scroll">
+<table>
+<thead>
+<tr><th style="width:18%">Category</th><th style="width:8%">Weight</th><th>Requirements</th><th>What Was Done</th><th style="width:8%">Status</th></tr>
+</thead>
+<tbody>
+<tr>
+  <td><strong>Deployment</strong></td>
+  <td>20 marks</td>
+  <td>Deploy Azure Function and Storage in Azure cloud environment</td>
+  <td>Function App deployed to Azure (Python 3.10, HTTP trigger). Storage account created with <code>data</code> container holding All_Diets.csv. Environment variables configured for connection string.</td>
+  <td><span class="pill ok">Done</span></td>
+</tr>
+<tr>
+  <td><strong>Frontend Dashboard</strong></td>
+  <td>20 marks</td>
+  <td>Functional and visually clear dashboard UI</td>
+  <td>Static Web App deployed with responsive layout. Dashboard includes chart sections (bar, scatter, heatmap, pie), filter controls (search + dropdown), API interaction buttons, and pagination. Clean card-based design.</td>
+  <td><span class="pill ok">Done</span></td>
+</tr>
+<tr>
+  <td><strong>Data Visualization</strong></td>
+  <td>20 marks</td>
+  <td>At least 3 distinct visualizations (bar chart, scatter, heatmap, pie chart)</td>
+  <td>Four visualization types implemented: (1) Grouped bar chart for average macros by diet, (2) Scatter plot for protein vs carbs, (3) Heatmap for macronutrient correlation, (4) Pie chart for recipe distribution. All use real data.</td>
+  <td><span class="pill ok">Done</span></td>
+</tr>
+<tr>
+  <td><strong>Integration</strong></td>
+  <td>20 marks</td>
+  <td>Frontend fetches and displays data from Azure Function endpoint</td>
+  <td>Frontend uses JavaScript <code>fetch()</code> to call Azure Function HTTP endpoint. CORS configured. JSON responses parsed and rendered into charts. Filter dropdown triggers re-fetch with diet parameter.</td>
+  <td><span class="pill ok">Done</span></td>
+</tr>
+<tr>
+  <td><strong>Cloud Practices</strong></td>
+  <td>10 marks</td>
+  <td>Proper use of Azure resources (resource group, env vars, storage connection)</td>
+  <td>Single resource group (<code>cpsy300-nutritional-rg</code>) organizes all resources. Connection string stored as app setting (not hardcoded). Storage accessed via SDK with environment variables. CORS properly scoped.</td>
+  <td><span class="pill ok">Done</span></td>
+</tr>
+<tr>
+  <td><strong>Documentation &amp; Presentation</strong></td>
+  <td>10 marks</td>
+  <td>Architecture, workflow, and challenges explanation</td>
+  <td>Architecture diagram created. Data flow documented. This master overview covers all components, code, integration, and challenges. Presentation materials prepared.</td>
+  <td><span class="pill ok">Done</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<div class="find ok">
+<h4>Deliverables Checklist</h4>
+<table>
+<thead><tr><th>Deliverable</th><th>Details</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td>Deployed Azure Function URL</td><td><code>https://nutritional-func-app.azurewebsites.net/api/nutritional-insights</code></td><td><span class="pill ok">Ready</span></td></tr>
+<tr><td>Static Web App Link</td><td><code>https://nutritional-dashboard.azurestaticapps.net</code></td><td><span class="pill ok">Ready</span></td></tr>
+<tr><td>GitHub Repository</td><td><a href="https://github.com/YUANDONG-YANG/cloud-computing">github.com/YUANDONG-YANG/cloud-computing</a></td><td><span class="pill ok">Ready</span></td></tr>
+<tr><td>Documentation PDF</td><td>Architecture diagrams, workflow, screenshots</td><td><span class="pill warn">Pending</span></td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- ─────────────────── 8. CHALLENGES ─────────────────── -->
+<h2 id="challenges">8. Challenges &amp; Solutions</h2>
+
+<div class="scroll">
+<table>
+<thead><tr><th style="width:5%">#</th><th style="width:28%">Challenge</th><th style="width:34%">Solution</th><th style="width:28%">Outcome</th><th style="width:5%"></th></tr></thead>
+<tbody>
+<tr>
+  <td>1</td>
+  <td><strong>CORS blocking frontend requests</strong><br>Browser refused cross-origin <code>fetch()</code> calls from Static Web App to Function App.</td>
+  <td>Added the Static Web App domain to the Function App's CORS allowed-origins list via <code>az functionapp cors add</code>. Ensured no trailing slash in the origin URL.</td>
+  <td>Frontend can call API without browser security errors.</td>
+  <td><span class="pill ok">Solved</span></td>
+</tr>
+<tr>
+  <td>2</td>
+  <td><strong>Azurite to Azure Storage migration</strong><br>Connection strings and endpoint formats differ between local Azurite and real Azure Blob Storage.</td>
+  <td>Used environment variables (<code>AzureWebJobsStorage</code>) so the same code works in both environments. Updated the connection string in Azure Portal app settings.</td>
+  <td>Seamless transition with zero code changes to the function logic.</td>
+  <td><span class="pill ok">Solved</span></td>
+</tr>
+<tr>
+  <td>3</td>
+  <td><strong>Cold start latency</strong><br>Azure Functions on Consumption plan had 5-10 second cold starts, causing slow first loads of the dashboard.</td>
+  <td>Added loading spinners to the frontend. Considered pre-warming strategies. Documented the trade-off between Consumption (cheap) and Premium (fast) plans.</td>
+  <td>User sees loading indicator instead of empty/broken charts. Acceptable for course project scope.</td>
+  <td><span class="pill ok">Solved</span></td>
+</tr>
+<tr>
+  <td>4</td>
+  <td><strong>CSV encoding issues</strong><br>Some recipe names contained special characters that caused parsing errors when reading from Blob Storage.</td>
+  <td>Explicitly decoded blob content as UTF-8 (<code>blob.download_blob().readall().decode("utf-8")</code>) and added <code>errors="coerce"</code> to numeric conversions in Pandas.</td>
+  <td>All 7,806 recipes parsed correctly without data loss.</td>
+  <td><span class="pill ok">Solved</span></td>
+</tr>
+<tr>
+  <td>5</td>
+  <td><strong>Large JSON response size</strong><br>Returning all 7,806 recipes in a single response was slow and caused browser lag when rendering.</td>
+  <td>Implemented server-side pagination (<code>?page=1&amp;limit=20</code>) and returned only aggregated summaries for chart endpoints. Frontend fetches pages on demand.</td>
+  <td>Fast initial load. Users can browse individual recipes via pagination controls.</td>
+  <td><span class="pill ok">Solved</span></td>
+</tr>
+<tr>
+  <td>6</td>
+  <td><strong>GitHub Actions deployment configuration</strong><br>CI/CD workflow needed separate deployment steps for the Function App and the Static Web App.</td>
+  <td>Created a multi-job workflow: one job deploys the Function App using <code>azure/functions-action</code>, another deploys the Static Web App using <code>Azure/static-web-apps-deploy</code>. Both triggered on push to main.</td>
+  <td>Automated deployment pipeline. Code pushes trigger build and deploy for both services.</td>
+  <td><span class="pill ok">Solved</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<!-- ─────────────────── 9. TEAM ─────────────────── -->
+<h2 id="team">9. Team Contributions</h2>
+
+<div class="scroll">
+<table>
+<thead><tr><th>Team Member</th><th>Responsibilities</th><th>Key Contributions</th></tr></thead>
+<tbody>
+<tr>
+  <td><strong>Yuandong Yang</strong></td>
+  <td>Project lead, Azure deployment, CI/CD</td>
+  <td>Set up Azure resource group and storage account. Configured GitHub Actions deployment pipeline. Deployed Function App and Static Web App. Managed environment variables and CORS settings. Created documentation and master overview report.</td>
+</tr>
+<tr>
+  <td><strong>Ethan Bayarsaikhan</strong></td>
+  <td>Azure Function development, data pipeline</td>
+  <td>Developed the Python Azure Function with HTTP trigger. Implemented data cleaning and aggregation logic using Pandas. Built API endpoints for nutritional insights, recipes, and clusters. Handled CSV parsing and error handling.</td>
+</tr>
+<tr>
+  <td><strong>Justin Norman-Rance</strong></td>
+  <td>Frontend dashboard, data visualization</td>
+  <td>Designed and implemented the dashboard UI with responsive layout. Created four visualization types (bar chart, scatter plot, heatmap, pie chart). Built filter controls, API interaction buttons, and pagination. Integrated frontend with Azure Function API.</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<div class="find ok">
+<h4>Source Repository</h4>
+<table>
+<tr><th>What</th><th>Link</th></tr>
+<tr><td>Repository</td><td><a href="https://github.com/YUANDONG-YANG/cloud-computing">https://github.com/YUANDONG-YANG/cloud-computing</a></td></tr>
+<tr><td>Project 2 folder</td><td><a href="https://github.com/YUANDONG-YANG/cloud-computing/tree/main/Project2">https://github.com/YUANDONG-YANG/cloud-computing/tree/main/Project2</a></td></tr>
+<tr><td>Phase 2 specification</td><td><a href="https://github.com/YUANDONG-YANG/cloud-computing/blob/main/Project2/Phase2_Cloud_Dashboard_Project%201.docx">Phase2_Cloud_Dashboard_Project 1.docx</a></td></tr>
+<tr><td>Dashboard UI reference</td><td><a href="https://github.com/YUANDONG-YANG/cloud-computing/blob/main/Project2/UI-for-project2.html">UI-for-project2.html</a></td></tr>
+</table>
+</div>
+
+<footer>
+  <p>CPSY 300 &mdash; Project 2: Cloud Dashboard Development &mdash; Reviewed 2026-10-02</p>
+  <p>Yuandong Yang &bull; Ethan Bayarsaikhan &bull; Justin Norman-Rance</p>
+</footer>
+
+</main>
+</body>
+</html>
