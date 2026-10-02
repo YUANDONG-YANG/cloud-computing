@@ -93,6 +93,16 @@ placeholder.
 If nothing is cached, the endpoints return **503** with an explanatory error
 rather than inventing numbers — see `ENABLE_DEMO_FALLBACK` below.
 
+## Deploying to Azure
+
+`docs/deployment-walkthrough.html` is the step-by-step runbook: open it in a
+browser and work down the checklist. It covers installing the tooling,
+registering the GitHub OAuth App, running `deploy.sh`, verifying the deployment,
+and capturing the four pieces of evidence the rubric asks for, with the expected
+output and the recovery step at each stage. Record the video afterwards from
+`docs/demo-plan.md`, then run `./teardown.sh` — Azure bills by the hour whether
+or not anyone uses the resources.
+
 ## Local Development
 
 ### Prerequisites
