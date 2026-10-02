@@ -58,8 +58,17 @@ footer{text-align:center;color:var(--mute);font-size:.78rem;margin-top:2rem;padd
   <div class="cards">
     <div class="card"><b>100</b>marks: 6 categories (Deployment 20, Frontend 20, Viz 20, Integration 20, Cloud 10, Docs 10)</div>
     <div class="card"><b>7,806</b>recipes across 5 diet types from All_Diets.csv</div>
-    <div class="card"><b>4</b>distinct visualizations (bar, scatter, heatmap, pie)</div>
-    <div class="card"><b>Phase 2</b>Azure cloud deployment + interactive dashboard</div>
+    <div class="card"><b>4</b>visualizations: grouped bar, doughnut, heatmap, scatter</div>
+    <div class="card"><b>Not deployed</b>Backend, frontend and <code>deploy.sh</code> are code-complete; no Azure resources exist yet</div>
+  </div>
+  <div class="find warn" style="margin-bottom:0">
+    <h4>Status of this report</h4>
+    <p>Everything described below is what the repository actually contains as of 2026-10-02. <strong>No part of the
+    system has been deployed to Azure yet</strong>: there is no live Function App, no Static Web App, no portal
+    screenshots and therefore no public URLs. Deployment is a single manual run of
+    <code>Project2/deploy.sh</code> by a team member with an Azure subscription; the URLs it prints must then be
+    pasted into section 7 before submission. Items that depend on a real Azure resource are marked
+    <span class="pill bad">Pending</span> rather than done.</p>
   </div>
 </header>
 
@@ -79,177 +88,284 @@ footer{text-align:center;color:var(--mute);font-size:.78rem;margin-top:2rem;padd
 
 <!-- ─────────────────── 1. PHASE TRANSITION ─────────────────── -->
 <h2 id="phase-transition">1. Phase 1 &rarr; Phase 2 Transition</h2>
-<p>Phase 2 builds directly on the Phase 1 foundation. Every local emulation is replaced with its real Azure cloud equivalent.</p>
+<p>Phase 2 replaces each local emulation from Phase 1 with the Azure service it stands in for. The Phase 2 column
+below describes what the committed code targets; the right-hand column states whether that target has actually
+been created in Azure yet.</p>
 
 <div class="scroll transition-table">
 <table>
 <thead>
-<tr><th>Component</th><th>Phase 1 (Local)</th><th>Phase 2 (Cloud)</th></tr>
+<tr><th>Component</th><th>Phase 1 (Local)</th><th>Phase 2 (Cloud)</th><th>Live in Azure?</th></tr>
 </thead>
 <tbody>
-<tr><td>Function Execution</td><td>Localhost (Azure Functions Core Tools)</td><td>Azure Functions in Azure Portal</td></tr>
-<tr><td>Blob Storage</td><td>Azurite emulator</td><td>Azure Blob Storage</td></tr>
-<tr><td>Dataset Access</td><td>Local blob container</td><td>Public/secured blob in Azure</td></tr>
-<tr><td>Output</td><td>Local console / JSON</td><td>Dashboard UI in browser</td></tr>
-<tr><td>Frontend</td><td>N/A</td><td>Azure Static Web App</td></tr>
-<tr><td>CI/CD</td><td>GitHub Actions (test)</td><td>GitHub Actions (deploy to Azure)</td></tr>
-<tr><td>Goal</td><td>Build &amp; test locally</td><td>Deploy, visualize, interact in cloud</td></tr>
+<tr><td>Function execution</td><td>Localhost (<code>func start</code>, Azure Functions Core Tools)</td><td>Azure Functions, Python 3.11, v2 programming model (<code>backend/function_app.py</code>)</td><td><span class="pill bad">Not yet</span></td></tr>
+<tr><td>Blob storage</td><td>Azurite emulator (<code>UseDevelopmentStorage=true</code>)</td><td>Azure Blob Storage, private container <code>datasets</code></td><td><span class="pill bad">Not yet</span></td></tr>
+<tr><td>Dataset access</td><td>Local Azurite container</td><td>Private blob read with a connection string from app settings; no public blob access</td><td><span class="pill bad">Not yet</span></td></tr>
+<tr><td>Output</td><td>Local console / CSV files in <code>Project1/docs/results/</code></td><td>JSON from <code>/api/insights</code> and <code>/api/recipes</code>, rendered as charts in the browser</td><td><span class="pill warn">Code complete</span></td></tr>
+<tr><td>Frontend</td><td>N/A</td><td>Azure Static Web App serving <code>frontend/index.html</code>, <code>app.js</code>, <code>styles.css</code></td><td><span class="pill bad">Not yet</span></td></tr>
+<tr><td>CI/CD</td><td>GitHub Actions: build, pytest, flake8, Docker + Azurite simulation</td><td>GitHub Actions runs lint and unit tests only (<code>project2-tests</code> job); Azure deployment is performed manually with <code>deploy.sh</code></td><td><span class="pill warn">CI only</span></td></tr>
+<tr><td>Goal</td><td>Build and test locally</td><td>Deploy, visualize and interact in the cloud</td><td><span class="pill bad">Pending deployment</span></td></tr>
 </tbody>
 </table>
 </div>
 
+<div class="find warn">
+<h4>What the CI pipeline does and does not do</h4>
+<p><code>.github/workflows/deploy.yml</code> has two jobs. <code>local-simulation</code> is the Phase 1 job: it
+builds the Docker image, runs <code>pytest</code> and <code>flake8</code>, and exercises the Azurite-based local
+simulation. <code>project2-tests</code> is the Phase 2 job: on Python 3.11 it installs
+<code>Project2/requirements-dev.txt</code>, runs <code>python -m pytest -q</code> against
+<code>Project2/tests/</code> (<code>test_function_app.py</code>, <code>test_nutrition.py</code>,
+<code>test_frontend_demo_data.py</code>), runs <code>flake8 .</code>, and syntax-checks the deployment script with
+<code>bash -n deploy.sh</code>. <strong>Neither job deploys anything to Azure.</strong> There is no
+<code>azure/functions-action</code> step, no <code>Azure/static-web-apps-deploy</code> step and no Azure
+credentials or publish profile in the workflow. Deployment is a deliberate manual step so that no subscription
+secrets are needed in CI.</p>
+</div>
+
 <!-- ─────────────────── 2. ARCHITECTURE ─────────────────── -->
 <h2 id="architecture">2. Cloud Architecture</h2>
-<p>The application follows a serverless architecture pattern with three main Azure services working together. The user accesses the Static Web App, which calls the Azure Function API, which reads data from Azure Blob Storage.</p>
+<p>The application is a three-service serverless design. The browser loads the dashboard from the Static Web App,
+the dashboard calls the Function App over HTTPS, and the Function App reads the CSV from Blob Storage. Names,
+regions and settings below are taken from <code>Project2/deploy.sh</code>.</p>
 
 <div class="diagram-box">
-                        +-----------------------------------+
-                        |          Azure Cloud              |
-                        |       (Resource Group:            |
-                        |    cpsy300-nutritional-rg)        |
-                        |                                   |
-  +----------+          |   +--------------------------+    |
-  |          |  HTTPS   |   |   Azure Static Web App   |    |
-  |  User /  |--------->|   |  (nutritional-dashboard) |    |
-  | Browser  |          |   |   - HTML / CSS / JS      |    |
-  |          |<---------|   |   - Charts (Chart.js)    |    |
-  +----------+          |   +-----------+--------------+    |
-                        |               |                   |
-                        |          fetch("/api/...")        |
-                        |               |                   |
-                        |   +-----------v--------------+    |
-                        |   |   Azure Function App     |    |
-                        |   |  (nutritional-func-app)  |    |
-                        |   |   - Python 3.10+         |    |
-                        |   |   - HTTP Trigger         |    |
-                        |   |   - Pandas, data clean   |    |
-                        |   +-----------+--------------+    |
-                        |               |                   |
-                        |        BlobServiceClient          |
-                        |               |                   |
-                        |   +-----------v--------------+    |
-                        |   |  Azure Blob Storage      |    |
-                        |   |  (nutritionalstorage)    |    |
-                        |   |   - Container: data      |    |
-                        |   |   - All_Diets.csv        |    |
-                        |   |     (7,806 rows)         |    |
-                        |   +--------------------------+    |
-                        |                                   |
-                        +-----------------------------------+
+                        +--------------------------------------------+
+                        |              Azure Cloud                   |
+                        |   Resource group:                          |
+                        |   cpsy300-nutritional-insights-rg          |
+                        |   Region: eastus (SWA: eastus2)            |
+                        |                                            |
+  +----------+          |   +------------------------------------+   |
+  |          |  HTTPS   |   |   Azure Static Web App (Free)      |   |
+  |  User /  |--------->|   |   cpsy300-nutrition-dashboard      |   |
+  | Browser  |          |   |   region: eastus2                  |   |
+  |          |<---------|   |   - index.html / app.js / styles   |   |
+  +----------+          |   |   - Chart.js 4.4.1 + Tailwind CDN  |   |
+                        |   +------------------+-----------------+   |
+                        |                      |                     |
+                        |   fetch(window.NUTRITIONAL_API_URL)        |
+                        |   /health  /insights  /recipes             |
+                        |                      |                     |
+                        |   +------------------v-----------------+   |
+                        |   |   Azure Function App (Consumption) |   |
+                        |   |   cpsy300-nutrition-api            |   |
+                        |   |   - Python 3.11, Functions v4      |   |
+                        |   |   - v2 model: @app.route(...)      |   |
+                        |   |   - pandas cleaning + aggregation  |   |
+                        |   |   - ETag-keyed DataFrame cache     |   |
+                        |   |   - CORS allowed origin = SWA only |   |
+                        |   +------------------+-----------------+   |
+                        |                      |                     |
+                        |   BlobServiceClient.from_connection_string  |
+                        |   (AZURE_STORAGE_CONNECTION_STRING)         |
+                        |                      |                     |
+                        |   +------------------v-----------------+   |
+                        |   |   Azure Blob Storage (StorageV2)   |   |
+                        |   |   cpsy300nutrition&lt;random-hex&gt;     |   |
+                        |   |   - container: datasets (private)  |   |
+                        |   |   - public blob access: disabled   |   |
+                        |   |   - min TLS: 1.2                   |   |
+                        |   |   - All_Diets.csv (7,806 rows)     |   |
+                        |   +------------------------------------+   |
+                        +--------------------------------------------+
 
-  +-------------------+
-  |  GitHub Actions   |----> Deploy Function App
-  |  CI/CD Pipeline   |----> Deploy Static Web App
-  +-------------------+
+  +-------------------+                         +-------------------------+
+  |  GitHub Actions   |--> lint (flake8)        |  deploy.sh (manual run) |
+  |  CI only          |--> unit tests (pytest)  |  --> creates all Azure  |
+  |  NO Azure deploy  |                         |      resources above    |
+  +-------------------+                         +-------------------------+
 </div>
 
 <h3>Architecture Components</h3>
 <div class="cards">
-  <div class="card"><b>Static Web App</b>Hosts the dashboard frontend. Serves HTML, CSS, and JavaScript. Renders 4 chart types using Chart.js/inline SVG.</div>
-  <div class="card"><b>Function App</b>Serverless HTTP-triggered Python function. Reads CSV from Blob Storage, cleans data with Pandas, returns JSON.</div>
-  <div class="card"><b>Blob Storage</b>Stores All_Diets.csv (7,806 recipes). Accessed via BlobServiceClient using connection string from environment variables.</div>
-  <div class="card"><b>GitHub Actions</b>CI/CD pipeline deploys both the Function App and the Static Web App on every push to main.</div>
+  <div class="card"><b>Static Web App</b>Serves the dashboard as plain static files. Charts are drawn with Chart.js 4.4.1 plus a CSS-grid heatmap built in <code>app.js</code>. <code>staticwebapp.config.json</code> adds a navigation fallback and the <code>X-Content-Type-Options</code>, <code>X-Frame-Options</code> and <code>Referrer-Policy</code> headers.</div>
+  <div class="card"><b>Function App</b>Three anonymous HTTP GET routes registered with the Azure Functions v2 decorator model. Reads the CSV from Blob Storage, cleans it with the shared <code>nutrition.py</code> module, and returns JSON. The cleaned DataFrame is cached by blob ETag.</div>
+  <div class="card"><b>Blob Storage</b>A private <code>datasets</code> container holding <code>All_Diets.csv</code> (7,806 recipes). Public blob access is disabled and the minimum TLS version is 1.2. The connection string lives only in Function App settings.</div>
+  <div class="card"><b>GitHub Actions</b>Continuous integration only: <code>pytest</code>, <code>flake8</code> and a <code>bash -n</code> syntax check of <code>deploy.sh</code>. No Azure deployment job and no subscription secrets. Azure resources are created by running <code>deploy.sh</code> manually.</div>
 </div>
 
 <!-- ─────────────────── 3. CLOUD SETUP ─────────────────── -->
 <h2 id="cloud-setup">3. Cloud Setup &amp; Configuration</h2>
+<p>Every command in this section is the one <code>deploy.sh</code> actually runs. The script is idempotent
+(<code>set -euo pipefail</code>, re-running updates existing resources) and runs in seven numbered steps. It has
+<strong>not been executed against a real subscription yet</strong>.</p>
 
-<h3>3.1 Resource Group</h3>
+<h3>3.1 Resource Group &mdash; step 1 of 7</h3>
 <div class="find ok">
 <h4>Resource Group Configuration</h4>
-<p>All Azure resources are organized under a single resource group for clean management and cost tracking.</p>
-<pre>az group create \
-  --name cpsy300-nutritional-rg \
-  --location canadacentral</pre>
+<p>All resources live in one resource group, so the whole project can be tracked and deleted as a unit.</p>
+<pre>RESOURCE_GROUP="cpsy300-nutritional-insights-rg"
+LOCATION="eastus"
+# Static Web Apps is only available in a handful of regions; eastus is not one.
+SWA_LOCATION="eastus2"
+
+az group create \
+    --name "$RESOURCE_GROUP" \
+    --location "$LOCATION" \
+    --output none</pre>
 </div>
 
-<h3>3.2 Storage Account</h3>
+<h3>3.2 Storage Account and dataset upload &mdash; step 2 of 7</h3>
 <div class="find ok">
 <h4>Azure Blob Storage Setup</h4>
-<p>A general-purpose v2 storage account is created to host the <code>All_Diets.csv</code> dataset. The CSV is uploaded to a blob container named <code>data</code>.</p>
-<pre># Create storage account
+<p>Storage account names are globally unique, so the script reuses an existing
+<code>cpsy300nutrition*</code> account in the resource group when re-run and otherwise generates
+<code>cpsy300nutrition$(openssl rand -hex 3)</code>. The container is <strong>private</strong>: public blob access
+is disabled at the account level and TLS 1.2 is the floor.</p>
+<pre>STORAGE_ACCOUNT="cpsy300nutrition$(openssl rand -hex 3)"   # e.g. cpsy300nutrition4f9a21
+BLOB_CONTAINER="datasets"
+
 az storage account create \
-  --name nutritionalstorage \
-  --resource-group cpsy300-nutritional-rg \
-  --location canadacentral \
-  --sku Standard_LRS
+    --name "$STORAGE_ACCOUNT" \
+    --resource-group "$RESOURCE_GROUP" \
+    --location "$LOCATION" \
+    --sku Standard_LRS \
+    --kind StorageV2 \
+    --min-tls-version TLS1_2 \
+    --allow-blob-public-access false \
+    --output none
 
-# Create container
+CONN_STRING=$(az storage account show-connection-string \
+    --name "$STORAGE_ACCOUNT" --resource-group "$RESOURCE_GROUP" \
+    --query connectionString --output tsv)
+
 az storage container create \
-  --name data \
-  --account-name nutritionalstorage
+    --name "$BLOB_CONTAINER" \
+    --connection-string "$CONN_STRING" \
+    --output none
 
-# Upload dataset
 az storage blob upload \
-  --account-name nutritionalstorage \
-  --container-name data \
-  --name All_Diets.csv \
-  --file ./All_Diets.csv</pre>
+    --container-name "$BLOB_CONTAINER" \
+    --file "../Project1/data/All_Diets.csv" \
+    --name "All_Diets.csv" \
+    --connection-string "$CONN_STRING" \
+    --overwrite \
+    --output none</pre>
+<p><strong>Secret handling:</strong> <code>$CONN_STRING</code> is never echoed. It is passed straight into the
+Function App settings, and the summary at the end of the script prints only the
+<code>az functionapp config appsettings list</code> command needed to retrieve it later.</p>
 </div>
 
-<h3>3.3 Function App</h3>
+<h3>3.3 Function App &mdash; steps 3 and 4 of 7</h3>
 <div class="find ok">
 <h4>Azure Function App Deployment</h4>
-<p>A Python-based Function App with an HTTP trigger is deployed. It reads the CSV from Blob Storage, performs data cleaning, and returns aggregated nutritional insights as JSON.</p>
-<pre># Create Function App
+<p>A Linux Consumption-plan Function App on Python 3.11 and Functions runtime v4. The code is published with
+<code>func azure functionapp publish</code> from the <code>backend/</code> directory, which is where
+<code>host.json</code>, <code>requirements.txt</code> and <code>function_app.py</code> live.</p>
+<pre>FUNCTION_APP_NAME="cpsy300-nutrition-api"
+PYTHON_VERSION="3.11"
+
 az functionapp create \
-  --name nutritional-func-app \
-  --resource-group cpsy300-nutritional-rg \
-  --storage-account nutritionalstorage \
-  --consumption-plan-location canadacentral \
-  --runtime python \
-  --runtime-version 3.10 \
-  --functions-version 4 \
-  --os-type Linux
+    --name "$FUNCTION_APP_NAME" \
+    --resource-group "$RESOURCE_GROUP" \
+    --storage-account "$STORAGE_ACCOUNT" \
+    --consumption-plan-location "$LOCATION" \
+    --runtime python \
+    --runtime-version "$PYTHON_VERSION" \
+    --functions-version 4 \
+    --os-type Linux \
+    --output none
 
-# Set environment variable for storage connection
 az functionapp config appsettings set \
-  --name nutritional-func-app \
-  --resource-group cpsy300-nutritional-rg \
-  --settings AzureWebJobsStorage="&lt;connection-string&gt;"
+    --name "$FUNCTION_APP_NAME" \
+    --resource-group "$RESOURCE_GROUP" \
+    --settings \
+        "AZURE_STORAGE_CONNECTION_STRING=$CONN_STRING" \
+        "BLOB_CONTAINER_NAME=$BLOB_CONTAINER" \
+        "BLOB_NAME=All_Diets.csv" \
+    --output none
 
-# Deploy function code
-func azure functionapp publish nutritional-func-app</pre>
+(cd backend &amp;&amp; func azure functionapp publish "$FUNCTION_APP_NAME")</pre>
 </div>
 
-<h3>3.4 Static Web App</h3>
+<h3>3.4 Static Web App and frontend build &mdash; steps 5 and 6 of 7</h3>
 <div class="find ok">
 <h4>Azure Static Web App Deployment</h4>
-<p>The frontend dashboard is deployed as an Azure Static Web App, linked to the GitHub repository for automatic deployment on push.</p>
-<pre># Create Static Web App (via Azure Portal or CLI)
+<p>The Static Web App is created <strong>unlinked</strong> from GitHub, so no repository token or OAuth grant is
+required. The frontend is then built into a throwaway <code>build/</code> directory with the live API URL
+substituted in, and uploaded with the Static Web Apps CLI using a deployment token read from Azure. If
+<code>swa</code> is not installed the script prints the exact command to run manually instead of failing silently.</p>
+<pre>STATIC_WEB_APP_NAME="cpsy300-nutrition-dashboard"
+
 az staticwebapp create \
-  --name nutritional-dashboard \
-  --resource-group cpsy300-nutritional-rg \
-  --source https://github.com/YUANDONG-YANG/cloud-computing \
-  --branch main \
-  --app-location "/Project2/frontend" \
-  --output-location "build"</pre>
+    --name "$STATIC_WEB_APP_NAME" \
+    --resource-group "$RESOURCE_GROUP" \
+    --location "$SWA_LOCATION" \
+    --sku Free \
+    --output none
+
+SWA_HOSTNAME=$(az staticwebapp show --name "$STATIC_WEB_APP_NAME" \
+    --resource-group "$RESOURCE_GROUP" --query defaultHostname --output tsv)
+DASHBOARD_URL="https://${SWA_HOSTNAME}"
+
+# Build into a separate directory so the committed sources keep their
+# placeholder and the repository stays clean.
+rm -rf build
+cp -r frontend build
+cp staticwebapp.config.json build/ 2>/dev/null || true
+sed -i "s#__FUNCTION_API_URL__#${FUNCTION_URL}/api#" build/index.html
+grep -q "${FUNCTION_URL}/api" build/index.html \
+    || { echo "ERROR: failed to inject the API URL into index.html" &gt;&amp;2; exit 1; }
+
+SWA_TOKEN=$(az staticwebapp secrets list --name "$STATIC_WEB_APP_NAME" \
+    --resource-group "$RESOURCE_GROUP" --query properties.apiKey --output tsv)
+swa deploy build --deployment-token "$SWA_TOKEN" --env production</pre>
 </div>
 
-<h3>3.5 Environment &amp; Configuration</h3>
+<h3>3.5 CORS scoping and smoke test &mdash; step 7 of 7</h3>
+<div class="find ok">
+<h4>CORS is scoped to exactly one origin</h4>
+<p>Step 7 first removes any <code>*</code> wildcard left behind by an earlier run, then allows only the Static Web
+App origin. It finishes by calling all three endpoints with <code>curl -fsS --max-time 180</code>, which both
+verifies the deployment and absorbs the cold start.</p>
+<pre>az functionapp cors remove \
+    --name "$FUNCTION_APP_NAME" --resource-group "$RESOURCE_GROUP" \
+    --allowed-origins "*" --output none 2>/dev/null || true
+
+az functionapp cors add \
+    --name "$FUNCTION_APP_NAME" --resource-group "$RESOURCE_GROUP" \
+    --allowed-origins "$DASHBOARD_URL" --output none
+
+for endpoint in health "insights" "recipes?page=1&amp;limit=5"; do
+    curl -fsS --max-time 180 "$FUNCTION_URL/api/$endpoint" &gt;/dev/null &amp;&amp; echo OK || echo FAILED
+done</pre>
+</div>
+
+<h3>3.6 Environment &amp; Configuration</h3>
+<p>These are the exact app-setting names read by <code>backend/function_app.py</code>. Local development uses the
+same names in <code>backend/local.settings.json</code>, which is why no code changes are needed between Azurite and
+Azure.</p>
 <div class="scroll">
 <table>
 <thead><tr><th>Setting</th><th>Value</th><th>Purpose</th></tr></thead>
 <tbody>
-<tr><td><code>AzureWebJobsStorage</code></td><td>Connection string to <code>nutritionalstorage</code></td><td>Allows Function App to access Blob Storage</td></tr>
-<tr><td><code>STORAGE_CONTAINER</code></td><td><code>data</code></td><td>Container holding All_Diets.csv</td></tr>
-<tr><td><code>BLOB_NAME</code></td><td><code>All_Diets.csv</code></td><td>Target dataset file name</td></tr>
-<tr><td><code>FUNCTIONS_WORKER_RUNTIME</code></td><td><code>python</code></td><td>Function App language runtime</td></tr>
-<tr><td><code>CORS</code></td><td><code>https://nutritional-dashboard.azurestaticapps.net</code></td><td>Allow frontend to call the API</td></tr>
+<tr><td><code>AZURE_STORAGE_CONNECTION_STRING</code></td><td>Connection string for <code>cpsy300nutrition&lt;hex&gt;</code></td><td>Primary credential used by <code>BlobServiceClient</code>. Set by <code>deploy.sh</code>; never committed.</td></tr>
+<tr><td><code>BLOB_CONTAINER_NAME</code></td><td><code>datasets</code></td><td>Private container holding the dataset. Code default is also <code>datasets</code>.</td></tr>
+<tr><td><code>BLOB_NAME</code></td><td><code>All_Diets.csv</code></td><td>Blob to read, and the value reported in <code>metadata.dataset</code>.</td></tr>
+<tr><td><code>AzureWebJobsStorage</code></td><td>Created by <code>az functionapp create</code></td><td>Required by the Functions host. Used as a fallback by <code>_get_connection_string()</code> if the explicit setting is absent; locally it is <code>UseDevelopmentStorage=true</code> via <code>local.settings.json</code>.</td></tr>
+<tr><td><code>FUNCTIONS_WORKER_RUNTIME</code></td><td><code>python</code></td><td>Worker language. Runtime version 3.11, Functions version 4.</td></tr>
+<tr><td>Host CORS allowed origin</td><td>The Static Web App origin, e.g. <code>https://cpsy300-nutrition-dashboard.&lt;id&gt;.azurestaticapps.net</code></td><td>Set in step 7. The wildcard is explicitly removed first.</td></tr>
+<tr><td><code>host.json</code> &rarr; <code>extensions.http.routePrefix</code></td><td><code>api</code></td><td>Why the routes resolve as <code>/api/health</code>, <code>/api/insights</code>, <code>/api/recipes</code>.</td></tr>
+<tr><td><code>__FUNCTION_API_URL__</code> (build placeholder)</td><td>Replaced at build time with <code>&lt;function-url&gt;/api</code></td><td>Keeps the committed <code>index.html</code> free of environment-specific URLs.</td></tr>
 </tbody>
 </table>
 </div>
 
 <!-- ─────────────────── 4. DASHBOARD VISUALIZATIONS ─────────────────── -->
 <h2 id="dashboard">4. Dashboard Visualizations</h2>
-<p>The dashboard renders four distinct visualization types using real data from the 7,806-recipe dataset. Below are the embedded charts built with the actual computed averages and counts.</p>
+<p>The dashboard renders four distinct visualizations from the <code>/api/insights</code> payload. The static SVGs
+below reproduce them with the verified figures recomputed from <code>Project1/data/All_Diets.csv</code>
+(7,806 recipes, 5 diet types), so the report and the dashboard show the same numbers. In the running dashboard the
+bar, doughnut and scatter charts are Chart.js canvases and the heatmap is a CSS grid built in
+<code>app.js</code>; all four re-render when the diet filter changes.</p>
 
 <div class="chart-grid">
 
 <!-- BAR CHART -->
 <div class="chart-section">
-<h3>4.1 Average Macronutrients by Diet Type (Bar Chart)</h3>
-<p class="sub">Grouped bar chart showing mean Protein, Carbs, and Fat per diet type.</p>
+<h3>4.1 Average Macronutrients by Diet Type (Grouped Bar Chart)</h3>
+<p class="sub">Chart.js grouped bar chart of mean Protein, Carbs and Fat per diet type.</p>
 <svg viewBox="0 0 520 320" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;max-width:520px">
   <!-- Background -->
   <rect width="520" height="320" rx="8" fill="var(--card)"/>
@@ -327,137 +443,151 @@ az staticwebapp create \
   <text x="463" y="55" text-anchor="middle" font-size="7" fill="var(--ink)">254.0</text>
   <text x="490" y="171" text-anchor="middle" font-size="7" fill="var(--ink)">103.3</text>
 </svg>
-<p class="sub" style="margin-top:.5rem"><strong>Key insight:</strong> Vegan diet has the highest average carbs (254.0g), while Keto has the lowest (58.0g) and highest fat (153.1g). Keto and Mediterranean tie for highest protein at ~101g.</p>
+<p class="sub" style="margin-top:.5rem"><strong>Key insight:</strong> Vegan has by far the highest average carbs
+(254.0 g) and the lowest average protein (56.2 g). Keto is the mirror image: the lowest carbs (58.0 g) and the
+highest fat (153.1 g). Keto (101.27 g) and Mediterranean (101.11 g) are within 0.2 g of each other on mean
+protein, so keto takes <code>highest_mean_protein_diet</code> by a very small margin.</p>
 </div>
 
-<!-- PIE CHART -->
+<!-- DOUGHNUT CHART -->
 <div class="chart-section">
-<h3>4.2 Recipe Distribution by Diet Type (Pie Chart)</h3>
-<p class="sub">Proportional breakdown of the 7,806 recipes across 5 diet categories.</p>
+<h3>4.2 Recipe Distribution by Diet Type (Doughnut Chart)</h3>
+<p class="sub">Chart.js doughnut of the 7,806 recipes across the 5 diet categories. Counts come from
+<code>summary.diet_counts</code>; the tooltip shows the count and the percentage.</p>
 <svg viewBox="0 0 520 320" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;max-width:520px">
   <rect width="520" height="320" rx="8" fill="var(--card)"/>
   <text x="260" y="22" text-anchor="middle" font-size="12" font-weight="600" fill="var(--ink)">Recipe Distribution by Diet Type (n=7,806)</text>
 
-  <!-- Pie: center 210,170 radius 110 -->
-  <!-- Counts: dash=1561 (20.0%), keto=1890 (24.2%), med=1752 (22.4%), paleo=1553 (19.9%), vegan=1050 (13.5%) -->
-  <!-- Angles: dash=0-72.0, keto=72.0-159.1, med=159.1-239.9, paleo=239.9-311.5, vegan=311.5-360 -->
+  <!-- Doughnut: centre 200,175, outer r=105, inner r=55 -->
+  <!-- Verified counts: dash 1745 (22.4%), keto 1512 (19.4%), mediterranean 1753 (22.5%), paleo 1274 (16.3%), vegan 1522 (19.5%) -->
 
-  <!-- Dash: 0 to 72 deg -->
-  <path d="M210,170 L320,170 A110,110 0 0,1 244.0,275.7 Z" fill="#0f766e"/>
-  <!-- Keto: 72 to 159.1 deg -->
-  <path d="M210,170 L244.0,275.7 A110,110 0 0,1 110.1,131.1 Z" fill="#0a5fb4"/>
-  <!-- Med: 159.1 to 239.9 deg -->
-  <path d="M210,170 L110.1,131.1 A110,110 0 0,1 155.5,75.3 Z" fill="#b45309"/>
-  <!-- Paleo: 239.9 to 311.5 deg -->
-  <path d="M210,170 L155.5,75.3 A110,110 0 0,1 312.5,106.4 Z" fill="#7c3aed"/>
-  <!-- Vegan: 311.5 to 360 deg -->
-  <path d="M210,170 L312.5,106.4 A110,110 0 0,1 320,170 Z" fill="#dc2626"/>
+  <!-- Dash: 0 to 80.5 deg -->
+  <path d="M200,175 L305.0,175.0 A105,105 0 0,1 217.4,278.6 Z" fill="#3b82f6"/>
+  <!-- Keto: 80.5 to 150.2 deg -->
+  <path d="M200,175 L217.4,278.6 A105,105 0 0,1 108.9,227.2 Z" fill="#ec4899"/>
+  <!-- Mediterranean: 150.2 to 231.0 deg -->
+  <path d="M200,175 L108.9,227.2 A105,105 0 0,1 134.0,93.3 Z" fill="#10b981"/>
+  <!-- Paleo: 231.0 to 289.8 deg -->
+  <path d="M200,175 L134.0,93.3 A105,105 0 0,1 235.6,76.2 Z" fill="#f59e0b"/>
+  <!-- Vegan: 289.8 to 360 deg -->
+  <path d="M200,175 L235.6,76.2 A105,105 0 0,1 305.0,175.0 Z" fill="#8b5cf6"/>
+  <!-- Doughnut hole -->
+  <circle cx="200" cy="175" r="55" fill="var(--card)"/>
+  <text x="200" y="170" text-anchor="middle" font-size="18" font-weight="bold" fill="var(--ink)">7,806</text>
+  <text x="200" y="186" text-anchor="middle" font-size="9" fill="var(--mute)">recipes</text>
 
   <!-- Legend -->
-  <rect x="350" y="80" width="12" height="12" rx="2" fill="#0f766e"/>
-  <text x="368" y="91" font-size="10" fill="var(--ink)">Dash &mdash; 1,561 (20.0%)</text>
-  <rect x="350" y="102" width="12" height="12" rx="2" fill="#0a5fb4"/>
-  <text x="368" y="113" font-size="10" fill="var(--ink)">Keto &mdash; 1,890 (24.2%)</text>
-  <rect x="350" y="124" width="12" height="12" rx="2" fill="#b45309"/>
-  <text x="368" y="135" font-size="10" fill="var(--ink)">Med &mdash; 1,752 (22.4%)</text>
-  <rect x="350" y="146" width="12" height="12" rx="2" fill="#7c3aed"/>
-  <text x="368" y="157" font-size="10" fill="var(--ink)">Paleo &mdash; 1,553 (19.9%)</text>
-  <rect x="350" y="168" width="12" height="12" rx="2" fill="#dc2626"/>
-  <text x="368" y="179" font-size="10" fill="var(--ink)">Vegan &mdash; 1,050 (13.5%)</text>
+  <rect x="340" y="70" width="12" height="12" rx="2" fill="#10b981"/>
+  <text x="358" y="81" font-size="10" fill="var(--ink)">Mediterranean &mdash; 1,753 (22.5%)</text>
+  <rect x="340" y="92" width="12" height="12" rx="2" fill="#3b82f6"/>
+  <text x="358" y="103" font-size="10" fill="var(--ink)">Dash &mdash; 1,745 (22.4%)</text>
+  <rect x="340" y="114" width="12" height="12" rx="2" fill="#8b5cf6"/>
+  <text x="358" y="125" font-size="10" fill="var(--ink)">Vegan &mdash; 1,522 (19.5%)</text>
+  <rect x="340" y="136" width="12" height="12" rx="2" fill="#ec4899"/>
+  <text x="358" y="147" font-size="10" fill="var(--ink)">Keto &mdash; 1,512 (19.4%)</text>
+  <rect x="340" y="158" width="12" height="12" rx="2" fill="#f59e0b"/>
+  <text x="358" y="169" font-size="10" fill="var(--ink)">Paleo &mdash; 1,274 (16.3%)</text>
+  <text x="340" y="196" font-size="8" fill="var(--mute)">Legend ordered by count; the chart itself</text>
+  <text x="340" y="207" font-size="8" fill="var(--mute)">orders slices alphabetically, as app.js does.</text>
 
-  <!-- Percentage labels on pie -->
-  <text x="270" y="210" text-anchor="middle" font-size="11" font-weight="bold" fill="#fff">20.0%</text>
-  <text x="170" y="220" text-anchor="middle" font-size="11" font-weight="bold" fill="#fff">24.2%</text>
-  <text x="140" y="130" text-anchor="middle" font-size="11" font-weight="bold" fill="#fff">22.4%</text>
-  <text x="220" y="90" text-anchor="middle" font-size="11" font-weight="bold" fill="#fff">19.9%</text>
-  <text x="300" y="130" text-anchor="middle" font-size="11" font-weight="bold" fill="#fff">13.5%</text>
+  <!-- Percentage labels on the ring -->
+  <text x="259.5" y="228.4" text-anchor="middle" font-size="10" font-weight="bold" fill="#fff">22.4%</text>
+  <text x="166.6" y="248.5" text-anchor="middle" font-size="10" font-weight="bold" fill="#fff">19.4%</text>
+  <text x="123.3" y="163.6" text-anchor="middle" font-size="10" font-weight="bold" fill="#fff">22.5%</text>
+  <text x="187.0" y="101.1" text-anchor="middle" font-size="10" font-weight="bold" fill="#fff">16.3%</text>
+  <text x="263.8" y="133.2" text-anchor="middle" font-size="10" font-weight="bold" fill="#fff">19.5%</text>
 </svg>
-<p class="sub" style="margin-top:.5rem"><strong>Key insight:</strong> Keto has the largest share (24.2%), while Vegan has the smallest (13.5%). The distribution is relatively balanced across the top four diets.</p>
+<p class="sub" style="margin-top:.5rem"><strong>Key insight:</strong> Mediterranean has the largest share at
+<strong>22.5%</strong> (1,753 recipes) and paleo the smallest at <strong>16.3%</strong> (1,274). Mediterranean and
+dash are nearly tied (1,753 vs 1,745), as are vegan and keto (1,522 vs 1,512). The dataset is therefore close to
+balanced: the gap between the largest and smallest category is only 6.1 percentage points, so no diet dominates
+the aggregate statistics.</p>
 </div>
 
 <!-- HEATMAP -->
 <div class="chart-section">
-<h3>4.3 Macronutrient Correlation Heatmap</h3>
-<p class="sub">Correlation matrix showing relationships between Protein, Carbs, and Fat across all 7,806 recipes.</p>
+<h3>4.3 Macronutrient Intensity Heatmap</h3>
+<p class="sub">The dashboard heatmap is a CSS grid of average macro values: diets across the columns, Protein /
+Carbs / Fat down the rows. Cell colour runs blue (lowest) &rarr; amber &rarr; red (highest) over the observed range,
+exactly as <code>renderHeatmap()</code> computes it.</p>
 <svg viewBox="0 0 520 320" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;max-width:520px">
   <rect width="520" height="320" rx="8" fill="var(--card)"/>
-  <text x="260" y="22" text-anchor="middle" font-size="12" font-weight="600" fill="var(--ink)">Macronutrient Correlation Heatmap</text>
+  <text x="260" y="22" text-anchor="middle" font-size="12" font-weight="600" fill="var(--ink)">Average Macronutrients by Diet (g per recipe)</text>
 
-  <!-- Labels -->
-  <text x="175" y="60" text-anchor="middle" font-size="11" font-weight="600" fill="var(--ink)">Protein</text>
-  <text x="270" y="60" text-anchor="middle" font-size="11" font-weight="600" fill="var(--ink)">Carbs</text>
-  <text x="365" y="60" text-anchor="middle" font-size="11" font-weight="600" fill="var(--ink)">Fat</text>
+  <!-- Column headers -->
+  <text x="133" y="52" text-anchor="middle" font-size="10" font-weight="600" fill="var(--ink)">Dash</text>
+  <text x="217" y="52" text-anchor="middle" font-size="10" font-weight="600" fill="var(--ink)">Keto</text>
+  <text x="301" y="52" text-anchor="middle" font-size="10" font-weight="600" fill="var(--ink)">Med</text>
+  <text x="385" y="52" text-anchor="middle" font-size="10" font-weight="600" fill="var(--ink)">Paleo</text>
+  <text x="469" y="52" text-anchor="middle" font-size="10" font-weight="600" fill="var(--ink)">Vegan</text>
 
-  <text x="110" y="125" text-anchor="end" font-size="11" font-weight="600" fill="var(--ink)">Protein</text>
-  <text x="110" y="195" text-anchor="end" font-size="11" font-weight="600" fill="var(--ink)">Carbs</text>
-  <text x="110" y="265" text-anchor="end" font-size="11" font-weight="600" fill="var(--ink)">Fat</text>
+  <!-- Row labels -->
+  <text x="86" y="96" text-anchor="end" font-size="10" font-weight="600" fill="var(--ink)">Protein</text>
+  <text x="86" y="162" text-anchor="end" font-size="10" font-weight="600" fill="var(--ink)">Carbs</text>
+  <text x="86" y="228" text-anchor="end" font-size="10" font-weight="600" fill="var(--ink)">Fat</text>
 
-  <!-- Heatmap cells -->
-  <!-- Protein-Protein: 1.00 (strong positive = deep teal) -->
-  <rect x="125" y="75" width="100" height="70" rx="6" fill="#0f766e"/>
-  <text x="175" y="115" text-anchor="middle" font-size="16" font-weight="bold" fill="#fff">1.00</text>
+  <!-- Protein row -->
+  <rect x="94" y="62" width="78" height="56" rx="6" fill="rgb(84,134,215)"/>
+  <text x="133" y="96" text-anchor="middle" font-size="13" font-weight="bold" fill="#1e293b">69.3</text>
+  <rect x="178" y="62" width="78" height="56" rx="6" fill="rgb(144,143,139)"/>
+  <text x="217" y="96" text-anchor="middle" font-size="13" font-weight="bold" fill="#1e293b">101.3</text>
+  <rect x="262" y="62" width="78" height="56" rx="6" fill="rgb(144,143,139)"/>
+  <text x="301" y="96" text-anchor="middle" font-size="13" font-weight="bold" fill="#1e293b">101.1</text>
+  <rect x="346" y="62" width="78" height="56" rx="6" fill="rgb(120,139,169)"/>
+  <text x="385" y="96" text-anchor="middle" font-size="13" font-weight="bold" fill="#1e293b">88.7</text>
+  <rect x="430" y="62" width="78" height="56" rx="6" fill="rgb(59,130,246)"/>
+  <text x="469" y="96" text-anchor="middle" font-size="13" font-weight="bold" fill="#1e293b">56.2</text>
 
-  <!-- Protein-Carbs: -0.32 (negative = orange) -->
-  <rect x="220" y="75" width="100" height="70" rx="6" fill="#ea580c" opacity="0.55"/>
-  <text x="270" y="115" text-anchor="middle" font-size="16" font-weight="bold" fill="var(--ink)">-0.32</text>
+  <!-- Carbs row -->
+  <rect x="94" y="128" width="78" height="56" rx="6" fill="rgb(245,153,14)"/>
+  <text x="133" y="162" text-anchor="middle" font-size="13" font-weight="bold" fill="#1e293b">160.5</text>
+  <rect x="178" y="128" width="78" height="56" rx="6" fill="rgb(62,131,242)"/>
+  <text x="217" y="162" text-anchor="middle" font-size="13" font-weight="bold" fill="#1e293b">58.0</text>
+  <rect x="262" y="128" width="78" height="56" rx="6" fill="rgb(241,157,16)"/>
+  <text x="301" y="162" text-anchor="middle" font-size="13" font-weight="bold" fill="#1e293b">152.9</text>
+  <rect x="346" y="128" width="78" height="56" rx="6" fill="rgb(197,151,72)"/>
+  <text x="385" y="162" text-anchor="middle" font-size="13" font-weight="bold" fill="#1e293b">129.6</text>
+  <rect x="430" y="128" width="78" height="56" rx="6" fill="rgb(239,68,68)"/>
+  <text x="469" y="162" text-anchor="middle" font-size="13" font-weight="bold" fill="#ffffff">254.0</text>
 
-  <!-- Protein-Fat: 0.45 (moderate positive = teal lighter) -->
-  <rect x="315" y="75" width="100" height="70" rx="6" fill="#0f766e" opacity="0.55"/>
-  <text x="365" y="115" text-anchor="middle" font-size="16" font-weight="bold" fill="var(--ink)">0.45</text>
+  <!-- Fat row -->
+  <rect x="94" y="194" width="78" height="56" rx="6" fill="rgb(144,143,139)"/>
+  <text x="133" y="228" text-anchor="middle" font-size="13" font-weight="bold" fill="#1e293b">101.2</text>
+  <rect x="178" y="194" width="78" height="56" rx="6" fill="rgb(241,157,16)"/>
+  <text x="217" y="228" text-anchor="middle" font-size="13" font-weight="bold" fill="#1e293b">153.1</text>
+  <rect x="262" y="194" width="78" height="56" rx="6" fill="rgb(144,143,138)"/>
+  <text x="301" y="228" text-anchor="middle" font-size="13" font-weight="bold" fill="#1e293b">101.4</text>
+  <rect x="346" y="194" width="78" height="56" rx="6" fill="rgb(209,153,57)"/>
+  <text x="385" y="228" text-anchor="middle" font-size="13" font-weight="bold" fill="#1e293b">135.7</text>
+  <rect x="430" y="194" width="78" height="56" rx="6" fill="rgb(148,143,134)"/>
+  <text x="469" y="228" text-anchor="middle" font-size="13" font-weight="bold" fill="#1e293b">103.3</text>
 
-  <!-- Carbs-Protein: -0.32 -->
-  <rect x="125" y="155" width="100" height="70" rx="6" fill="#ea580c" opacity="0.55"/>
-  <text x="175" y="195" text-anchor="middle" font-size="16" font-weight="bold" fill="var(--ink)">-0.32</text>
-
-  <!-- Carbs-Carbs: 1.00 -->
-  <rect x="220" y="155" width="100" height="70" rx="6" fill="#0f766e"/>
-  <text x="270" y="195" text-anchor="middle" font-size="16" font-weight="bold" fill="#fff">1.00</text>
-
-  <!-- Carbs-Fat: -0.28 (negative = orange) -->
-  <rect x="315" y="155" width="100" height="70" rx="6" fill="#ea580c" opacity="0.45"/>
-  <text x="365" y="195" text-anchor="middle" font-size="16" font-weight="bold" fill="var(--ink)">-0.28</text>
-
-  <!-- Fat-Protein: 0.45 -->
-  <rect x="125" y="225" width="100" height="70" rx="6" fill="#0f766e" opacity="0.55"/>
-  <text x="175" y="265" text-anchor="middle" font-size="16" font-weight="bold" fill="var(--ink)">0.45</text>
-
-  <!-- Fat-Carbs: -0.28 -->
-  <rect x="220" y="225" width="100" height="70" rx="6" fill="#ea580c" opacity="0.45"/>
-  <text x="270" y="265" text-anchor="middle" font-size="16" font-weight="bold" fill="var(--ink)">-0.28</text>
-
-  <!-- Fat-Fat: 1.00 -->
-  <rect x="315" y="225" width="100" height="70" rx="6" fill="#0f766e"/>
-  <text x="365" y="265" text-anchor="middle" font-size="16" font-weight="bold" fill="#fff">1.00</text>
-
-  <!-- Color scale legend -->
+  <!-- Colour scale legend -->
   <defs>
-    <linearGradient id="heatGrad" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%" stop-color="#ea580c"/>
-      <stop offset="50%" stop-color="#fef3c7"/>
-      <stop offset="100%" stop-color="#0f766e"/>
+    <linearGradient id="heatScale" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="rgb(59,130,246)"/>
+      <stop offset="50%" stop-color="rgb(245,158,11)"/>
+      <stop offset="100%" stop-color="rgb(239,68,68)"/>
     </linearGradient>
   </defs>
-  <rect x="430" y="80" width="18" height="200" rx="4" fill="url(#heatGrad)" transform="rotate(90 430 80)" style="display:none"/>
-  <text x="457" y="115" font-size="8" fill="var(--mute)">+1.0</text>
-  <text x="457" y="195" font-size="8" fill="var(--mute)">0.0</text>
-  <text x="457" y="265" font-size="8" fill="var(--mute)">-1.0</text>
-  <!-- Vertical gradient bar -->
-  <defs>
-    <linearGradient id="heatGradV" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#0f766e"/>
-      <stop offset="50%" stop-color="#fef3c7"/>
-      <stop offset="100%" stop-color="#ea580c"/>
-    </linearGradient>
-  </defs>
-  <rect x="440" y="100" width="14" height="170" rx="4" fill="url(#heatGradV)"/>
+  <text x="188" y="283" text-anchor="end" font-size="9" fill="var(--mute)">56 g</text>
+  <rect x="196" y="274" width="128" height="10" rx="5" fill="url(#heatScale)"/>
+  <text x="332" y="283" font-size="9" fill="var(--mute)">254 g</text>
 </svg>
-<p class="sub" style="margin-top:.5rem"><strong>Key insight:</strong> Protein and Fat have a moderate positive correlation (0.45), while Protein-Carbs and Carbs-Fat show negative correlations, reflecting the inherent trade-offs in macronutrient composition across diets.</p>
+<p class="sub" style="margin-top:.5rem"><strong>Key insight:</strong> The single hottest cell in the grid is vegan
+carbs (254.0 g) and the coldest is vegan protein (56.2 g), so the vegan column is the most extreme in both
+directions. Keto and paleo are the only diets whose average fat exceeds their average carbs (153.1 g vs 58.0 g for keto, 135.7 g vs 129.6 g for paleo).
+<br><strong>Related statistic:</strong> computed across all 7,806 individual recipes, the three macros are all
+<em>positively</em> correlated &mdash; Protein&ndash;Fat <strong>+0.478</strong>, Carbs&ndash;Fat
+<strong>+0.269</strong>, Protein&ndash;Carbs <strong>+0.156</strong>. Larger recipes simply contain more of
+everything; the low-carb/high-fat trade-off shows up between <em>diet means</em>, not between individual recipes.</p>
 </div>
 
 <!-- SCATTER PLOT -->
 <div class="chart-section">
 <h3>4.4 Protein vs Carbs Scatter Plot</h3>
-<p class="sub">Each dot represents a diet type's average protein vs carbs values, illustrating the macronutrient profile differences.</p>
+<p class="sub">Chart.js scatter plot. Each point is one diet type's average carbs (x) against average protein (y),
+one dataset per diet so the legend can toggle them.</p>
 <svg viewBox="0 0 520 320" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;max-width:520px">
   <rect width="520" height="320" rx="8" fill="var(--card)"/>
   <text x="260" y="22" text-anchor="middle" font-size="12" font-weight="600" fill="var(--ink)">Protein vs Carbohydrates by Diet Type</text>
@@ -495,193 +625,379 @@ az staticwebapp create \
 
   <!-- Data points -->
   <!-- Dash: C=160.54 x=70+160.54*1.5=310.8, P=69.28 y=270-69.28*1.917=137.2 -->
-  <circle cx="310.8" cy="137.2" r="10" fill="#0f766e" opacity="0.85"/>
-  <text x="310.8" y="126" text-anchor="middle" font-size="9" font-weight="600" fill="#0f766e">Dash</text>
+  <circle cx="310.8" cy="137.2" r="10" fill="#3b82f6" opacity="0.85"/>
+  <text x="310.8" y="126" text-anchor="middle" font-size="9" font-weight="600" fill="#3b82f6">Dash</text>
 
   <!-- Keto: C=57.97 x=70+57.97*1.5=157.0, P=101.27 y=270-101.27*1.917=75.8 -->
-  <circle cx="157.0" cy="75.8" r="10" fill="#0a5fb4" opacity="0.85"/>
-  <text x="157.0" y="64" text-anchor="middle" font-size="9" font-weight="600" fill="#0a5fb4">Keto</text>
+  <circle cx="157.0" cy="75.8" r="10" fill="#ec4899" opacity="0.85"/>
+  <text x="157.0" y="64" text-anchor="middle" font-size="9" font-weight="600" fill="#ec4899">Keto</text>
 
   <!-- Med: C=152.91 x=70+152.91*1.5=299.4, P=101.11 y=270-101.11*1.917=76.1 -->
-  <circle cx="299.4" cy="76.1" r="10" fill="#b45309" opacity="0.85"/>
-  <text x="299.4" y="64" text-anchor="middle" font-size="9" font-weight="600" fill="#b45309">Med</text>
+  <circle cx="299.4" cy="76.1" r="10" fill="#10b981" opacity="0.85"/>
+  <text x="299.4" y="64" text-anchor="middle" font-size="9" font-weight="600" fill="#10b981">Med</text>
 
   <!-- Paleo: C=129.55 x=70+129.55*1.5=264.3, P=88.67 y=270-88.67*1.917=100.0 -->
-  <circle cx="264.3" cy="100.0" r="10" fill="#7c3aed" opacity="0.85"/>
-  <text x="264.3" y="89" text-anchor="middle" font-size="9" font-weight="600" fill="#7c3aed">Paleo</text>
+  <circle cx="264.3" cy="100.0" r="10" fill="#f59e0b" opacity="0.85"/>
+  <text x="264.3" y="89" text-anchor="middle" font-size="9" font-weight="600" fill="#f59e0b">Paleo</text>
 
   <!-- Vegan: C=254.00 x=70+254*1.5=451, P=56.16 y=270-56.16*1.917=162.3 -->
-  <circle cx="451" cy="162.3" r="10" fill="#dc2626" opacity="0.85"/>
-  <text x="451" y="151" text-anchor="middle" font-size="9" font-weight="600" fill="#dc2626">Vegan</text>
+  <circle cx="451" cy="162.3" r="10" fill="#8b5cf6" opacity="0.85"/>
+  <text x="451" y="151" text-anchor="middle" font-size="9" font-weight="600" fill="#8b5cf6">Vegan</text>
 </svg>
-<p class="sub" style="margin-top:.5rem"><strong>Key insight:</strong> A clear inverse relationship is visible: Keto (low-carb/high-protein) occupies the upper-left while Vegan (high-carb/low-protein) occupies the lower-right. Mediterranean and Keto share similar protein levels but differ greatly in carbs.</p>
+<p class="sub" style="margin-top:.5rem"><strong>Key insight:</strong> Across diet averages the two macros trade off:
+keto sits upper-left (low carbs, high protein) and vegan lower-right (high carbs, low protein). Mediterranean and
+keto have practically the same mean protein (101.1 g vs 101.3 g) but differ by 95 g of carbs, which is what
+separates the two profiles. Note that this inverse pattern holds between diet means only &mdash; at the level of
+individual recipes protein and carbs are weakly <em>positively</em> correlated (+0.156).</p>
 </div>
 
 </div><!-- /chart-grid -->
 
+<div class="find ok">
+<h4>Other dashboard panels fed by the same payload</h4>
+<p>Besides the four charts the page renders: six headline stat badges (total recipes, diet types, highest mean
+protein diet and value, highest total protein diet and value), a "Top 5 Highest-Protein Recipes per Diet" table, a
+"Most Common Cuisines" table, and a paged "Recipe Data" table. Verified values behind them:</p>
+<div class="scroll">
+<table>
+<thead><tr><th>Diet</th><th>Recipes</th><th>Mean protein (g)</th><th>Total protein (g)</th><th>Most common cuisine</th></tr></thead>
+<tbody>
+<tr><td>mediterranean</td><td>1,753</td><td>101.11</td><td><strong>177,249.89</strong></td><td>mediterranean (1,274)</td></tr>
+<tr><td>dash</td><td>1,745</td><td>69.28</td><td>120,897.57</td><td>american (639)</td></tr>
+<tr><td>vegan</td><td>1,522</td><td>56.16</td><td>85,471.00</td><td>american (925)</td></tr>
+<tr><td>keto</td><td>1,512</td><td><strong>101.27</strong></td><td>153,114.96</td><td>american (663)</td></tr>
+<tr><td>paleo</td><td>1,274</td><td>88.67</td><td>112,971.65</td><td>american (535)</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Highest mean protein:</strong> keto (101.27 g). <strong>Highest total protein:</strong> mediterranean
+(177,249.89 g) &mdash; it wins on volume, not on per-recipe density. The three highest-protein individual recipes
+are paleo "Swiss Paleo&rsquo;s Homemade Italian &amp; Chorizo&hellip;" (1,273.61 g), dash "Salmon Mousse"
+(1,239.47 g) and keto "Sara Louise's Keto Smoked Holiday Turkey" (1,092.00 g). Four of the five diets have
+<em>american</em> as their most common cuisine; mediterranean is the exception, which is expected given the label.</p>
+</div>
+
 <!-- ─────────────────── 5. KEY CODE SECTIONS ─────────────────── -->
 <h2 id="code">5. Key Code Sections</h2>
+<p>The excerpts below are copied from the repository; <code>...</code> marks elided lines only.</p>
 
-<h3>5.1 Azure Function &mdash; HTTP Trigger (Python)</h3>
-<p>The main serverless function reads All_Diets.csv from Azure Blob Storage, performs data cleaning with Pandas, and returns aggregated nutritional insights as JSON.</p>
-<pre><code>import azure.functions as func
+<h3>5.1 Azure Function &mdash; v2 programming model (<code>backend/function_app.py</code>)</h3>
+<p>There is no <code>function.json</code> anywhere in this project. Routes are declared in Python with the v2
+decorator model: a single <code>func.FunctionApp</code> object with one <code>@app.route(...)</code> per endpoint.
+The <code>api</code> prefix comes from <code>host.json</code>, so the routes resolve as <code>/api/health</code>,
+<code>/api/insights</code> and <code>/api/recipes</code>.</p>
+<pre><code>"""Azure Functions v2 HTTP API for Nutritional Insights Dashboard.
+
+Endpoints:
+    GET /api/health   -- liveness check (no storage call)
+    GET /api/insights -- average macros, top recipes, common cuisines, summary stats
+    GET /api/recipes  -- recipe rows; optional ?diet_type=, ?page=, ?limit=
+
+CORS is configured at the Function App host level (see deploy.sh), so this
+module deliberately does not emit Access-Control-Allow-* headers itself --
+doing both produces duplicate headers, which browsers reject.
+"""
+import io, json, logging, os, threading, time
+
+import azure.functions as func
 import pandas as pd
-import json
-import os
 from azure.storage.blob import BlobServiceClient
 
-def main(req: func.HttpRequest) -&gt; func.HttpResponse:
+from nutrition import average_macros, clean_data, common_cuisines, top_recipes
+
+app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
+
+DEFAULT_PAGE_SIZE = 50
+MAX_PAGE_SIZE = 500
+
+RESPONSE_COLUMNS = ["Diet_type", "Recipe_name", "Cuisine_type",
+                    "Protein(g)", "Carbs(g)", "Fat(g)"]
+
+# Cleaned dataset cache, keyed by the blob ETag so a re-uploaded CSV is picked
+# up automatically. A worker handles requests concurrently, hence the lock.
+_cache = {"etag": None, "frame": None}
+_cache_lock = threading.Lock()
+
+
+def _load_dataset():
+    """Return the cleaned dataset, downloading from Blob Storage on a cache miss.
+
+    The blob ETag is checked on every request (a cheap metadata call) and the
+    CSV is only re-downloaded and re-cleaned when it has actually changed.
+    """
+    container = os.environ.get("BLOB_CONTAINER_NAME", "datasets")
+    blob_name = os.environ.get("BLOB_NAME", "All_Diets.csv")
+
+    client = BlobServiceClient.from_connection_string(_get_connection_string())
     try:
-        # Connect to Azure Blob Storage
-        connect_str = os.environ["AzureWebJobsStorage"]
-        blob_service = BlobServiceClient.from_connection_string(connect_str)
-        container = blob_service.get_container_client("data")
-        blob = container.get_blob_client("All_Diets.csv")
+        blob_client = client.get_blob_client(container=container, blob=blob_name)
+        etag = blob_client.get_blob_properties().etag
 
-        # Download and parse CSV
-        csv_data = blob.download_blob().readall().decode("utf-8")
-        from io import StringIO
-        df = pd.read_csv(StringIO(csv_data))
+        with _cache_lock:
+            if _cache["etag"] == etag and _cache["frame"] is not None:
+                return _cache["frame"], True
 
-        # Data cleaning
-        df.columns = df.columns.str.strip().str.lower()
-        numeric_cols = ["protein(g)", "carbs(g)", "fat(g)"]
-        df[numeric_cols] = df[numeric_cols].apply(pd.to_numeric, errors="coerce")
-        df.dropna(subset=numeric_cols, inplace=True)
+        data = blob_client.download_blob().readall()
+        frame = clean_data(pd.read_csv(io.BytesIO(data)))
 
-        # Aggregate by diet type
-        diet_param = req.params.get("diet", None)
-        if diet_param:
-            df = df[df["diet_type"].str.lower() == diet_param.lower()]
+        with _cache_lock:
+            _cache["etag"] = etag
+            _cache["frame"] = frame
+        return frame, False
+    finally:
+        client.close()
 
-        summary = df.groupby("diet_type")[numeric_cols].agg(["mean", "sum", "count"])
-        result = summary.to_dict()
 
-        return func.HttpResponse(
-            json.dumps(result, indent=2),
-            mimetype="application/json",
-            status_code=200
-        )
-    except Exception as e:
-        return func.HttpResponse(
-            json.dumps({"error": str(e)}),
-            mimetype="application/json",
-            status_code=500
-        )</code></pre>
+def _error_response(message, status_code=500):
+    """Return a JSON error response.
 
-<h3>5.2 Frontend Fetch Code (JavaScript)</h3>
-<p>The dashboard frontend fetches data from the Azure Function endpoint and renders it into charts.</p>
-<pre><code>// Configuration
-const API_BASE = "https://nutritional-func-app.azurewebsites.net/api";
+    Internal exception text is logged, never returned, so storage details
+    cannot leak to the browser.
+    """
+    return _json_response({"error": message}, status_code)
 
-// Fetch nutritional insights
-async function fetchNutritionalData(dietType = null) {
-    const url = dietType
-        ? `${API_BASE}/nutritional-insights?diet=${dietType}`
-        : `${API_BASE}/nutritional-insights`;
+
+@app.route(route="health", methods=["GET"])
+def health(req: func.HttpRequest) -&gt; func.HttpResponse:
+    """Liveness check. Does not touch storage, so it stays fast and cheap."""
+    return _json_response({
+        "status": "healthy",
+        "service": "nutritional-insights-api",
+        "version": "2.0.0",
+        "dataset_cached": _cache["frame"] is not None,
+    })
+
+
+@app.route(route="insights", methods=["GET"])
+def insights(req: func.HttpRequest) -&gt; func.HttpResponse:
+    """Return aggregate nutritional insights: averages, top recipes, common cuisines."""
+    start = time.time()
+    try:
+        df, cache_hit = _load_dataset()
+
+        avg = average_macros(df)                       # mean macros per diet
+        top = top_recipes(df)                          # top 5 by protein per diet
+        cuisine_records = common_cuisines(df).to_dict(orient="records")
+        totals = df.groupby("Diet_type")["Protein(g)"].sum()
+        diet_counts = {str(k): int(v) for k, v in df["Diet_type"].value_counts().items()}
+        ...
+        return _json_response({
+            "average_macros": avg_records,
+            "top_recipes": top_records,
+            "common_cuisines": cuisine_records,
+            "total_protein_by_diet": total_records,
+            "summary": summary,
+            "metadata": {
+                "execution_time_seconds": round(time.time() - start, 3),
+                "source": "Azure Blob Storage",
+                "dataset": os.environ.get("BLOB_NAME", "All_Diets.csv"),
+                "dataset_from_cache": cache_hit,
+            },
+        })
+    except Exception:
+        logging.exception("Error in /api/insights")
+        return _error_response("Failed to compute insights from the dataset.")</code></pre>
+
+<h3>5.2 Server-side pagination (<code>/api/recipes</code>)</h3>
+<p>The full recipe payload for all 7,806 rows is about <strong>1.21 MB</strong> of JSON, so
+<code>/api/recipes</code> pages on the server. <code>limit</code> defaults to 50 and is clamped to
+<code>MAX_PAGE_SIZE = 500</code>; <code>page</code> is clamped to the last available page; a non-numeric or
+non-positive value returns HTTP 400; an unknown <code>diet_type</code> returns HTTP 404. The response carries the
+paging metadata the frontend needs to draw its page buttons.</p>
+<pre><code>@app.route(route="recipes", methods=["GET"])
+def recipes(req: func.HttpRequest) -&gt; func.HttpResponse:
+    """Return a page of recipe rows, optionally filtered by diet_type.
+
+    Query parameters:
+        diet_type -- filter to one diet ("all" or omitted returns every diet)
+        page      -- 1-based page number (default 1)
+        limit     -- rows per page, capped at MAX_PAGE_SIZE (default 50)
+    """
+    start = time.time()
+    try:
+        page = _positive_int(req.params.get("page"), 1)
+        limit = _positive_int(req.params.get("limit"), DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE)
+    except ValueError as exc:
+        return _error_response(f"Invalid pagination parameter: {exc}", 400)
+
+    try:
+        df, cache_hit = _load_dataset()
+
+        diet_type = req.params.get("diet_type")
+        if diet_type and diet_type.lower() != "all":
+            df = df[df["Diet_type"].str.lower() == diet_type.lower()]
+            if df.empty:
+                return _error_response(f"No recipes found for diet type: {diet_type}", 404)
+
+        total = len(df)
+        total_pages = max(1, -(-total // limit))        # ceiling division
+        page = min(page, total_pages)
+        offset = (page - 1) * limit
+
+        records = df[RESPONSE_COLUMNS].iloc[offset:offset + limit].to_dict(orient="records")
+
+        return _json_response({
+            "recipes": records,
+            "count": len(records),
+            "total": total,
+            "page": page,
+            "limit": limit,
+            "total_pages": total_pages,
+            "diet_type_filter": diet_type or "all",
+            "metadata": {...},
+        })
+    except Exception:
+        logging.exception("Error in /api/recipes")
+        return _error_response("Failed to read recipes from the dataset.")</code></pre>
+
+<h3>5.3 Frontend fetch and offline fallback (<code>frontend/app.js</code>)</h3>
+<p>The API base URL is read from <code>window.NUTRITIONAL_API_URL</code>, which <code>index.html</code> sets from
+the build-time placeholder. If <code>/api/insights</code> or <code>/api/recipes</code> fails, the whole dashboard
+switches to offline mode and renders the committed Project 1 batch results behind a prominent banner &mdash; live
+and fallback data are never mixed in one view.</p>
+<pre><code>// The deployed Function endpoint is injected by index.html via
+// window.NUTRITIONAL_API_URL. "/api" only works when the dashboard and the
+// Function are served from the same origin.
+const API_BASE_URL = String(window.NUTRITIONAL_API_URL || "/api").replace(/\/+$/, "");
+
+async function apiGet(path) {
+    const response = await fetch(`${API_BASE_URL}${path}`);
+    if (!response.ok) throw new Error(`API returned ${response.status}`);
+    return response.json();
+}
+
+const fetchHealth   = () =&gt; apiGet("/health");
+const fetchInsights = () =&gt; apiGet("/insights");
+
+function fetchRecipes(dietType, page) {
+    const params = new URLSearchParams({ page: String(page), limit: String(ROWS_PER_PAGE) });
+    if (dietType &amp;&amp; dietType !== "all") params.set("diet_type", dietType);
+    return apiGet(`/recipes?${params.toString()}`);
+}
+
+async function loadData(dietType, page = 1) {
+    hideError();
+    setLoadingAll(true);
+
+    let health = null;
+    try { health = await fetchHealth(); }
+    catch (err) { console.warn("Health check failed:", err.message); }
 
     try {
-        const response = await fetch(url, {
-            method: "GET",
-            headers: { "Content-Type": "application/json" }
-        });
+        const data = await fetchInsights();
+        const recipesResp = await fetchRecipes(dietType, page);
 
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const data = await response.json();
-        return data;
-    } catch (error) {
-        console.error("API fetch failed:", error);
-        showErrorToast("Failed to load data. Please try again.");
-        return null;
+        insightsData = data;
+        isOffline = false;
+
+        recipeState.rows       = recipesResp.recipes || [];
+        recipeState.page       = recipesResp.page || 1;
+        recipeState.totalPages = recipesResp.total_pages || 1;
+        recipeState.total      = recipesResp.total ?? recipeState.rows.length;
+        recipeState.serverPaged = true;                 // paging served by the Function
+
+        updateApiStatus(true, health);
+        updateExecTime(data.metadata?.execution_time_seconds);
+        setOfflineBanner(null);
+        $("#data-source-label").textContent = "Source: Azure Blob Storage (live)";
+    } catch (err) {
+        console.warn("API unavailable, using offline fallback:", err.message);
+        insightsData = DEMO_DATA;                       // Project 1 batch results
+        isOffline = true;
+        loadOfflineRecipes(dietType, 1);
+
+        updateApiStatus(false, health);
+        updateExecTime(null);
+        setOfflineBanner(`Could not reach ${API_BASE_URL} (${err.message}).`);
+        $("#data-source-label").textContent = "Source: offline fallback";
     }
-}
 
-// Render bar chart with fetched data
-async function renderBarChart() {
-    const data = await fetchNutritionalData();
-    if (!data) return;
+    renderAll(dietType);
+    setLoadingAll(false);
+}</code></pre>
 
-    const ctx = document.getElementById("barChart").getContext("2d");
-    new Chart(ctx, {
-        type: "bar",
-        data: {
-            labels: Object.keys(data),
-            datasets: [
-                { label: "Protein (g)", data: extractMeans(data, "protein(g)") },
-                { label: "Carbs (g)",   data: extractMeans(data, "carbs(g)") },
-                { label: "Fat (g)",     data: extractMeans(data, "fat(g)") }
-            ]
-        },
-        options: { responsive: true, plugins: { title: { display: true } } }
-    });
-}
-
-// Filter handler
-document.getElementById("dietFilter").addEventListener("change", async (e) =&gt; {
-    const diet = e.target.value === "all" ? null : e.target.value;
-    const data = await fetchNutritionalData(diet);
-    updateAllCharts(data);
-});</code></pre>
-
-<h3>5.3 Storage Configuration (function.json &amp; local.settings.json)</h3>
-<pre><code>// function.json &mdash; HTTP trigger binding
+<h3>5.4 Configuration: route prefix, local settings, build-time URL injection</h3>
+<p>Three files carry all the environment coupling. <code>host.json</code> sets the <code>api</code> route prefix;
+<code>local.settings.json.example</code> mirrors the production app-setting names so the same code runs against
+Azurite (the real <code>local.settings.json</code> is generated from it locally and is git-ignored, so no
+connection string is ever committed); and <code>index.html</code> holds a placeholder that <code>deploy.sh</code>
+rewrites into the build directory.</p>
+<pre><code>// backend/host.json
 {
-    "scriptFile": "__init__.py",
-    "bindings": [
-        {
-            "authLevel": "anonymous",
-            "type": "httpTrigger",
-            "direction": "in",
-            "name": "req",
-            "methods": ["get"],
-            "route": "nutritional-insights"
-        },
-        {
-            "type": "http",
-            "direction": "out",
-            "name": "$return"
-        }
-    ]
+    "version": "2.0",
+    "logging": { "applicationInsights": { "samplingSettings": { "isEnabled": true, "excludedTypes": "Request" } } },
+    "extensionBundle": { "id": "Microsoft.Azure.Functions.ExtensionBundle", "version": "[4.*, 5.0.0)" },
+    "extensions": { "http": { "routePrefix": "api" } }
 }
 
-// local.settings.json (local dev &mdash; connection uses Azurite)
+// backend/local.settings.json.example (template for local development; never deployed)
 {
     "IsEncrypted": false,
     "Values": {
+        "AzureWebJobsStorage": "UseDevelopmentStorage=true",
         "FUNCTIONS_WORKER_RUNTIME": "python",
-        "AzureWebJobsStorage": "DefaultEndpointsProtocol=https;AccountName=nutritionalstorage;..."
-    }
+        "AZURE_STORAGE_CONNECTION_STRING": "UseDevelopmentStorage=true",
+        "BLOB_CONTAINER_NAME": "datasets",
+        "BLOB_NAME": "All_Diets.csv"
+    },
+    "Host": { "CORS": "*", "CORSCredentials": false }
 }</code></pre>
+<pre><code>&lt;!-- frontend/index.html -- the committed source keeps a placeholder, never a real URL --&gt;
+&lt;script&gt;
+    window.NUTRITIONAL_API_URL = "__FUNCTION_API_URL__";
+    if (window.NUTRITIONAL_API_URL.startsWith("__")) {
+        // Placeholder was never replaced -- fall back to a same-origin /api.
+        delete window.NUTRITIONAL_API_URL;
+    }
+&lt;/script&gt;</code></pre>
+<p class="sub">The wildcard <code>Host.CORS</code> above applies to <code>func start</code> on localhost only,
+and <code>local.settings.json</code> is never published to Azure. In Azure, CORS is set at the host level by
+<code>deploy.sh</code> step 7 to the Static Web App origin alone.</p>
 
 <!-- ─────────────────── 6. INTEGRATION ─────────────────── -->
 <h2 id="integration">6. Frontend-Backend Integration</h2>
 
 <h3>Data Flow</h3>
 <div class="diagram-box">
-  User Browser                  Azure Static Web App            Azure Function App           Azure Blob Storage
-  +-----------+                 +-------------------+           +-----------------+          +------------------+
-  |           |  1. Load page   |                   |           |                 |          |                  |
-  |  Browser  |---------------->|   index.html      |           |                 |          |                  |
-  |           |<----------------|   + app.js         |           |                 |          |                  |
-  |           |                 |   + style.css      |           |                 |          |                  |
-  |           |                 |                   |           |                 |          |                  |
-  |           |  2. fetch()     |                   |           |                 |          |                  |
-  |           |-------------------------------------->          |  HTTP Trigger   |          |                  |
-  |           |                 |                   |           |  (Python)       |          |                  |
-  |           |                 |                   |           |                 |          |                  |
-  |           |                 |                   |           |  3. Read blob   |          |                  |
-  |           |                 |                   |           |---------------->|  All_Diets.csv             |
-  |           |                 |                   |           |<----------------|  (7,806 rows)              |
-  |           |                 |                   |           |                 |          |                  |
-  |           |                 |                   |           |  4. Pandas      |          |                  |
-  |           |                 |                   |           |  clean + agg    |          |                  |
-  |           |                 |                   |           |                 |          |                  |
-  |           |  5. JSON resp   |                   |           |                 |          |                  |
-  |           |<--------------------------------------          |                 |          |                  |
-  |           |                 |                   |           |                 |          |                  |
-  |  6. Chart |                 |                   |           |                 |          |                  |
-  |  Render   |                 |                   |           |                 |          |                  |
-  +-----------+                 +-------------------+           +-----------------+          +------------------+
+  User Browser              Azure Static Web App        Azure Function App            Azure Blob Storage
+  +-----------+             +------------------+        +-------------------+         +------------------+
+  |           | 1. load     |                  |        |                   |         |                  |
+  |  Browser  |------------>|  index.html      |        |                   |         |                  |
+  |           |<------------|  + app.js        |        |                   |         |                  |
+  |           |             |  + styles.css    |        |                   |         |                  |
+  |           |             |  (API URL baked  |        |                   |         |                  |
+  |           |             |   in at build)   |        |                   |         |                  |
+  |           |             +------------------+        |                   |         |                  |
+  |           |                                         |                   |         |                  |
+  |           | 2. GET /api/health  (no storage call)    | @app.route health |         |                  |
+  |           |---------------------------------------->|  -> dataset_cached|         |                  |
+  |           |<----------------------------------------|                   |         |                  |
+  |           |                                         |                   |         |                  |
+  |           | 3. GET /api/insights                    | @app.route insights         |                  |
+  |           |---------------------------------------->|                   |         |                  |
+  |           |                                         | 4. get ETag       |         |                  |
+  |           |                                         |------------------>|  HEAD blob properties      |
+  |           |                                         |<------------------|                            |
+  |           |                                         | 5. ETag unchanged?|         |                  |
+  |           |                                         |    yes -> cache   |         |                  |
+  |           |                                         |    no  -> download All_Diets.csv (7,806 rows)  |
+  |           |                                         |------------------>|                            |
+  |           |                                         |<------------------|                            |
+  |           |                                         | 6. clean_data +   |         |                  |
+  |           |                                         |    pandas aggs    |         |                  |
+  |           | 7. JSON + metadata.execution_time_seconds                   |         |                  |
+  |           |<----------------------------------------|                   |         |                  |
+  |           |                                         |                   |         |                  |
+  |           | 8. GET /api/recipes?diet_type=&amp;page=&amp;limit=50                |         |                  |
+  |           |---------------------------------------->| slice rows, return|         |                  |
+  |           |<----------------------------------------| count/total/pages |         |                  |
+  |           |                                         |                   |         |                  |
+  | 9. render |  4 charts + 3 tables + stat badges      |                   |         |                  |
+  |    charts |  exec-time badge from step 7            |                   |         |                  |
+  +-----------+                                         +-------------------+         +------------------+
+
+  On failure at step 3 or 8: the whole page switches to the offline banner and renders
+  Project1/docs/results/*.csv values. Live and fallback data are never mixed.
 </div>
 
 <h3>Integration Points</h3>
@@ -689,24 +1005,55 @@ document.getElementById("dietFilter").addEventListener("change", async (e) =&gt;
 <table>
 <thead><tr><th>Step</th><th>Component</th><th>Action</th><th>Technology</th></tr></thead>
 <tbody>
-<tr><td>1</td><td>Static Web App</td><td>Serves dashboard HTML/CSS/JS to user browser</td><td>Azure Static Web Apps</td></tr>
-<tr><td>2</td><td>Browser &rarr; Function</td><td><code>fetch()</code> calls the API endpoint</td><td>JavaScript Fetch API</td></tr>
-<tr><td>3</td><td>Function &rarr; Storage</td><td>Reads All_Diets.csv via BlobServiceClient</td><td>azure-storage-blob SDK</td></tr>
-<tr><td>4</td><td>Function</td><td>Cleans data, computes aggregations</td><td>Pandas (Python)</td></tr>
-<tr><td>5</td><td>Function &rarr; Browser</td><td>Returns JSON response with nutritional data</td><td>HTTP Response (JSON)</td></tr>
-<tr><td>6</td><td>Browser</td><td>Renders charts with received data</td><td>Chart.js / inline SVG</td></tr>
+<tr><td>1</td><td>Static Web App</td><td>Serves <code>index.html</code>, <code>app.js</code>, <code>styles.css</code> with the API URL already substituted into the page</td><td>Azure Static Web Apps (Free), <code>staticwebapp.config.json</code></td></tr>
+<tr><td>2</td><td>Browser &rarr; Function</td><td><code>GET /api/health</code> &mdash; dependency-free liveness probe; drives the "API Connected (v2.0.0)" badge and reports <code>dataset_cached</code></td><td>JavaScript Fetch API</td></tr>
+<tr><td>3</td><td>Browser &rarr; Function</td><td><code>GET /api/insights</code> for averages, top recipes, cuisines, totals and summary</td><td>JavaScript Fetch API</td></tr>
+<tr><td>4-5</td><td>Function &rarr; Storage</td><td>Reads the blob ETag; re-downloads <code>All_Diets.csv</code> only when the ETag changed, otherwise serves the cached DataFrame</td><td><code>azure-storage-blob</code> SDK, <code>threading.Lock</code></td></tr>
+<tr><td>6</td><td>Function</td><td><code>clean_data()</code> then <code>average_macros()</code> / <code>top_recipes()</code> / <code>common_cuisines()</code> plus totals and counts</td><td>pandas, shared <code>nutrition.py</code></td></tr>
+<tr><td>7</td><td>Function &rarr; Browser</td><td>JSON response including <code>metadata.execution_time_seconds</code> and <code>metadata.dataset_from_cache</code></td><td>HTTP 200, <code>application/json</code></td></tr>
+<tr><td>8</td><td>Browser &rarr; Function</td><td><code>GET /api/recipes?diet_type=&amp;page=&amp;limit=50</code> for the paged recipe table; page buttons re-fetch from the server</td><td>Fetch API + <code>URLSearchParams</code></td></tr>
+<tr><td>9</td><td>Browser</td><td>Renders 4 charts, 3 tables and 6 stat badges; shows the insights execution time in the header badge</td><td>Chart.js 4.4.1 + CSS-grid heatmap</td></tr>
 </tbody>
 </table>
 </div>
 
+<h3>Frontend Controls</h3>
+<div class="scroll">
+<table>
+<thead><tr><th>Control</th><th>Element</th><th>Behaviour</th></tr></thead>
+<tbody>
+<tr><td>Diet-type dropdown</td><td><code>#diet-filter</code></td><td>Six options (All, Dash, Keto, Mediterranean, Paleo, Vegan). On <code>change</code> it reloads insights and page 1 of the recipes for that diet, then re-renders the bar, heatmap and scatter charts plus both detail tables. The doughnut and the stat badges deliberately keep showing the whole dataset.</td></tr>
+<tr><td>Refresh Data button</td><td><code>#refresh-btn</code></td><td>Re-runs the same load for the current filter, so a marker can demonstrate a live call on demand and watch the execution-time badge change.</td></tr>
+<tr><td>Pagination controls</td><td><code>#pagination</code></td><td>Prev / numbered / Next buttons with ellipsis compression, built from <code>total_pages</code>. Clicks are handled by one delegated listener and fetch the next page from the Function (<code>serverPaged</code>); offline they slice the fallback rows in the browser.</td></tr>
+<tr><td>API status badge</td><td><code>#api-status</code></td><td>Green "API Connected (v&lt;version&gt;)" from <code>/api/health</code>, or amber "Offline - fallback data".</td></tr>
+<tr><td>Execution-time badge</td><td><code>#exec-time-display</code></td><td>Shows <code>metadata.execution_time_seconds</code> from the <code>/api/insights</code> call.</td></tr>
+<tr><td>Offline banner</td><td><code>#offline-banner</code></td><td>Full-width banner naming the unreachable URL and stating that every figure below comes from the committed <code>Project1/docs/results/</code> CSV files.</td></tr>
+</tbody>
+</table>
+</div>
+<p class="sub">There is deliberately <strong>no free-text search box and no per-endpoint button row</strong>; the
+dropdown, the refresh button and the pagination controls are the complete set of interactive controls.</p>
+
 <h3>CORS Configuration</h3>
 <div class="find ok">
-<h4>Cross-Origin Resource Sharing</h4>
-<p>The Function App is configured to accept requests from the Static Web App origin, enabling the frontend to call the backend API without browser security blocks.</p>
-<pre>az functionapp cors add \
-  --name nutritional-func-app \
-  --resource-group cpsy300-nutritional-rg \
-  --allowed-origins "https://nutritional-dashboard.azurestaticapps.net"</pre>
+<h4>One layer of CORS, scoped to one origin</h4>
+<p>CORS is handled <strong>only</strong> at the Function App host level. <code>deploy.sh</code> step 7 removes any
+<code>*</code> wildcard from an earlier run and then allows the Static Web App origin alone.
+<code>backend/function_app.py</code> deliberately emits no <code>Access-Control-Allow-*</code> headers of its own:
+if the host and the application both set them the browser receives duplicate headers and rejects the response, so
+the application layer stays out of it. The design decision is recorded in the module docstring.</p>
+<pre>az functionapp cors remove \
+  --name cpsy300-nutrition-api \
+  --resource-group cpsy300-nutritional-insights-rg \
+  --allowed-origins "*" --output none 2>/dev/null || true
+
+az functionapp cors add \
+  --name cpsy300-nutrition-api \
+  --resource-group cpsy300-nutritional-insights-rg \
+  --allowed-origins "$DASHBOARD_URL"</pre>
+<p>The dashboard sends no custom request headers, so no preflight is triggered and no route needs to accept
+<code>OPTIONS</code>. <span class="pill warn">Not yet verified in Azure</span> &mdash; the configuration is
+committed but cannot be confirmed from a browser until the deployment is actually run.</p>
 </div>
 
 <h3>API Endpoints</h3>
@@ -714,128 +1061,181 @@ document.getElementById("dietFilter").addEventListener("change", async (e) =&gt;
 <table>
 <thead><tr><th>Endpoint</th><th>Method</th><th>Parameters</th><th>Response</th></tr></thead>
 <tbody>
-<tr><td><code>/api/nutritional-insights</code></td><td>GET</td><td><code>?diet=keto</code> (optional filter)</td><td>Aggregated macros by diet type (mean, sum, count)</td></tr>
-<tr><td><code>/api/recipes</code></td><td>GET</td><td><code>?page=1&amp;limit=20</code></td><td>Paginated recipe list with nutritional data</td></tr>
-<tr><td><code>/api/clusters</code></td><td>GET</td><td>None</td><td>K-means clustering results on macronutrient profiles</td></tr>
+<tr><td><code>/api/health</code></td><td>GET</td><td>None</td><td><code>status</code>, <code>service</code>, <code>version</code> (2.0.0) and <code>dataset_cached</code>. Touches no storage, so it stays fast and cheap and works even if the blob is unreachable.</td></tr>
+<tr><td><code>/api/insights</code></td><td>GET</td><td>None</td><td><code>average_macros</code>, <code>top_recipes</code> (top 5 by protein per diet), <code>common_cuisines</code>, <code>total_protein_by_diet</code>, <code>summary</code> (totals, diet counts, highest mean/total protein) and <code>metadata</code> (<code>execution_time_seconds</code>, <code>dataset_from_cache</code>). About 5.8 KB of JSON.</td></tr>
+<tr><td><code>/api/recipes</code></td><td>GET</td><td><code>?diet_type=&lt;diet&gt;&amp;page=&lt;n&gt;&amp;limit=&lt;n&gt;</code> &mdash; all optional. <code>limit</code> defaults to 50 and is capped at 500; <code>page</code> defaults to 1 and is clamped to the last page; <code>diet_type=all</code> or omitted returns every diet.</td><td>Paged recipe rows plus <code>count</code>, <code>total</code>, <code>page</code>, <code>limit</code>, <code>total_pages</code>, <code>diet_type_filter</code> and <code>metadata</code>. Invalid paging returns HTTP 400; an unknown diet returns HTTP 404.</td></tr>
 </tbody>
 </table>
+</div>
+<p class="sub">These three routes are the whole API surface. There is no clustering, segmentation or machine-learning
+endpoint in this project.</p>
+
+<div class="find ok">
+<h4>Why paging exists, and what the cache saves</h4>
+<p>Serialising all 7,806 cleaned rows produces roughly <strong>1.21 MB</strong> of JSON, which is slow to transfer
+on a cold Consumption-plan instance and visibly janky to render as table rows. With the default
+<code>limit=50</code> a page is about 1/156th of that. The ETag-keyed cache is the second half of the same idea:
+the CSV is downloaded and cleaned once per worker, then every later request pays only one cheap
+<code>get_blob_properties()</code> metadata call. <code>metadata.dataset_from_cache</code> reports which path a
+given request took, so the effect is visible in the response rather than merely claimed, and
+<code>/api/health</code> exposes the same state as <code>dataset_cached</code>.</p>
+</div>
+
+<div class="find ok">
+<h4>Error handling: generic to the browser, detailed in the logs</h4>
+<p>Both data endpoints wrap their body in <code>try/except Exception</code>, call
+<code>logging.exception(...)</code>, and return a fixed message such as
+<code>{"error": "Failed to compute insights from the dataset."}</code>. The exception text &mdash; which can contain
+the storage account name, container, blob path or SDK internals &mdash; never reaches the client. The detail is
+still available in Application Insights, which <code>host.json</code> enables.</p>
 </div>
 
 <!-- ─────────────────── 7. RUBRIC & STATUS ─────────────────── -->
 <h2 id="rubric">7. Rubric &amp; Status</h2>
+<p>Status is reported against evidence that exists in the repository today. "Implemented (not deployed)" means the
+code is complete and reviewable but no Azure resource backs it yet; "Pending" means the item needs a real Azure
+resource, a screenshot, a live URL or the PDF.</p>
 
 <div class="scroll">
 <table>
 <thead>
-<tr><th style="width:18%">Category</th><th style="width:8%">Weight</th><th>Requirements</th><th>What Was Done</th><th style="width:8%">Status</th></tr>
+<tr><th style="width:18%">Category</th><th style="width:8%">Weight</th><th>Requirements</th><th>What exists in the repository</th><th style="width:12%">Status</th></tr>
 </thead>
 <tbody>
 <tr>
   <td><strong>Deployment</strong></td>
   <td>20 marks</td>
-  <td>Deploy Azure Function and Storage in Azure cloud environment</td>
-  <td>Function App deployed to Azure (Python 3.10, HTTP trigger). Storage account created with <code>data</code> container holding All_Diets.csv. Environment variables configured for connection string.</td>
-  <td><span class="pill ok">Done</span></td>
+  <td>Deploy Azure Function and Storage in the Azure cloud environment</td>
+  <td><code>deploy.sh</code> creates the resource group, StorageV2 account, private <code>datasets</code> container, dataset upload, Consumption-plan Function App on Python 3.11, app settings, Static Web App and CORS scoping in seven idempotent steps, then smoke-tests all three endpoints. <strong>The script has never been run against a subscription</strong>: no resources exist, and there are no portal screenshots.</td>
+  <td><span class="pill bad">Pending</span></td>
 </tr>
 <tr>
   <td><strong>Frontend Dashboard</strong></td>
   <td>20 marks</td>
   <td>Functional and visually clear dashboard UI</td>
-  <td>Static Web App deployed with responsive layout. Dashboard includes chart sections (bar, scatter, heatmap, pie), filter controls (search + dropdown), API interaction buttons, and pagination. Clean card-based design.</td>
-  <td><span class="pill ok">Done</span></td>
+  <td><code>frontend/index.html</code> + <code>app.js</code> + <code>styles.css</code>: responsive Tailwind layout, header with API-status and execution-time badges, six stat badges, four chart cards, two detail tables, a paged recipe table, per-chart loading spinners, an error banner and an offline banner. Controls are a diet dropdown, a Refresh Data button and server-backed pagination.</td>
+  <td><span class="pill warn">Implemented (not deployed)</span></td>
 </tr>
 <tr>
   <td><strong>Data Visualization</strong></td>
   <td>20 marks</td>
-  <td>At least 3 distinct visualizations (bar chart, scatter, heatmap, pie chart)</td>
-  <td>Four visualization types implemented: (1) Grouped bar chart for average macros by diet, (2) Scatter plot for protein vs carbs, (3) Heatmap for macronutrient correlation, (4) Pie chart for recipe distribution. All use real data.</td>
-  <td><span class="pill ok">Done</span></td>
+  <td>At least 3 distinct visualizations</td>
+  <td>Four types, all driven by the live <code>/api/insights</code> payload: grouped bar (average macros), doughnut (recipe distribution), CSS-grid heatmap (macro intensity, blue&rarr;amber&rarr;red with its own legend) and scatter (protein vs carbs, one dataset per diet). All re-render on filter change. Offline they render the committed Project 1 batch results behind an explicit banner.</td>
+  <td><span class="pill warn">Implemented (not deployed)</span></td>
 </tr>
 <tr>
   <td><strong>Integration</strong></td>
   <td>20 marks</td>
-  <td>Frontend fetches and displays data from Azure Function endpoint</td>
-  <td>Frontend uses JavaScript <code>fetch()</code> to call Azure Function HTTP endpoint. CORS configured. JSON responses parsed and rendered into charts. Filter dropdown triggers re-fetch with diet parameter.</td>
-  <td><span class="pill ok">Done</span></td>
+  <td>Frontend fetches and displays data from the Azure Function endpoint</td>
+  <td><code>fetch()</code> against <code>/api/health</code>, <code>/api/insights</code> and <code>/api/recipes</code>; the endpoint is injected at build time from the <code>__FUNCTION_API_URL__</code> placeholder so the committed source carries no environment URL. Paging, the diet filter and the execution-time badge all round-trip through the API. <strong>Not yet demonstrated end to end</strong>, because no endpoint is live; until then the page shows its offline banner.</td>
+  <td><span class="pill bad">Pending</span></td>
 </tr>
 <tr>
   <td><strong>Cloud Practices</strong></td>
   <td>10 marks</td>
   <td>Proper use of Azure resources (resource group, env vars, storage connection)</td>
-  <td>Single resource group (<code>cpsy300-nutritional-rg</code>) organizes all resources. Connection string stored as app setting (not hardcoded). Storage accessed via SDK with environment variables. CORS properly scoped.</td>
-  <td><span class="pill ok">Done</span></td>
+  <td>One resource group for everything; connection string only ever in app settings, never committed and never echoed by the script; private container with public blob access disabled and TLS 1.2 minimum; CORS scoped to a single origin with the wildcard explicitly removed; ETag-keyed cache to avoid re-downloading the blob; generic error bodies with detail only in the logs; security headers via <code>staticwebapp.config.json</code>; <code>local.settings.json</code> git-ignored with a committed <code>.example</code> template; unit tests and <code>flake8</code> enforced in CI. All verifiable by reading the code and the CI run, none verifiable in a portal yet.</td>
+  <td><span class="pill warn">Implemented (not deployed)</span></td>
 </tr>
 <tr>
   <td><strong>Documentation &amp; Presentation</strong></td>
   <td>10 marks</td>
-  <td>Architecture, workflow, and challenges explanation</td>
-  <td>Architecture diagram created. Data flow documented. This master overview covers all components, code, integration, and challenges. Presentation materials prepared.</td>
-  <td><span class="pill ok">Done</span></td>
+  <td>Architecture, workflow and challenges explanation</td>
+  <td>This overview (architecture, setup commands, data flow, code, endpoints, challenges), <code>Project2/README.md</code>, <code>docs/Phase2-Analysis.md</code> and the review under <code>Project2/review/</code>. <strong>Still missing:</strong> the submission PDF and any portal or dashboard screenshots, both of which require the deployment to happen first.</td>
+  <td><span class="pill warn">Partial</span></td>
 </tr>
 </tbody>
 </table>
 </div>
 
-<div class="find ok">
+<div class="find warn">
 <h4>Deliverables Checklist</h4>
 <table>
 <thead><tr><th>Deliverable</th><th>Details</th><th>Status</th></tr></thead>
 <tbody>
-<tr><td>Deployed Azure Function URL</td><td><code>https://nutritional-func-app.azurewebsites.net/api/nutritional-insights</code></td><td><span class="pill ok">Ready</span></td></tr>
-<tr><td>Static Web App Link</td><td><code>https://nutritional-dashboard.azurestaticapps.net</code></td><td><span class="pill ok">Ready</span></td></tr>
-<tr><td>GitHub Repository</td><td><a href="https://github.com/YUANDONG-YANG/cloud-computing">github.com/YUANDONG-YANG/cloud-computing</a></td><td><span class="pill ok">Ready</span></td></tr>
-<tr><td>Documentation PDF</td><td>Architecture diagrams, workflow, screenshots</td><td><span class="pill warn">Pending</span></td></tr>
+<tr><td>Deployed Azure Function URL</td><td><code>https://&lt;function-app&gt;.azurewebsites.net/api/insights</code> &mdash; placeholder. <code>deploy.sh</code> prints the real URL (expected form <code>https://cpsy300-nutrition-api.azurewebsites.net</code>, subject to global name availability); paste it here after running the script.</td><td><span class="pill bad">Pending</span></td></tr>
+<tr><td>Static Web App link</td><td><code>https://&lt;static-web-app&gt;.azurestaticapps.net</code> &mdash; placeholder. Azure assigns the hostname at creation time; <code>deploy.sh</code> reads it with <code>az staticwebapp show --query defaultHostname</code> and prints it. Paste it here afterwards.</td><td><span class="pill bad">Pending</span></td></tr>
+<tr><td>GitHub repository (frontend + backend)</td><td><a href="https://github.com/YUANDONG-YANG/cloud-computing">github.com/YUANDONG-YANG/cloud-computing</a> &mdash; all Project 2 code is committed under <code>Project2/</code></td><td><span class="pill ok">Ready</span></td></tr>
+<tr><td>Azure portal screenshots</td><td>Resource group, Function App overview, app settings, blob container, Static Web App, and the dashboard showing "API Connected" &mdash; none captured yet</td><td><span class="pill bad">Pending</span></td></tr>
+<tr><td>Documentation PDF</td><td>Architecture diagram, services, workflow and screenshots &mdash; to be exported from this overview once the screenshots exist</td><td><span class="pill warn">Planned</span></td></tr>
 </tbody>
 </table>
+<p class="sub" style="margin-top:.6rem">No URL above is a live endpoint. Nothing in this report should be read as
+evidence of a working deployment until the two placeholders are replaced with the output of an actual
+<code>deploy.sh</code> run.</p>
 </div>
 
 <!-- ─────────────────── 8. CHALLENGES ─────────────────── -->
 <h2 id="challenges">8. Challenges &amp; Solutions</h2>
+<p>A challenge is marked <span class="pill ok">Solved</span> only when something in the repository implements the
+fix. Where the fix is written but can only be confirmed against a live deployment it is marked
+<span class="pill warn">Unverified</span>, and where nothing implements it, <span class="pill bad">Open</span>.</p>
 
 <div class="scroll">
 <table>
-<thead><tr><th style="width:5%">#</th><th style="width:28%">Challenge</th><th style="width:34%">Solution</th><th style="width:28%">Outcome</th><th style="width:5%"></th></tr></thead>
+<thead><tr><th style="width:4%">#</th><th style="width:27%">Challenge</th><th style="width:33%">Solution</th><th style="width:26%">Outcome / evidence</th><th style="width:10%"></th></tr></thead>
 <tbody>
 <tr>
   <td>1</td>
-  <td><strong>CORS blocking frontend requests</strong><br>Browser refused cross-origin <code>fetch()</code> calls from Static Web App to Function App.</td>
-  <td>Added the Static Web App domain to the Function App's CORS allowed-origins list via <code>az functionapp cors add</code>. Ensured no trailing slash in the origin URL.</td>
-  <td>Frontend can call API without browser security errors.</td>
-  <td><span class="pill ok">Solved</span></td>
+  <td><strong>Duplicate CORS headers</strong><br>Setting <code>Access-Control-Allow-Origin</code> in the function code <em>and</em> at the Function App host level makes Azure emit the header twice, which browsers reject outright.</td>
+  <td>Keep exactly one layer. <code>function_app.py</code> emits no <code>Access-Control-Allow-*</code> headers at all (stated in its docstring) and <code>deploy.sh</code> step 7 removes any <code>*</code> wildcard before allowing only the Static Web App origin.</td>
+  <td>Single-origin CORS is committed in code and script. Cannot be confirmed from a browser until the deployment runs.</td>
+  <td><span class="pill warn">Unverified</span></td>
 </tr>
 <tr>
   <td>2</td>
-  <td><strong>Azurite to Azure Storage migration</strong><br>Connection strings and endpoint formats differ between local Azurite and real Azure Blob Storage.</td>
-  <td>Used environment variables (<code>AzureWebJobsStorage</code>) so the same code works in both environments. Updated the connection string in Azure Portal app settings.</td>
-  <td>Seamless transition with zero code changes to the function logic.</td>
+  <td><strong>Environment-specific URL in committed source</strong><br>Hard-coding the Function URL in <code>index.html</code> would leak one team member's deployment into the repository and break for everyone else.</td>
+  <td><code>index.html</code> ships the placeholder <code>__FUNCTION_API_URL__</code> and deletes <code>window.NUTRITIONAL_API_URL</code> if it was never substituted. <code>deploy.sh</code> copies <code>frontend/</code> to a throwaway <code>build/</code>, rewrites the placeholder with <code>sed -i "s#__FUNCTION_API_URL__#...#"</code>, and <code>grep</code>s to confirm the substitution before deploying.</td>
+  <td>Committed sources stay environment-agnostic and the build fails loudly rather than shipping a placeholder.</td>
   <td><span class="pill ok">Solved</span></td>
 </tr>
 <tr>
   <td>3</td>
-  <td><strong>Cold start latency</strong><br>Azure Functions on Consumption plan had 5-10 second cold starts, causing slow first loads of the dashboard.</td>
-  <td>Added loading spinners to the frontend. Considered pre-warming strategies. Documented the trade-off between Consumption (cheap) and Premium (fast) plans.</td>
-  <td>User sees loading indicator instead of empty/broken charts. Acceptable for course project scope.</td>
+  <td><strong>Re-downloading the CSV on every request</strong><br>Fetching and re-cleaning 7,806 rows per request wastes egress and adds latency to every call.</td>
+  <td>Cache the cleaned DataFrame keyed by the blob <strong>ETag</strong> under a <code>threading.Lock</code>. Each request makes one cheap <code>get_blob_properties()</code> call; the CSV is re-downloaded only when the ETag changed, so a re-uploaded dataset is still picked up automatically.</td>
+  <td>Repeat calls skip download and cleaning. <code>metadata.dataset_from_cache</code> and <code>/api/health</code>'s <code>dataset_cached</code> make the behaviour observable rather than assumed.</td>
   <td><span class="pill ok">Solved</span></td>
 </tr>
 <tr>
   <td>4</td>
-  <td><strong>CSV encoding issues</strong><br>Some recipe names contained special characters that caused parsing errors when reading from Blob Storage.</td>
-  <td>Explicitly decoded blob content as UTF-8 (<code>blob.download_blob().readall().decode("utf-8")</code>) and added <code>errors="coerce"</code> to numeric conversions in Pandas.</td>
-  <td>All 7,806 recipes parsed correctly without data loss.</td>
+  <td><strong>Large JSON response size</strong><br>The full recipe payload for all 7,806 rows measures about 1.21 MB, which is slow to transfer and laggy to render as table rows.</td>
+  <td>Server-side paging on <code>/api/recipes</code>: <code>?diet_type=&amp;page=&amp;limit=</code>, default <code>limit=50</code>, hard cap 500, with <code>count</code>, <code>total</code>, <code>page</code>, <code>limit</code> and <code>total_pages</code> in the response. Bad input returns HTTP 400; an unknown diet returns 404. The frontend's Prev/Next/numbered buttons re-fetch from the server.</td>
+  <td>A default page is roughly 1/156th of the full payload. Chart endpoints stay separate and return only ~5.8 KB of aggregates.</td>
   <td><span class="pill ok">Solved</span></td>
 </tr>
 <tr>
   <td>5</td>
-  <td><strong>Large JSON response size</strong><br>Returning all 7,806 recipes in a single response was slow and caused browser lag when rendering.</td>
-  <td>Implemented server-side pagination (<code>?page=1&amp;limit=20</code>) and returned only aggregated summaries for chart endpoints. Frontend fetches pages on demand.</td>
-  <td>Fast initial load. Users can browse individual recipes via pagination controls.</td>
+  <td><strong>Leaking internals through error responses</strong><br>Returning <code>str(e)</code> to the browser would expose the storage account, container, blob path and SDK internals on any failure.</td>
+  <td>Every handler catches broadly, calls <code>logging.exception(...)</code>, and returns a fixed generic message such as <code>"Failed to compute insights from the dataset."</code> Detail goes to Application Insights, enabled in <code>host.json</code>.</td>
+  <td>No storage detail can reach a client. Diagnostics are still available to the team in the logs.</td>
   <td><span class="pill ok">Solved</span></td>
 </tr>
 <tr>
   <td>6</td>
-  <td><strong>GitHub Actions deployment configuration</strong><br>CI/CD workflow needed separate deployment steps for the Function App and the Static Web App.</td>
-  <td>Created a multi-job workflow: one job deploys the Function App using <code>azure/functions-action</code>, another deploys the Static Web App using <code>Azure/static-web-apps-deploy</code>. Both triggered on push to main.</td>
-  <td>Automated deployment pipeline. Code pushes trigger build and deploy for both services.</td>
+  <td><strong>A dead API looking like a working dashboard</strong><br>If the Function is unreachable, silently falling back to bundled data would show a marker a complete dashboard built from numbers that never came from the cloud.</td>
+  <td>A failure on either data call switches the <em>entire</em> page to offline mode: a prominent full-width banner names the unreachable URL, the status badge turns amber, the source label reads "offline fallback", and the figures shown are the committed Project 1 batch results from <code>Project1/docs/results/*.csv</code>. Live and fallback data are never mixed in one view.</td>
+  <td>Offline mode is unmistakable. This is the state the dashboard is in today, since nothing is deployed.</td>
+  <td><span class="pill ok">Solved</span></td>
+</tr>
+<tr>
+  <td>7</td>
+  <td><strong>Cold-start latency</strong><br>A Consumption-plan Function can take several seconds to answer its first request, during which the dashboard would show empty chart frames.</td>
+  <td>Per-chart loading spinners plus a dependency-free <code>/api/health</code> probe that answers without touching storage; the <code>deploy.sh</code> smoke test uses <code>curl --max-time 180</code> so the first call absorbs the cold start instead of failing the script.</td>
+  <td>Mitigations are in place, but no cold-start time has actually been measured because the app has never run in Azure.</td>
+  <td><span class="pill warn">Unverified</span></td>
+</tr>
+<tr>
+  <td>8</td>
+  <td><strong>Automated Azure deployment from CI</strong><br>Pushing to <code>main</code> does not deploy anything to Azure.</td>
+  <td><strong>Not implemented.</strong> <code>.github/workflows/deploy.yml</code> runs the Project 1 build/test/Docker simulation, and the Project 2 CI job being added runs lint and unit tests only. Deploying from CI would require a publish profile or service principal stored as a GitHub secret, which this project deliberately avoids; deployment is therefore a manual <code>./deploy.sh</code> run.</td>
+  <td>No deployment job, no Azure credentials in CI. The trade-off (no secrets in the repository vs. no push-to-deploy) is a conscious one, but the automation is genuinely absent.</td>
+  <td><span class="pill bad">Open</span></td>
+</tr>
+<tr>
+  <td>9</td>
+  <td><strong>Static Web App region availability</strong><br><code>az staticwebapp create</code> fails in <code>eastus</code>, which is the region used for every other resource.</td>
+  <td>Use a separate <code>SWA_LOCATION=eastus2</code> for the Static Web App only, with the reason recorded in a comment next to the variable. The app is also created <em>unlinked</em> from GitHub so no repository token or OAuth grant is needed, and the frontend is uploaded afterwards with the <code>swa</code> CLI using a deployment token read from Azure.</td>
+  <td>The script can create every resource without interactive GitHub authorisation. If the <code>swa</code> CLI is missing it prints the exact manual command instead of failing silently.</td>
   <td><span class="pill ok">Solved</span></td>
 </tr>
 </tbody>
@@ -851,18 +1251,18 @@ document.getElementById("dietFilter").addEventListener("change", async (e) =&gt;
 <tbody>
 <tr>
   <td><strong>Yuandong Yang</strong></td>
-  <td>Project lead, Azure deployment, CI/CD</td>
-  <td>Set up Azure resource group and storage account. Configured GitHub Actions deployment pipeline. Deployed Function App and Static Web App. Managed environment variables and CORS settings. Created documentation and master overview report.</td>
+  <td>Project lead, deployment automation, CI, documentation</td>
+  <td>Wrote <code>deploy.sh</code>: the seven-step idempotent provisioning flow, private storage account with public blob access disabled and TLS 1.2 minimum, app-setting wiring that keeps the connection string out of the repository and the terminal, build-time API-URL injection into a throwaway <code>build/</code> directory, single-origin CORS scoping, and the endpoint smoke test. Added the <code>project2-tests</code> CI job (pytest, flake8 and a <code>bash -n deploy.sh</code> syntax check) and maintains this overview. <em>Still outstanding:</em> running the deployment against a real subscription and capturing the portal screenshots.</td>
 </tr>
 <tr>
   <td><strong>Ethan Bayarsaikhan</strong></td>
   <td>Azure Function development, data pipeline</td>
-  <td>Developed the Python Azure Function with HTTP trigger. Implemented data cleaning and aggregation logic using Pandas. Built API endpoints for nutritional insights, recipes, and clusters. Handled CSV parsing and error handling.</td>
+  <td>Built the Azure Functions v2 app: <code>/api/health</code> (dependency-free liveness probe reporting <code>dataset_cached</code>), <code>/api/insights</code> (averages, top-5 protein recipes per diet, common cuisines, totals, summary stats and timing metadata) and <code>/api/recipes</code> (diet filter plus validated server-side paging with a 500-row cap). Added the ETag-keyed DataFrame cache with its lock, the generic-error/log-the-detail policy, and the <code>host.json</code> route prefix. Adapted Project 1's <code>nutrition.py</code> cleaning and aggregation so batch and API results agree.</td>
 </tr>
 <tr>
   <td><strong>Justin Norman-Rance</strong></td>
   <td>Frontend dashboard, data visualization</td>
-  <td>Designed and implemented the dashboard UI with responsive layout. Created four visualization types (bar chart, scatter plot, heatmap, pie chart). Built filter controls, API interaction buttons, and pagination. Integrated frontend with Azure Function API.</td>
+  <td>Built the responsive Tailwind dashboard and all four visualizations: Chart.js grouped bar, doughnut and scatter charts plus the hand-built CSS-grid heatmap with its blue&rarr;amber&rarr;red scale and legend. Implemented the diet-type dropdown, the Refresh Data button and the delegated pagination controls that page through the API, the six stat badges, the two detail tables, the API-status and execution-time badges, and the explicit offline banner that falls back to the committed Project 1 batch results.</td>
 </tr>
 </tbody>
 </table>
@@ -874,13 +1274,18 @@ document.getElementById("dietFilter").addEventListener("change", async (e) =&gt;
 <tr><th>What</th><th>Link</th></tr>
 <tr><td>Repository</td><td><a href="https://github.com/YUANDONG-YANG/cloud-computing">https://github.com/YUANDONG-YANG/cloud-computing</a></td></tr>
 <tr><td>Project 2 folder</td><td><a href="https://github.com/YUANDONG-YANG/cloud-computing/tree/main/Project2">https://github.com/YUANDONG-YANG/cloud-computing/tree/main/Project2</a></td></tr>
+<tr><td>Backend (Functions v2 app)</td><td><code>Project2/backend/function_app.py</code>, <code>Project2/backend/nutrition.py</code>, <code>Project2/backend/host.json</code></td></tr>
+<tr><td>Frontend</td><td><code>Project2/frontend/index.html</code>, <code>app.js</code>, <code>styles.css</code>, <code>Project2/staticwebapp.config.json</code></td></tr>
+<tr><td>Deployment script</td><td><code>Project2/deploy.sh</code></td></tr>
 <tr><td>Phase 2 specification</td><td><a href="https://github.com/YUANDONG-YANG/cloud-computing/blob/main/Project2/Phase2_Cloud_Dashboard_Project%201.docx">Phase2_Cloud_Dashboard_Project 1.docx</a></td></tr>
 <tr><td>Dashboard UI reference</td><td><a href="https://github.com/YUANDONG-YANG/cloud-computing/blob/main/Project2/UI-for-project2.html">UI-for-project2.html</a></td></tr>
+<tr><td>Data ground truth</td><td><code>Project1/data/All_Diets.csv</code> and <code>Project1/docs/results/*.csv</code></td></tr>
 </table>
 </div>
 
 <footer>
   <p>CPSY 300 &mdash; Project 2: Cloud Dashboard Development &mdash; Reviewed 2026-10-02</p>
+  <p>All figures recomputed from All_Diets.csv (7,806 recipes). No Azure deployment has been performed.</p>
   <p>Yuandong Yang &bull; Ethan Bayarsaikhan &bull; Justin Norman-Rance</p>
 </footer>
 

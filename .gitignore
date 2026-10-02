@@ -5,3 +5,9 @@ __pycache__/
 *.done
 .env
 *.pyc
+
+# Azure Functions local settings (may contain storage connection strings)
+local.settings.json
+# deploy.sh build output (frontend with the live API URL injected)
+Project2/build/
+node_modules/

@@ -58,8 +58,14 @@ Phase 2 builds on Phase 1 (local development). The goal is to **move the solutio
 
 - [ ] Deployed Azure Function URL
 - [ ] Azure Static Web App or Frontend Deployment Link
-- [ ] GitHub Repository with frontend and backend code
+- [x] GitHub Repository with frontend and backend code
 - [ ] Documentation PDF explaining architecture, services, and screenshots
+
+**Status (2026-10-02):** the backend, frontend, deployment script and test suite are
+complete and committed, but **no Azure resources have been provisioned**, so the two
+URL deliverables are outstanding and there are no screenshots. The source document for
+the Documentation PDF is `docs/Phase2-Documentation.md`; it is written and marks each
+required screenshot as a pending placeholder for a human to capture after deployment.
 
 ---
 
@@ -70,6 +76,19 @@ The provided UI skeleton includes:
 - **Filters:** Search by Diet Type input, dropdown selector (All/Vegan/Keto/...)
 - **API buttons:** "Get Nutritional Insights", "Get Recipes", "Get Clusters"
 - **Pagination:** Previous / 1 / 2 / Next
+
+### What was actually built (deviations from the skeleton)
+
+The skeleton is a reference, not a specification, and the delivered dashboard differs
+from it in three ways. These are recorded here so the documentation matches the code:
+
+| Skeleton element | Delivered implementation |
+|------------------|--------------------------|
+| 4 chart slots (bar, scatter, heatmap, pie) | **Built.** Grouped bar, scatter and doughnut via Chart.js; the heatmap is a CSS grid rather than a chart library. |
+| Search by Diet Type text input | **Not built.** There is **no search box**; filtering is done entirely through the diet-type dropdown. |
+| "Get Nutritional Insights" / "Get Recipes" buttons | **Replaced** by a single **Refresh Data** button; both endpoints are called together on load, on filter change and on refresh, so the dashboard is never half-updated. |
+| "Get Clusters" button | **Not built.** There is **no clustering feature** anywhere in this project -- no `/api/clusters` endpoint, no K-means, and no UI control for it. The button was dropped from the design. |
+| Pagination (Previous / 1 / 2 / Next) | **Built**, for the main Recipe Data table only, and implemented **server-side**: each page click issues a fresh `/api/recipes?page=N&limit=50` call. The Top-5-protein table is not paginated. |
 
 ---
 
@@ -86,10 +105,52 @@ The provided UI skeleton includes:
 | paleo          | 88.67       | 129.55    | 135.67   |
 | vegan          | 56.16       | 254.00    | 103.30   |
 
+**Recipe counts per diet** (exact, recomputed from `All_Diets.csv`; total 7,806):
+
+| Diet           | Recipes | Share  |
+|----------------|---------|--------|
+| mediterranean  | 1,753   | 22.5%  |
+| dash           | 1,745   | 22.4%  |
+| vegan          | 1,522   | 19.5%  |
+| keto           | 1,512   | 19.4%  |
+| paleo          | 1,274   | 16.3%  |
+
+**Total protein per diet (g)** (exact):
+
+| Diet           | Total Protein (g) |
+|----------------|-------------------|
+| mediterranean  | 177,249.89        |
+| keto           | 153,114.96        |
+| dash           | 120,897.57        |
+| paleo          | 112,971.65        |
+| vegan          | 85,471.00         |
+
+**Most common cuisine per diet** (exact):
+
+| Diet           | Cuisine       | Count |
+|----------------|---------------|-------|
+| dash           | american      | 639   |
+| keto           | american      | 663   |
+| mediterranean  | mediterranean | 1,274 |
+| paleo          | american      | 535   |
+| vegan          | american      | 925   |
+
+**Macronutrient correlations** (all positive):
+
+| Pair           | Correlation |
+|----------------|-------------|
+| Protein-Carbs  | +0.156      |
+| Carbs-Fat      | +0.269      |
+| Protein-Fat    | +0.478      |
+
 **Key findings:**
 - Highest mean protein: **keto** (101.27 g)
 - Highest total protein: **mediterranean** (177,249.89 g)
-- Recipe counts (approx): dash ~1561, keto ~1890, mediterranean ~1752, paleo ~1553, vegan ~1050
+- Largest diet by recipe count: **mediterranean** (22.5%); smallest: **paleo** (16.3%)
+
+**Payload size:** the full unpaged `/api/recipes` response for all 7,806 rows is
+approximately **1.21 MB**. That is what motivated server-side paging (default
+`limit=50`, hard cap 500) rather than shipping the whole dataset on every page load.
 
 ---
 
@@ -115,9 +176,23 @@ The provided UI skeleton includes:
 
 ### Frontend (Static Web App)
 - HTML/CSS/JS dashboard
-- Fetches data from Azure Function endpoint via fetch() API
-- Renders charts using Chart.js or inline SVG
-- Includes filters, search, pagination
+- Fetches data from the Azure Function endpoint via the `fetch()` API
+- Renders charts with Chart.js (bar, doughnut, scatter) plus a CSS-grid heatmap
+- Interaction controls as delivered: diet-type **dropdown filter**, **Refresh Data**
+  button, and **server-side pagination** on the main recipe table. There is **no
+  search box** -- the planned "Search by Diet Type" input from the UI skeleton was
+  not implemented, since the dropdown covers the same five values exhaustively.
+- When the Function is unreachable, the page shows a prominent offline banner and
+  renders the committed Project 1 batch results; live and fallback data are never
+  mixed.
+
+### Not implemented (explicitly out of scope)
+- **Clustering.** The UI skeleton's "Get Clusters" button and any K-means / `/api/clusters`
+  endpoint were **not built**. The delivered API is exactly three endpoints:
+  `/api/health`, `/api/insights`, `/api/recipes`. Any earlier description of a
+  clustering feature is inaccurate.
+- **CI/CD deployment.** There is no GitHub Actions workflow that provisions or deploys
+  the Azure resources; deployment is performed by running `deploy.sh` manually.
 
 ### Storage
 - Azure Blob Storage container holding All_Diets.csv

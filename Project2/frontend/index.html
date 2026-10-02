@@ -10,6 +10,19 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
     <!-- Custom styles -->
     <link rel="stylesheet" href="styles.css">
+    <!--
+      Deployed Function endpoint. Set this to the Function App URL printed by
+      deploy.sh, e.g. https://cpsy300-nutrition-api.azurewebsites.net/api
+      Leave it unset only when the dashboard is served from the same origin as
+      the API; otherwise the dashboard falls back to offline data.
+    -->
+    <script>
+        window.NUTRITIONAL_API_URL = "__FUNCTION_API_URL__";
+        if (window.NUTRITIONAL_API_URL.startsWith("__")) {
+            // Placeholder was never replaced -- fall back to a same-origin /api.
+            delete window.NUTRITIONAL_API_URL;
+        }
+    </script>
 </head>
 <body class="bg-slate-100 min-h-screen">
 
@@ -86,6 +99,22 @@
                 <span class="stat-label">Total Protein (g)</span>
             </div>
         </section>
+
+        <!-- Offline Banner: shown when the Azure Function cannot be reached -->
+        <div id="offline-banner" class="offline-banner hidden">
+            <svg class="w-6 h-6 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                      d="M18.364 5.636a9 9 0 010 12.728m-12.728 0a9 9 0 010-12.728m9.9 9.9a5 5 0 010-7.072m-7.072 0a5 5 0 010 7.072M12 12h.01"/>
+            </svg>
+            <div>
+                <p class="font-semibold">Offline mode &mdash; showing Project 1 batch results, not live cloud data.</p>
+                <p class="text-sm mt-0.5">
+                    Every figure below comes from the committed
+                    <code>Project1/docs/results/</code> CSV files.
+                    <span id="offline-detail"></span>
+                </p>
+            </div>
+        </div>
 
         <!-- Error Banner (hidden by default) -->
         <div id="error-banner" class="error-banner hidden">
