@@ -293,7 +293,14 @@ def get_insights_api(req: func.HttpRequest) -> func.HttpResponse:
 
 
 def _get_fallback_insights():
-    """Return hardcoded demo insights based on the real 7806-recipe dataset."""
+    """Sample insights for working on the UI without Azure.
+
+    Only served when ENABLE_DEMO_FALLBACK is on, and the dashboard labels it
+    as sample data when it is. The totals and averages below were measured
+    from Project1/data/All_Diets.csv; `top_recipes` and `cuisine_types` are
+    left empty rather than invented, so those charts render empty instead of
+    showing numbers that are not in any dataset.
+    """
     return {
         "total_recipes": 7806,
         "diet_types": ["dash", "keto", "mediterranean", "paleo", "vegan"],
@@ -306,11 +313,11 @@ def _get_fallback_insights():
             "vegan": {"Protein": 56.16, "Carbs": 254.00, "Fat": 103.30},
         },
         "recipe_counts": {
-            "dash": 1546,
-            "keto": 1580,
-            "mediterranean": 1564,
-            "paleo": 1543,
-            "vegan": 1573,
+            "dash": 1745,
+            "keto": 1512,
+            "mediterranean": 1753,
+            "paleo": 1274,
+            "vegan": 1522,
         },
         "heatmap": {
             "diets": ["dash", "keto", "mediterranean", "paleo", "vegan"],
@@ -411,7 +418,12 @@ def get_recipes_api(req: func.HttpRequest) -> func.HttpResponse:
 
 
 def _get_fallback_recipes():
-    """Return a small set of demo recipes for local dev without cache."""
+    """Illustrative recipe rows for working on the table without Azure.
+
+    These are made up, not drawn from the dataset, and are only served when
+    ENABLE_DEMO_FALLBACK is on. Fifteen rows also means pagination collapses
+    to a single page, so never demo against them.
+    """
     demos = [
         {"Diet_type": "keto", "Recipe_name": "Keto Butter Chicken", "Cuisine_type": "indian", "Protein(g)": 42.5, "Carbs(g)": 8.3, "Fat(g)": 28.7},
         {"Diet_type": "keto", "Recipe_name": "Bacon Cheese Burger Bowl", "Cuisine_type": "american", "Protein(g)": 38.2, "Carbs(g)": 5.1, "Fat(g)": 35.4},
