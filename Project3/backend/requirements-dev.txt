@@ -14,3 +14,8 @@
 -r requirements.txt
 
 pytest==8.3.5
+
+# `.flake8` sets max-line-length = 110 for this project, matching Projects 1
+# and 2. Pinning the linter alongside its config keeps a new flake8 release
+# from failing a build on rules nobody changed; this is Project 1's version.
+flake8==7.2.0
