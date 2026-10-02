@@ -161,6 +161,11 @@ func start
 # 5. In a second terminal: create the blob containers and upload the dataset.
 #    This is what fires the blob trigger and fills the cache. Until it runs,
 #    /api/insights and /api/recipes answer 503 by design.
+#
+#    If these three commands fail an API-version check, the Azure CLI is newer
+#    than the Azurite build. docker-compose already passes
+#    --skipApiVersionCheck for that reason; a hand-started Azurite needs it too:
+#      azurite --blobHost 0.0.0.0 --skipApiVersionCheck
 export AZURE_STORAGE_CONNECTION_STRING="UseDevelopmentStorage=true"
 az storage container create --name raw-data
 az storage container create --name clean-data

@@ -61,7 +61,11 @@ services:
       - "10002:10002"   # Table  — used internally by the Functions host
     volumes:
       - azurite-data:/data
-    command: "azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0"
+    # --skipApiVersionCheck: the Azure CLI sends an x-ms-version newer than
+    # this Azurite build knows, and without the flag every `az storage`
+    # call fails the API-version check -- which takes out step 5 of the
+    # README Quick Start, the step that fires the blob trigger.
+    command: "azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 --skipApiVersionCheck"
 
   # ---------------------------------------------------------------------------
   # Redis — OPTIONAL read-through cache layer in front of Cosmos DB.
