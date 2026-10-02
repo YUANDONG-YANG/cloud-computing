@@ -7,6 +7,7 @@ import pytest
 
 from lambda_function import process_nutritional_data_from_azurite
 from nutrition import average_macros, clean_data, common_cuisines, top_recipes
+from storage_config import connection_string
 
 
 def sample():
@@ -98,3 +99,16 @@ def test_failed_download_preserves_existing_results(tmp_path):
     with pytest.raises(RuntimeError, match="unavailable"):
         process_nutritional_data_from_azurite(path, service)
     assert json.loads(path.read_text()) == [{"existing": True}]
+
+
+def test_connection_string_defaults_to_local_azurite(monkeypatch):
+    monkeypatch.delenv("AZURE_STORAGE_CONNECTION_STRING", raising=False)
+    monkeypatch.setenv("AZURITE_HOST", "azurite")
+    assert "BlobEndpoint=http://azurite:10000/devstoreaccount1" in connection_string()
+
+
+def test_connection_string_refuses_real_azure(monkeypatch):
+    monkeypatch.setenv("AZURE_STORAGE_CONNECTION_STRING",
+                       "AccountName=x;AccountKey=y;BlobEndpoint=https://x.blob.core.windows.net/")
+    with pytest.raises(ValueError, match="non-local"):
+        connection_string()
