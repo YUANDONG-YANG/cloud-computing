@@ -65,7 +65,59 @@ footer{text-align:center;padding:2rem 1rem;color:var(--mute);font-size:.85rem;bo
     <strong>Date:</strong> 2026-10-02 &nbsp;|&nbsp;
     <strong>GitHub:</strong> <a href="https://github.com/YUANDONG-YANG/cloud-computing" target="_blank">YUANDONG-YANG/cloud-computing</a>
   </p>
+  <p class="sub" style="margin-top:.6rem">
+    <strong>Document status:</strong>
+    <span class="pill warn">Code complete &middot; not deployed</span>
+    <span class="pill bad">No evidence captured</span>
+    <span class="pill bad">Demo video not recorded</span>
+  </p>
 </header>
+
+<!-- ============================================================ -->
+<!-- DOCUMENT STATUS / HONESTY NOTICE                              -->
+<!-- ============================================================ -->
+<div class="find">
+  <h3 style="margin-top:0">What this document does and does not claim</h3>
+  <p>This is a <strong>status report on source code</strong>, not a record of a running system. Every feature
+  below is implemented in this repository and can be read and reviewed. <strong>None of it has been
+  deployed.</strong> As of 2026-10-02 there are no Azure resources, no screenshots, no logs, no captured
+  <code class="inline-code">curl</code> output, and no demo recording anywhere in the repository.</p>
+
+  <p>Three things are therefore outside what the code can establish on its own:</p>
+  <ul style="font-size:.9rem">
+    <li><strong>Nothing is provisioned.</strong> <code class="inline-code">deploy.sh</code> exists and has not
+      been run. Until it is, no claim about runtime behaviour, response times or platform encryption is
+      backed by anything observable.</li>
+    <li><strong>No OAuth application has been registered.</strong> The Google and GitHub flows are written and
+      read their credentials from app settings, but no client ID or secret exists yet, so third-party login
+      cannot succeed until someone creates the applications and sets the four values.</li>
+    <li><strong>The demo video (20 of 100 marks) has not been started.</strong></li>
+  </ul>
+
+  <p><strong>This document supersedes an earlier version</strong> that showed nine rubric items as
+  &ldquo;Complete&rdquo;, eight security risks as &ldquo;Mitigated&rdquo;, encryption as &ldquo;Enabled&rdquo;
+  and a self-assigned score of 80/100. Those labels described work that had not been deployed or evidenced, and
+  the self-score was assigned to unbuilt work. See
+  <code class="inline-code">Project3/review/score-risk-2026-10-02.md</code> for the current mark-risk analysis.
+  Earlier revisions of this report also contained illustrative Node.js snippets and performance figures for an
+  implementation that does not exist; the code shown below is now quoted from the actual Python source, with
+  file and line references.</p>
+
+  <h4>Status legend</h4>
+  <p class="sub" style="font-size:.88rem">Each status below means exactly one of three things:</p>
+  <ul style="font-size:.88rem;list-style:none;padding-left:0">
+    <li style="margin:.35rem 0"><span class="pill ok">Verified in repo</span>
+      &nbsp;A reviewer can confirm this right now by reading the cited source file. It says nothing about
+      runtime behaviour.</li>
+    <li style="margin:.35rem 0"><span class="pill warn">Code complete &middot; unverified</span>
+      &nbsp;Implemented, but it has never executed against real infrastructure. No evidence exists that it
+      works end to end.</li>
+    <li style="margin:.35rem 0"><span class="pill bad">Not done</span>
+      &nbsp;Does not exist yet: not provisioned, not registered, not recorded, or not implemented at all.</li>
+  </ul>
+  <p class="sub" style="font-size:.88rem">No item on this page is marked as working in production, because no
+  item has been observed working in production.</p>
+</div>
 
 <!-- ============================================================ -->
 <!-- TABLE OF CONTENTS                                             -->
@@ -78,11 +130,11 @@ footer{text-align:center;padding:2rem 1rem;color:var(--mute);font-size:.85rem;bo
     <li><a href="#interaction">Data Interaction</a></li>
     <li><a href="#auth">Authentication &amp; Security</a></li>
     <li><a href="#dashboard">Dashboard UI</a></li>
-    <li><a href="#code">Key Code Snippets</a></li>
-    <li><a href="#rubric">Rubric / Status</a></li>
+    <li><a href="#code">Honest Failure Modes</a></li>
+    <li><a href="#rubric">Rubric / Status &amp; Evidence Gaps</a></li>
     <li><a href="#security">Security Analysis</a></li>
     <li><a href="#team">Team &amp; Contributions</a></li>
-    <li><a href="#challenges">Challenges &amp; Solutions</a></li>
+    <li><a href="#challenges">Design Decisions &amp; Open Problems</a></li>
   </ol>
 </div>
 
@@ -90,15 +142,23 @@ footer{text-align:center;padding:2rem 1rem;color:var(--mute);font-size:.85rem;bo
 <!-- 1. ARCHITECTURE                                               -->
 <!-- ============================================================ -->
 <h2 id="arch">1. Enhanced Cloud Architecture</h2>
-<p>Phase 3 extends the Phase 2 static web app with three pillars: <strong>event-driven data processing</strong> (Azure Function blob trigger), <strong>caching</strong> (Azure Cache for Redis / Cosmos DB), and <strong>authentication/security</strong> (Azure Static Web Apps Auth, OAuth, encryption at rest).</p>
+<p>Phase 3 extends the Phase 2 static web app with three pillars: <strong>event-driven data processing</strong> (Azure Function blob trigger), <strong>caching</strong> (Cosmos DB as the durable cache, with Redis as an optional read-through layer), and <strong>authentication/security</strong> (custom JWT auth, Google/GitHub OAuth, platform encryption at rest).</p>
+<p class="sub"><strong>This is the intended target architecture, not a deployed one.</strong>
+<span class="pill bad">0 Azure resources provisioned</span>
+Azure Cache for Redis is deliberately <em>not</em> provisioned &mdash; it has no free tier, and the rubric accepts
+either an external cache or a database. Cosmos DB serverless is the cache of record
+(<code class="inline-code">deploy.sh:13-16</code>, <code class="inline-code">deploy.sh:88-96</code>). There is
+also no Azure Static Web Apps resource and no <code class="inline-code">staticwebapp.config.json</code>: the
+frontend is static files served from Blob Storage static website hosting, and all authentication is
+implemented in the Function App rather than by a platform auth provider.</p>
 
 <div class="section-card">
-<h3>Architecture Diagram</h3>
+<h3>Architecture Diagram <span class="pill warn">Target design &middot; not provisioned</span></h3>
 <svg viewBox="0 0 900 440" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:900px;display:block;margin:0 auto">
   <!-- Background -->
   <rect width="900" height="440" rx="12" fill="var(--bg)" stroke="var(--line)" stroke-width="1"/>
   <!-- Title -->
-  <text x="450" y="30" text-anchor="middle" font-size="15" font-weight="700" fill="var(--brand)">Phase 3 Enhanced Cloud Architecture</text>
+  <text x="450" y="30" text-anchor="middle" font-size="15" font-weight="700" fill="var(--brand)">Phase 3 Target Architecture (not yet provisioned)</text>
 
   <!-- Azure Blob Storage -->
   <rect x="30" y="60" width="170" height="80" rx="10" fill="var(--card)" stroke="var(--accent)" stroke-width="2"/>
@@ -120,19 +180,21 @@ footer{text-align:center;padding:2rem 1rem;color:var(--mute);font-size:.85rem;bo
   <!-- Arrow: Function -> Redis -->
   <line x1="460" y1="85" x2="540" y2="85" stroke="var(--ok)" stroke-width="2" marker-end="url(#arrowG)"/>
 
-  <!-- Redis Cache -->
-  <rect x="540" y="55" width="160" height="65" rx="10" fill="var(--okbg)" stroke="var(--ok)" stroke-width="2"/>
-  <text x="620" y="80" text-anchor="middle" font-size="12" font-weight="700" fill="var(--ok)">Azure Redis Cache</text>
-  <text x="620" y="97" text-anchor="middle" font-size="10" fill="var(--mute)">Pre-computed results</text>
+  <!-- Redis Cache (optional, not provisioned) -->
+  <rect x="540" y="55" width="160" height="65" rx="10" fill="var(--warnbg)" stroke="var(--warn)" stroke-width="2" stroke-dasharray="5,3"/>
+  <text x="620" y="78" text-anchor="middle" font-size="12" font-weight="700" fill="var(--warn)">Redis (optional)</text>
+  <text x="620" y="94" text-anchor="middle" font-size="9" fill="var(--mute)">Used only if REDIS_HOST set</text>
+  <text x="620" y="108" text-anchor="middle" font-size="9" fill="var(--mute)">Not provisioned by deploy.sh</text>
 
   <!-- Arrow: Function -> Cosmos -->
   <line x1="460" y1="115" x2="540" y2="155" stroke="var(--accent)" stroke-width="2" marker-end="url(#arrowB)"/>
 
   <!-- Cosmos DB -->
   <rect x="540" y="135" width="160" height="75" rx="10" fill="var(--card)" stroke="var(--accent)" stroke-width="2"/>
-  <text x="620" y="160" text-anchor="middle" font-size="12" font-weight="700" fill="var(--accent)">Cosmos DB</text>
-  <text x="620" y="177" text-anchor="middle" font-size="10" fill="var(--mute)">Cleaned recipes</text>
-  <text x="620" y="192" text-anchor="middle" font-size="10" fill="var(--mute)">Encrypted at rest (AES-256)</text>
+  <text x="620" y="158" text-anchor="middle" font-size="12" font-weight="700" fill="var(--accent)">Cosmos DB (serverless)</text>
+  <text x="620" y="173" text-anchor="middle" font-size="9" fill="var(--mute)">Durable cache: insights +</text>
+  <text x="620" y="186" text-anchor="middle" font-size="9" fill="var(--mute)">chunked recipes + users</text>
+  <text x="620" y="200" text-anchor="middle" font-size="9" fill="var(--mute)">Encrypted at rest by default</text>
 
   <!-- Arrow: Redis -> SWA -->
   <line x1="700" y1="88" x2="750" y2="280" stroke="var(--ok)" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrowG)"/>
@@ -142,25 +204,26 @@ footer{text-align:center;padding:2rem 1rem;color:var(--mute);font-size:.85rem;bo
 
   <!-- Static Web App -->
   <rect x="60" y="250" width="250" height="90" rx="10" fill="var(--card)" stroke="var(--brand)" stroke-width="2"/>
-  <text x="185" y="275" text-anchor="middle" font-size="12" font-weight="700" fill="var(--brand)">Azure Static Web App</text>
-  <text x="185" y="293" text-anchor="middle" font-size="10" fill="var(--mute)">Dashboard (Charts, Filters, Search)</text>
-  <text x="185" y="308" text-anchor="middle" font-size="10" fill="var(--mute)">Pagination, Auth Gate</text>
-  <text x="185" y="323" text-anchor="middle" font-size="10" fill="var(--mute)">User Name + Logout in header</text>
+  <text x="185" y="273" text-anchor="middle" font-size="12" font-weight="700" fill="var(--brand)">Static Website (Blob)</text>
+  <text x="185" y="291" text-anchor="middle" font-size="10" fill="var(--mute)">Dashboard (Charts, Filters, Search)</text>
+  <text x="185" y="306" text-anchor="middle" font-size="10" fill="var(--mute)">Pagination, login redirect</text>
+  <text x="185" y="321" text-anchor="middle" font-size="10" fill="var(--mute)">User Name + Logout in header</text>
 
   <!-- Auth Providers -->
-  <rect x="60" y="365" width="250" height="60" rx="10" fill="var(--warnbg)" stroke="var(--warn)" stroke-width="2"/>
-  <text x="185" y="390" text-anchor="middle" font-size="12" font-weight="700" fill="var(--warn)">Authentication Providers</text>
-  <text x="185" y="408" text-anchor="middle" font-size="10" fill="var(--mute)">Email/Password | Google OAuth | GitHub OAuth</text>
+  <rect x="60" y="365" width="250" height="60" rx="10" fill="var(--badbg)" stroke="var(--bad)" stroke-width="2" stroke-dasharray="5,3"/>
+  <text x="185" y="386" text-anchor="middle" font-size="12" font-weight="700" fill="var(--bad)">Authentication Providers</text>
+  <text x="185" y="401" text-anchor="middle" font-size="9" fill="var(--mute)">Email/Password | Google OAuth | GitHub OAuth</text>
+  <text x="185" y="416" text-anchor="middle" font-size="9" fill="var(--bad)">OAuth apps NOT registered &mdash; no client ID/secret</text>
 
   <!-- Arrow: Auth -> SWA -->
   <line x1="185" y1="365" x2="185" y2="340" stroke="var(--warn)" stroke-width="2" marker-end="url(#arrowW)"/>
 
   <!-- API Layer -->
   <rect x="400" y="260" width="200" height="80" rx="10" fill="var(--card)" stroke="var(--brand)" stroke-width="2"/>
-  <text x="500" y="285" text-anchor="middle" font-size="12" font-weight="700" fill="var(--brand)">API Layer</text>
-  <text x="500" y="303" text-anchor="middle" font-size="10" fill="var(--mute)">GET /api/recipes?diet=&amp;q=</text>
-  <text x="500" y="318" text-anchor="middle" font-size="10" fill="var(--mute)">POST /api/auth/login</text>
-  <text x="500" y="333" text-anchor="middle" font-size="10" fill="var(--mute)">GET /api/auth/callback</text>
+  <text x="500" y="283" text-anchor="middle" font-size="12" font-weight="700" fill="var(--brand)">API Layer (Python)</text>
+  <text x="500" y="300" text-anchor="middle" font-size="9" fill="var(--mute)">GET /api/recipes?diet=&amp;search=&amp;page= (401 w/o JWT)</text>
+  <text x="500" y="314" text-anchor="middle" font-size="9" fill="var(--mute)">GET /api/insights (401 w/o JWT)</text>
+  <text x="500" y="328" text-anchor="middle" font-size="9" fill="var(--mute)">POST /api/auth/login | /api/auth/oauth/*</text>
 
   <!-- Arrow: SWA -> API -->
   <line x1="310" y1="295" x2="400" y2="295" stroke="var(--brand)" stroke-width="2" marker-end="url(#arrowBr)"/>
@@ -173,7 +236,7 @@ footer{text-align:center;padding:2rem 1rem;color:var(--mute);font-size:.85rem;bo
   <rect x="730" y="260" width="140" height="80" rx="10" fill="var(--card)" stroke="var(--line)" stroke-width="2"/>
   <text x="800" y="288" text-anchor="middle" font-size="12" font-weight="700" fill="var(--ink)">End User</text>
   <text x="800" y="305" text-anchor="middle" font-size="10" fill="var(--mute)">Browser</text>
-  <text x="800" y="320" text-anchor="middle" font-size="10" fill="var(--mute)">Authenticated Session</text>
+  <text x="800" y="320" text-anchor="middle" font-size="10" fill="var(--mute)">Bearer JWT in localStorage</text>
 
   <!-- Arrow: User -> SWA -->
   <line x1="730" y1="300" x2="610" y2="300" stroke="var(--line)" stroke-width="1.5" marker-end="url(#arrowL)"/>
@@ -194,19 +257,23 @@ footer{text-align:center;padding:2rem 1rem;color:var(--mute);font-size:.85rem;bo
   <div class="cards">
     <div class="card">
       <b style="font-size:1.1rem">Event-Driven</b>
-      <p class="sub" style="font-size:.85rem">Blob trigger fires the cleaning function only when <code class="inline-code">All_Diets.csv</code> is uploaded or modified, eliminating unnecessary computation.</p>
+      <p class="sub" style="font-size:.85rem">Blob trigger fires the cleaning function only when <code class="inline-code">All_Diets.csv</code> is uploaded or modified, instead of re-parsing on every request.</p>
+      <span class="pill warn">Code complete &middot; unverified</span>
     </div>
     <div class="card">
-      <b style="font-size:1.1rem">Cache-First</b>
-      <p class="sub" style="font-size:.85rem">Pre-computed aggregations stored in Redis provide sub-10ms reads. Cosmos DB holds cleaned recipe data for complex queries.</p>
+      <b style="font-size:1.1rem">Durable Cache</b>
+      <p class="sub" style="font-size:.85rem">Pre-computed aggregations and the cleaned recipe records are written to Cosmos DB, chunked at 2,000 records per document so any function instance can read them. Redis is an optional mirror.</p>
+      <span class="pill warn">Code complete &middot; unverified</span>
     </div>
     <div class="card">
       <b style="font-size:1.1rem">Auth Gate</b>
-      <p class="sub" style="font-size:.85rem">All dashboard routes are protected. Users must authenticate via email/password or OAuth before accessing any data.</p>
+      <p class="sub" style="font-size:.85rem">The data endpoints verify the JWT signature server-side and return 401 without one. The page-level redirect in the browser is a convenience, not the control.</p>
+      <span class="pill warn">Code complete &middot; unverified</span>
     </div>
     <div class="card">
-      <b style="font-size:1.1rem">Encrypted</b>
-      <p class="sub" style="font-size:.85rem">Cosmos DB encrypts all data at rest with AES-256. Passwords are stored as bcrypt hashes, never plaintext.</p>
+      <b style="font-size:1.1rem">Encryption</b>
+      <p class="sub" style="font-size:.85rem">Passwords are bcrypt hashes, never plaintext &mdash; readable in the source. Encryption at rest is a Cosmos platform default and becomes true the moment Cosmos exists; it does not exist yet.</p>
+      <span class="pill bad">No database provisioned</span>
     </div>
   </div>
 </div>
@@ -216,78 +283,69 @@ footer{text-align:center;padding:2rem 1rem;color:var(--mute);font-size:.85rem;bo
 <!-- ============================================================ -->
 <h2 id="perf">2. Performance Optimization</h2>
 
-<h3>2.1 Blob Trigger &mdash; Data Cleaning (10 marks)</h3>
+<h3>2.1 Blob Trigger &mdash; Data Cleaning (10 marks) <span class="pill warn">Code complete &middot; unverified</span></h3>
 <div class="section-card">
-  <p>The Azure Function listens for changes to <code class="inline-code">All_Diets.csv</code> in the <code class="inline-code">nutrition-data</code> Blob Storage container. When the file is uploaded or modified, the function automatically:</p>
+  <p>The Azure Function listens for changes to <code class="inline-code">All_Diets.csv</code> in the <code class="inline-code">raw-data</code> Blob Storage container. When the file is uploaded or modified, the function:</p>
   <ol>
-    <li>Parses the CSV (7,806 rows, 5 diet types)</li>
-    <li>Removes duplicate entries and rows with missing nutritional values</li>
-    <li>Normalizes diet type names (lowercase, trim whitespace)</li>
-    <li>Validates numeric fields (Protein_g, Carbs_g, Fat_g &ge; 0)</li>
-    <li>Writes cleaned data to Cosmos DB</li>
+    <li>Parses the CSV (7,806 rows, 5 diet types) with pandas</li>
+    <li>Cleans and normalizes the rows (<code class="inline-code">clean_data</code> in <code class="inline-code">backend/nutrition.py</code>)</li>
+    <li>Pre-computes every aggregation the dashboard needs (<code class="inline-code">precompute_all</code>)</li>
+    <li>Writes the insights and the cleaned recipe records to the Cosmos cache</li>
+    <li>Writes <code class="inline-code">cleaned_recipes.csv</code> back to the <code class="inline-code">clean-data</code> container</li>
   </ol>
+  <p class="sub"><strong>Evidence still needed:</strong> an Azure portal screenshot of the Function App showing
+  the <code class="inline-code">blob_trigger_clean</code> function, and an Application Insights / log-stream
+  excerpt containing the <code class="inline-code">Blob trigger fired</code> and
+  <code class="inline-code">Blob trigger completed in &hellip;s</code> lines for a real upload. Neither exists
+  today. Note also that a Consumption-plan blob trigger polls rather than subscribing to events, so the first
+  invocation after an upload can lag by minutes &mdash; that needs to be accounted for in the demo.</p>
 
-  <h4>Blob Trigger Function</h4>
-<pre><code>// function.json
-{
-  "bindings": [
-    {
-      "name": "csvBlob",
-      "type": "blobTrigger",
-      "direction": "in",
-      "path": "nutrition-data/All_Diets.csv",
-      "connection": "AzureWebJobsStorage"
-    }
-  ]
-}
+  <h4>Blob Trigger Function <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; actual source, <code class="inline-code">backend/function_app.py:180-243</code></span></h4>
+<pre><code># backend/function_app.py
+@app.blob_trigger(
+    arg_name="myblob",
+    path="raw-data/All_Diets.csv",
+    connection="AzureWebJobsStorage",
+)
+def blob_trigger_clean(myblob: func.InputStream):
+    """Triggered when All_Diets.csv is uploaded/modified in Blob Storage.
 
-// index.js - Azure Function (BlobTrigger)
-const { CosmosClient } = require("@azure/cosmos");
-const csv = require("csv-parser");
-const { Readable } = require("stream");
+    1. Reads and cleans the raw CSV data.
+    2. Pre-computes all aggregations (average macros, top recipes, etc.).
+    3. Stores results in Cosmos DB (mirrored to Redis when it is in use).
+    4. Saves cleaned CSV back to a separate blob container.
+    """
+    logger.info("Blob trigger fired: %s (%d bytes)", myblob.name, myblob.length or 0)
+    start = time.time()
 
-module.exports = async function (context, csvBlob) {
-  context.log("Blob trigger fired: All_Diets.csv modified");
-  context.log(`Blob size: ${csvBlob.length} bytes`);
+    try:
+        raw_bytes = myblob.read()
+        raw_df = pd.read_csv(io.BytesIO(raw_bytes))
+        logger.info("Loaded %d rows from blob", len(raw_df))
 
-  const rows = [];
-  const stream = Readable.from(csvBlob.toString());
+        # Step 1: Clean data
+        df = clean_data(raw_df)
+        logger.info("Cleaned data: %d rows", len(df))
 
-  await new Promise((resolve, reject) =&gt; {
-    stream
-      .pipe(csv())
-      .on("data", (row) =&gt; {
-        // Data cleaning: normalize, validate, deduplicate
-        const cleaned = {
-          recipe_name: (row.Recipe_name || "").trim(),
-          diet_type:   (row.Diet_type || "").toLowerCase().trim(),
-          protein_g:   parseFloat(row.Protein_g) || 0,
-          carbs_g:     parseFloat(row.Carbs_g) || 0,
-          fat_g:       parseFloat(row.Fat_g) || 0,
-        };
+        # Step 2: Pre-compute all analytics
+        insights = precompute_all(df)
+        store_insights(insights)
+        logger.info("Pre-computed insights cached")
 
-        // Validate: skip rows with empty names or invalid diet types
-        const validDiets = ["dash", "keto", "mediterranean", "paleo", "vegan"];
-        if (cleaned.recipe_name &amp;&amp; validDiets.includes(cleaned.diet_type)) {
-          rows.push(cleaned);
-        }
-      })
-      .on("end", resolve)
-      .on("error", reject);
-  });
+        # Step 3: Store recipe records for search/filter/pagination
+        records = df_to_records(df)
+        store_recipes(records)
+        logger.info("Stored %d recipe records for search", len(records))
 
-  context.log(`Cleaned ${rows.length} valid recipes from CSV`);
+        # Step 4: Save cleaned CSV to clean-data container
+        #   ... uploads cleaned_recipes.csv to BLOB_CONTAINER_CLEAN ...
 
-  // Write cleaned data to Cosmos DB
-  const client = new CosmosClient(process.env.COSMOS_CONNECTION);
-  const container = client.database("nutritionDB").container("recipes");
+        elapsed = time.time() - start
+        logger.info("Blob trigger completed in %.2fs", elapsed)
 
-  for (const row of rows) {
-    await container.items.upsert({ ...row, id: row.recipe_name });
-  }
-
-  context.log("Cleaned data written to Cosmos DB");
-};</code></pre>
+    except Exception as exc:
+        logger.exception("Blob trigger failed: %s", exc)
+        raise   # re-raise so the host records an invocation failure</code></pre>
 
   <h4>How the Blob Trigger Works</h4>
   <svg viewBox="0 0 780 120" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:780px;display:block;margin:.8rem auto">
@@ -318,103 +376,143 @@ module.exports = async function (context, csvBlob) {
   </svg>
 </div>
 
-<h3>2.2 Result Caching &mdash; Redis / Cosmos DB (10 marks)</h3>
+<h3>2.2 Result Caching &mdash; Cosmos DB (10 marks) <span class="pill warn">Code complete &middot; unverified</span></h3>
 <div class="section-card">
-  <p>After cleaning, the function pre-computes aggregated results (average macros per diet, recipe counts, totals) and stores them in Azure Cache for Redis. Dashboard reads never re-process the raw CSV &mdash; they fetch pre-computed results from cache.</p>
+  <p>After cleaning, the function pre-computes aggregated results (average macros per diet, recipe counts, totals) and stores them in <strong>Cosmos DB</strong>, which is the durable cache. Redis is used only when <code class="inline-code">REDIS_HOST</code> is set and is not provisioned by the deploy script. Dashboard reads never re-process the raw CSV &mdash; they fetch pre-computed results from the cache.</p>
+  <p>The cleaned recipe records are written in <strong>chunks of 2,000</strong> because a Cosmos document may not exceed 2&nbsp;MB and the full dataset serializes to roughly 1.2&nbsp;MB. Chunking also matters for correctness: the blob trigger and the HTTP handlers are not guaranteed to run in the same process on Azure Functions, so a process-local cache would leave the API with nothing to serve. A <code class="inline-code">recipes_meta</code> document records the chunk count, orphan chunks from a larger previous dataset are deleted before the new count is published, and a reader that finds a chunk missing treats the whole cache as incomplete rather than serving a partial dataset.</p>
+  <p class="sub"><strong>Evidence still needed:</strong> a Cosmos Data Explorer screenshot showing the
+  <code class="inline-code">cache</code> container with <code class="inline-code">insights_cache</code>,
+  <code class="inline-code">recipes_meta</code> and the <code class="inline-code">recipes_chunk_000&hellip;003</code>
+  documents; and a <code class="inline-code">curl</code> response from
+  <code class="inline-code">/api/insights</code> showing <code class="inline-code">"cache_source":&nbsp;"cosmosdb"</code>
+  rather than <code class="inline-code">"memory"</code> or a 503. Neither exists today.</p>
 
-  <h4>Caching Logic</h4>
-<pre><code>// cacheResults.js - Pre-compute and cache aggregations
-const redis = require("redis");
+  <h4>Caching Logic <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; actual source, <code class="inline-code">backend/cache.py:216-294</code></span></h4>
+<pre><code># backend/cache.py
+CHUNK_SIZE = 2000   # a Cosmos document may not exceed 2 MB
 
-async function cacheAggregations(cleanedRows) {
-  const client = redis.createClient({
-    url: process.env.REDIS_CONNECTION_STRING,
-    password: process.env.REDIS_KEY,
-    tls: { servername: process.env.REDIS_HOST }
-  });
-  await client.connect();
+def store_recipes(recipes_list: list) -> bool:
+    """Persist the cleaned recipe records for search, filter and pagination.
 
-  // Group by diet type
-  const dietGroups = {};
-  cleanedRows.forEach(row =&gt; {
-    if (!dietGroups[row.diet_type]) dietGroups[row.diet_type] = [];
-    dietGroups[row.diet_type].push(row);
-  });
+    Written to Cosmos in chunks so the dataset is readable from any function
+    instance, not just the one that handled the blob trigger.
+    """
+    updated_at = datetime.now(timezone.utc).isoformat()
+    total = len(recipes_list)
+    chunks = [recipes_list[i:i + CHUNK_SIZE]
+              for i in range(0, total, CHUNK_SIZE)] or [[]]
 
-  // Compute and cache averages per diet
-  for (const [diet, recipes] of Object.entries(dietGroups)) {
-    const count = recipes.length;
-    const avgProtein = recipes.reduce((s, r) =&gt; s + r.protein_g, 0) / count;
-    const avgCarbs   = recipes.reduce((s, r) =&gt; s + r.carbs_g, 0)   / count;
-    const avgFat     = recipes.reduce((s, r) =&gt; s + r.fat_g, 0)     / count;
+    previous = _cosmos_read(RECIPES_META_KEY) or {}
+    previous_count = int(previous.get("chunk_count", 0))
 
-    await client.hSet(`diet:${diet}`, {
-      count:      count.toString(),
-      avgProtein: avgProtein.toFixed(2),
-      avgCarbs:   avgCarbs.toFixed(2),
-      avgFat:     avgFat.toFixed(2),
-    });
-  }
+    wrote = True
+    for index, chunk in enumerate(chunks):
+        if not _cosmos_write({
+            "id": f"recipes_chunk_{index:03d}",
+            "partitionKey": "cache",
+            "records": chunk,
+        }):
+            wrote = False
+            break
 
-  // Cache total recipe count
-  await client.set("total_recipes", cleanedRows.length.toString());
-  await client.disconnect();
-}
+    if wrote:
+        # Drop chunks left over from a larger previous dataset before
+        # publishing the new count, so a reader never sees a mixed set.
+        for index in range(len(chunks), previous_count):
+            _cosmos_delete(f"recipes_chunk_{index:03d}")
 
-module.exports = { cacheAggregations };</code></pre>
+        wrote = _cosmos_write({
+            "id": RECIPES_META_KEY, "partitionKey": "cache",
+            "chunk_count": len(chunks), "record_count": total,
+            "updated_at": updated_at,
+        })
 
-  <h4>Before / After Performance Comparison</h4>
+    r = _get_redis()          # None unless REDIS_HOST is configured
+    if r:
+        r.set("recipes_cache", json.dumps(recipes_list))
+
+    _memory_store["recipes_cache"] = recipes_list
+    return wrote or bool(r)
+
+
+def get_recipes() -> Optional[list]:
+    """Read the cleaned recipe records, or None when nothing is cached."""
+    r = _get_redis()
+    if r:
+        raw = r.get("recipes_cache")
+        if raw:
+            return json.loads(raw)
+
+    meta = _cosmos_read(RECIPES_META_KEY)
+    if meta:
+        records: list = []
+        for index in range(int(meta.get("chunk_count", 0))):
+            doc = _cosmos_read(f"recipes_chunk_{index:03d}")
+            if doc is None:
+                logger.warning("Recipe chunk %d missing; cache is incomplete",
+                               index)
+                records = []
+                break
+            records.extend(doc.get("records", []))
+        if records:
+            return records
+
+    return _memory_store.get("recipes_cache")</code></pre>
+
+  <h4>Before / After Performance &mdash; <span class="pill bad">Not measured</span></h4>
+  <p class="sub">Phase 2 re-parsed the 7,806-row CSV on every dashboard load; Phase 3 reads pre-computed
+  results from the cache instead. That is a real structural change and it is visible in the code. <strong>The
+  size of the improvement has not been measured</strong>, because the system has never run on Azure. An earlier
+  revision of this report published &ldquo;~1,850&nbsp;ms &rarr; ~8&nbsp;ms, a 231&times; improvement&rdquo;;
+  those figures were never measured and have been withdrawn.</p>
   <div class="perf-grid">
     <div class="perf-box">
       <div class="label">Before (Phase 2) &mdash; CSV parsed on every request</div>
-      <div class="val bad">~1,850 ms</div>
+      <div class="val">Not measured</div>
       <p class="sub" style="font-size:.82rem">Parse 7,806-row CSV + compute aggregations on each dashboard load</p>
     </div>
     <div class="perf-box">
-      <div class="label">After (Phase 3) &mdash; Redis cache + blob trigger</div>
-      <div class="val good">~8 ms</div>
-      <p class="sub" style="font-size:.82rem">Redis HGET returns pre-computed results; CSV parsed only when changed</p>
+      <div class="label">After (Phase 3) &mdash; cache read + blob trigger</div>
+      <div class="val">Not measured</div>
+      <p class="sub" style="font-size:.82rem">Cache returns pre-computed results; CSV parsed only when it changes</p>
     </div>
   </div>
+  <p class="sub"><strong>Evidence still needed:</strong> the API already returns its own
+  <code class="inline-code">response_time_ms</code> on every <code class="inline-code">/api/recipes</code> and
+  <code class="inline-code">/api/insights</code> response
+  (<code class="inline-code">backend/function_app.py:411</code>), so two <code class="inline-code">curl</code>
+  outputs &mdash; one against the Phase 2 endpoint, one against the Phase 3 cached endpoint &mdash; would
+  substitute a measurement for this estimate. Until those are captured, no number belongs here. One caveat worth
+  measuring rather than assuming: <code class="inline-code">get_recipes()</code> currently reads <em>all</em>
+  chunks on every request and filters in Python, so the cached path is not automatically fast.</p>
 
-  <svg viewBox="0 0 600 200" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:600px;display:block;margin:1rem auto">
-    <rect width="600" height="200" rx="8" fill="var(--bg)" stroke="var(--line)"/>
-    <text x="300" y="25" text-anchor="middle" font-size="13" font-weight="700" fill="var(--brand)">Response Time Comparison (ms)</text>
-    <!-- Before bar -->
-    <rect x="80" y="50" width="440" height="35" rx="4" fill="var(--badbg)" stroke="var(--bad)" stroke-width="1"/>
-    <rect x="80" y="50" width="440" height="35" rx="4" fill="var(--bad)" opacity=".25"/>
-    <text x="90" y="72" font-size="12" font-weight="600" fill="var(--bad)">Phase 2: CSV on every request</text>
-    <text x="510" y="72" font-size="12" font-weight="700" fill="var(--bad)">1,850 ms</text>
-    <!-- After bar -->
-    <rect x="80" y="100" width="2" height="35" rx="1" fill="var(--ok)"/>
-    <text x="90" y="122" font-size="12" font-weight="600" fill="var(--ok)">Phase 3: Redis cache read</text>
-    <text x="510" y="122" font-size="12" font-weight="700" fill="var(--ok)">8 ms</text>
-    <!-- Labels -->
-    <text x="300" y="165" text-anchor="middle" font-size="10" fill="var(--mute)">231x improvement in dashboard load time</text>
-    <text x="300" y="185" text-anchor="middle" font-size="10" fill="var(--mute)">CSV processing happens only when All_Diets.csv changes (blob trigger)</text>
-  </svg>
-
-  <h4>Cached Data Structure in Redis</h4>
+  <h4>Cached Data Structure <span class="pill warn">Shape is from the code; values are computed locally, not read from a deployed cache</span></h4>
+  <p class="sub">The table below shows the shape of the <code class="inline-code">insights_cache</code> document
+  and the aggregate values produced by running the cleaning code against the local dataset. They have
+  <strong>not</strong> been read back out of a deployed Cosmos container. Keys are shown in the Redis
+  <code class="inline-code">diet:*</code> hash form the optional mirror uses; in Cosmos the same values live
+  under <code class="inline-code">average_macros</code> and <code class="inline-code">recipe_counts</code>
+  inside a single document.</p>
   <div class="scroll">
   <table>
-    <tr><th>Redis Key</th><th>Field</th><th>Value</th></tr>
-    <tr><td rowspan="4"><code class="inline-code">diet:dash</code></td><td>count</td><td>1,561</td></tr>
+    <tr><th>Cache Key</th><th>Field</th><th>Value (computed locally)</th></tr>
+    <tr><td rowspan="4"><code class="inline-code">diet:dash</code></td><td>count</td><td>1,745</td></tr>
     <tr><td>avgProtein</td><td>69.28</td></tr>
     <tr><td>avgCarbs</td><td>160.54</td></tr>
     <tr><td>avgFat</td><td>101.15</td></tr>
-    <tr><td rowspan="4"><code class="inline-code">diet:keto</code></td><td>count</td><td>1,890</td></tr>
+    <tr><td rowspan="4"><code class="inline-code">diet:keto</code></td><td>count</td><td>1,512</td></tr>
     <tr><td>avgProtein</td><td>101.27</td></tr>
     <tr><td>avgCarbs</td><td>57.97</td></tr>
     <tr><td>avgFat</td><td>153.12</td></tr>
-    <tr><td rowspan="4"><code class="inline-code">diet:mediterranean</code></td><td>count</td><td>1,752</td></tr>
+    <tr><td rowspan="4"><code class="inline-code">diet:mediterranean</code></td><td>count</td><td>1,753</td></tr>
     <tr><td>avgProtein</td><td>101.11</td></tr>
     <tr><td>avgCarbs</td><td>152.91</td></tr>
     <tr><td>avgFat</td><td>101.42</td></tr>
-    <tr><td rowspan="4"><code class="inline-code">diet:paleo</code></td><td>count</td><td>1,553</td></tr>
+    <tr><td rowspan="4"><code class="inline-code">diet:paleo</code></td><td>count</td><td>1,274</td></tr>
     <tr><td>avgProtein</td><td>88.67</td></tr>
     <tr><td>avgCarbs</td><td>129.55</td></tr>
     <tr><td>avgFat</td><td>135.67</td></tr>
-    <tr><td rowspan="4"><code class="inline-code">diet:vegan</code></td><td>count</td><td>1,050</td></tr>
+    <tr><td rowspan="4"><code class="inline-code">diet:vegan</code></td><td>count</td><td>1,522</td></tr>
     <tr><td>avgProtein</td><td>56.16</td></tr>
     <tr><td>avgCarbs</td><td>254.00</td></tr>
     <tr><td>avgFat</td><td>103.30</td></tr>
@@ -428,54 +526,94 @@ module.exports = { cacheAggregations };</code></pre>
 <!-- ============================================================ -->
 <h2 id="interaction">3. Data Interaction</h2>
 
-<h3>3.1 Diet Type Filter (5 marks)</h3>
+<h3>3.1 Diet Type Filter (5 marks) <span class="pill warn">Code complete &middot; unverified</span></h3>
 <div class="section-card">
-  <p>Users can filter recipes by selecting a diet type from a dropdown. The API queries Cosmos DB with a partition key filter, returning only matching recipes.</p>
+  <p>Users filter recipes by selecting a diet type from a dropdown. Filtering happens <strong>server-side in
+  the Function App</strong>, over the cleaned record list read from the Cosmos cache &mdash; it is not a Cosmos
+  SQL query with a partition-key filter. An earlier revision of this report claimed the latter; the code does
+  not do that. The dropdown options are populated from the cached dataset rather than hardcoded
+  (<code class="inline-code">frontend/app.js:145-156</code>).</p>
+  <p class="sub"><strong>Evidence still needed:</strong> a screenshot of the dashboard with a diet selected and
+  the result count updated, plus a <code class="inline-code">curl</code> output for
+  <code class="inline-code">/api/recipes?diet=keto</code> showing a <code class="inline-code">total</code> that
+  matches the real dataset count for that diet.</p>
 
-  <h4>Filter API Endpoint</h4>
-<pre><code>// api/recipes/filter.js
-const { CosmosClient } = require("@azure/cosmos");
+  <h4>Filter, Search and Pagination &mdash; one endpoint <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; actual source, <code class="inline-code">backend/function_app.py:376-412</code></span></h4>
+<pre><code># backend/function_app.py - inside get_recipes_api, after the 401 guard
+    # Apply diet filter
+    diet = req.params.get("diet", "").strip().lower()
+    if diet:
+        recipes = [r for r in recipes if r.get("Diet_type", "").lower() == diet]
 
-module.exports = async function (context, req) {
-  const dietType = req.query.diet || "all";
-  const client = new CosmosClient(process.env.COSMOS_CONNECTION);
-  const container = client.database("nutritionDB").container("recipes");
+    # Apply keyword search
+    search = req.params.get("search", "").strip().lower()
+    if search:
+        recipes = [
+            r for r in recipes
+            if search in r.get("Recipe_name", "").lower()
+            or search in r.get("Cuisine_type", "").lower()
+            or search in r.get("Diet_type", "").lower()
+        ]
 
-  let query;
-  if (dietType === "all") {
-    query = "SELECT * FROM c";
-  } else {
-    query = {
-      query: "SELECT * FROM c WHERE c.diet_type = @diet",
-      parameters: [{ name: "@diet", value: dietType.toLowerCase() }]
-    };
+    # Pagination
+    total = len(recipes)
+    page = max(1, int(req.params.get("page", "1")))
+    page_size = min(100, max(1, int(req.params.get("pageSize", "20"))))
+
+    total_pages = max(1, (total + page_size - 1) // page_size)
+    page = min(page, total_pages)
+    offset = (page - 1) * page_size
+    page_results = recipes[offset: offset + page_size]
+
+    return _json_response({
+        "status": "ok", "source": source,
+        "response_time_ms": elapsed,
+        "total": total, "page": page, "pageSize": page_size,
+        "totalPages": total_pages,
+        "hasNext": page &lt; total_pages, "hasPrev": page &gt; 1,
+        "results": page_results,
+    })</code></pre>
+
+  <h4>Frontend Filter Component <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; actual source, <code class="inline-code">frontend/app.js:74-80, 161-188</code></span></h4>
+<pre><code>// app.js - the filter and search controls share one request path
+if (dietFilter) {
+  dietFilter.addEventListener("change", () =&gt; {
+    currentDiet = dietFilter.value;
+    currentPage = 1;
+    loadRecipes();
+  });
+}
+
+async function loadRecipes() {
+  const params = new URLSearchParams();
+  if (currentDiet) params.set("diet", currentDiet);
+  if (currentSearch) params.set("search", currentSearch);
+  params.set("page", currentPage);
+  params.set("pageSize", currentPageSize);
+
+  let result = null;
+  try {
+    // authFetch attaches `Authorization: Bearer &lt;jwt&gt;`
+    const resp = await authFetch(API_BASE + "/recipes?" + params.toString());
+    if (resp.status === 401) return redirectToLogin();
+
+    result = await resp.json();
+    if (!resp.ok) {
+      showTableMessage(result.error || `Recipes unavailable (${resp.status}).`);
+      renderPagination({ page: 1, totalPages: 1, total: 0 });
+      return;
+    }
+  } catch (err) {
+    showTableMessage("Cannot reach the API.");
+    return;
   }
 
-  const { resources } = await container.items.query(query).fetchAll();
-
-  context.res = {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-    body: { count: resources.length, recipes: resources }
-  };
-};</code></pre>
-
-  <h4>Frontend Filter Component</h4>
-<pre><code>// Filter dropdown handler
-const dietSelect = document.getElementById("diet-filter");
-
-dietSelect.addEventListener("change", async (e) =&gt; {
-  const diet = e.target.value;
-  const res = await fetch(`/api/recipes/filter?diet=${diet}`);
-  const data = await res.json();
-  renderRecipeTable(data.recipes);
-  updateCharts(data.recipes);
-  document.getElementById("result-count").textContent =
-    `Showing ${data.count} recipes`;
-});</code></pre>
+  renderRecipeTable(result.results || []);
+  renderPagination(result);
+}</code></pre>
 
   <!-- Filter Mock SVG -->
-  <h4>Filter UI</h4>
+  <h4>Filter UI <span class="pill warn">Hand-drawn mockup, not a screenshot</span></h4>
   <svg viewBox="0 0 700 170" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;display:block;margin:.5rem auto">
     <rect width="700" height="170" rx="8" fill="var(--card)" stroke="var(--line)"/>
     <text x="20" y="30" font-size="13" font-weight="700" fill="var(--brand)">Filter by Diet Type</text>
@@ -484,7 +622,7 @@ dietSelect.addEventListener("change", async (e) =&gt; {
     <text x="30" y="66" font-size="11" fill="var(--ink)">Keto</text>
     <text x="200" y="66" font-size="11" fill="var(--mute)">&#9660;</text>
     <!-- Result count -->
-    <text x="240" y="66" font-size="11" fill="var(--ok)" font-weight="600">Showing 1,890 recipes</text>
+    <text x="240" y="66" font-size="11" fill="var(--ok)" font-weight="600">Showing 1,512 recipes</text>
     <!-- Mini table -->
     <rect x="20" y="90" width="660" height="22" rx="3" fill="var(--bg)" stroke="var(--line)"/>
     <text x="30" y="105" font-size="10" font-weight="600" fill="var(--mute)">Recipe Name</text>
@@ -507,74 +645,37 @@ dietSelect.addEventListener("change", async (e) =&gt; {
   </svg>
 </div>
 
-<h3>3.2 Keyword Search (10 marks)</h3>
+<h3>3.2 Keyword Search (10 marks) <span class="pill warn">Code complete &middot; unverified</span></h3>
 <div class="section-card">
-  <p>Users can search recipes by keyword (e.g., "chicken", "salad"). The API uses Cosmos DB's <code class="inline-code">CONTAINS</code> function for case-insensitive substring matching on the recipe name.</p>
+  <p>Users search recipes by keyword (e.g. &ldquo;chicken&rdquo;, &ldquo;salad&rdquo;). The match is a
+  case-insensitive substring test run <strong>server-side in Python</strong> across three fields &mdash;
+  <code class="inline-code">Recipe_name</code>, <code class="inline-code">Cuisine_type</code> and
+  <code class="inline-code">Diet_type</code> &mdash; over the cleaned records read from the Cosmos cache. It is
+  <strong>not</strong> Cosmos DB's <code class="inline-code">CONTAINS()</code> function; an earlier revision of
+  this report said it was. The query parameter is <code class="inline-code">search</code>, not
+  <code class="inline-code">q</code>, and the frontend debounce is 350&nbsp;ms. See the endpoint source in
+  &sect;3.1 above &mdash; filter, search and pagination are one handler.</p>
+  <p class="sub"><strong>Evidence still needed:</strong> a <code class="inline-code">curl</code> output for
+  <code class="inline-code">/api/recipes?search=chicken</code> with a real
+  <code class="inline-code">total</code>, and a dashboard screenshot of the same search. The result count for
+  any given keyword is currently unknown, because the search has never run against the real dataset in a
+  deployed environment.</p>
 
-  <h4>Search API Endpoint</h4>
-<pre><code>// api/recipes/search.js
-module.exports = async function (context, req) {
-  const keyword  = (req.query.q || "").toLowerCase();
-  const page     = parseInt(req.query.page) || 1;
-  const pageSize = parseInt(req.query.pageSize) || 20;
-  const offset   = (page - 1) * pageSize;
-
-  const client = new CosmosClient(process.env.COSMOS_CONNECTION);
-  const container = client.database("nutritionDB").container("recipes");
-
-  // Count total matching results
-  const countQuery = {
-    query: "SELECT VALUE COUNT(1) FROM c WHERE CONTAINS(LOWER(c.recipe_name), @kw)",
-    parameters: [{ name: "@kw", value: keyword }]
-  };
-  const { resources: countResult } = await container.items.query(countQuery).fetchAll();
-  const totalCount = countResult[0] || 0;
-
-  // Fetch paginated results
-  const dataQuery = {
-    query: `SELECT * FROM c WHERE CONTAINS(LOWER(c.recipe_name), @kw)
-            ORDER BY c.recipe_name
-            OFFSET @offset LIMIT @limit`,
-    parameters: [
-      { name: "@kw", value: keyword },
-      { name: "@offset", value: offset },
-      { name: "@limit", value: pageSize }
-    ]
-  };
-  const { resources } = await container.items.query(dataQuery).fetchAll();
-
-  context.res = {
-    status: 200,
-    body: {
-      keyword, page, pageSize,
-      totalCount,
-      totalPages: Math.ceil(totalCount / pageSize),
-      recipes: resources
-    }
-  };
-};</code></pre>
-
-  <h4>Frontend Search Component</h4>
-<pre><code>// Keyword search with debounce
-let searchTimeout;
-const searchInput = document.getElementById("search-input");
-
-searchInput.addEventListener("input", (e) =&gt; {
-  clearTimeout(searchTimeout);
-  searchTimeout = setTimeout(async () =&gt; {
-    const q = e.target.value.trim();
-    if (q.length &lt; 2) return;
-    const res = await fetch(`/api/recipes/search?q=${encodeURIComponent(q)}&amp;page=1`);
-    const data = await res.json();
-    renderRecipeTable(data.recipes);
-    renderPagination(data.page, data.totalPages);
-    document.getElementById("result-count").textContent =
-      `Found ${data.totalCount} recipes for "${data.keyword}"`;
-  }, 300);
-});</code></pre>
+  <h4>Frontend Search Component <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; actual source, <code class="inline-code">frontend/app.js:82-91</code></span></h4>
+<pre><code>// app.js - keyword search, debounced 350 ms
+if (searchInput) {
+  searchInput.addEventListener("input", () =&gt; {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() =&gt; {
+      currentSearch = searchInput.value.trim();
+      currentPage = 1;
+      loadRecipes();        // shown in full in 3.1
+    }, 350);
+  });
+}</code></pre>
 
   <!-- Search Mock SVG -->
-  <h4>Search UI</h4>
+  <h4>Search UI <span class="pill warn">Hand-drawn mockup, not a screenshot</span></h4>
   <svg viewBox="0 0 700 140" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;display:block;margin:.5rem auto">
     <rect width="700" height="140" rx="8" fill="var(--card)" stroke="var(--line)"/>
     <text x="20" y="30" font-size="13" font-weight="700" fill="var(--brand)">Keyword Search</text>
@@ -585,7 +686,7 @@ searchInput.addEventListener("input", (e) =&gt; {
     <circle cx="352" cy="61" r="7" fill="none" stroke="var(--accent)" stroke-width="1.5"/>
     <line x1="357" y1="66" x2="363" y2="72" stroke="var(--accent)" stroke-width="1.5"/>
     <!-- Result count -->
-    <text x="390" y="66" font-size="11" fill="var(--ok)" font-weight="600">Found 312 recipes for "chicken"</text>
+    <text x="390" y="66" font-size="11" fill="var(--mute)" font-weight="600">Found N recipes for "chicken"</text>
     <!-- Mini results -->
     <rect x="20" y="90" width="660" height="18" rx="3" fill="var(--okbg)" stroke="var(--ok)" stroke-width=".5"/>
     <text x="30" y="103" font-size="10" fill="var(--ok)">1. Keto Chicken Bowl (keto) - P: 42.5g | C: 8.2g | F: 28.7g</text>
@@ -594,55 +695,46 @@ searchInput.addEventListener("input", (e) =&gt; {
   </svg>
 </div>
 
-<h3>3.3 Pagination (5 marks)</h3>
+<h3>3.3 Pagination (5 marks) <span class="pill warn">Code complete &middot; unverified</span></h3>
 <div class="section-card">
-  <p>Search results are paginated with 20 results per page. The API supports <code class="inline-code">page</code> and <code class="inline-code">pageSize</code> query parameters and returns metadata for rendering pagination controls.</p>
+  <p>Results are paginated at 20 per page (<code class="inline-code">pageSize</code> clamped to 1&ndash;100). The
+  slicing is done server-side in the Function App over the filtered record list &mdash; <strong>not</strong>
+  with a Cosmos <code class="inline-code">OFFSET/LIMIT</code> clause, as an earlier revision of this report
+  claimed. The response carries <code class="inline-code">total</code>,
+  <code class="inline-code">page</code>, <code class="inline-code">totalPages</code>,
+  <code class="inline-code">hasNext</code> and <code class="inline-code">hasPrev</code> for the controls to
+  render from (see &sect;3.1).</p>
+  <p class="sub"><strong>Evidence still needed:</strong> a screenshot showing page 2 or later with the controls
+  visible. This is the one item where a broken cache is silently fatal: if the cache is empty and the demo
+  fallback were switched on, the 15-row sample yields <code class="inline-code">totalPages = 1</code> and
+  <code class="inline-code">renderPagination</code> renders <em>no controls at all</em>
+  (<code class="inline-code">frontend/app.js:482-524</code>) &mdash; the feature would be invisible on video.
+  The fallback is off by default for exactly this reason.</p>
 
-  <h4>Pagination Component</h4>
-<pre><code>// Pagination renderer
-function renderPagination(currentPage, totalPages) {
+  <h4>Pagination Component <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; actual source, <code class="inline-code">frontend/app.js:482-532</code></span></h4>
+<pre><code>// app.js - renderPagination reads the metadata the API returns
+function renderPagination(result) {
   const container = document.getElementById("pagination");
-  container.innerHTML = "";
+  if (!container) return;
 
-  // Previous button
-  const prev = document.createElement("button");
-  prev.textContent = "Previous";
-  prev.disabled = currentPage === 1;
-  prev.onclick = () =&gt; loadPage(currentPage - 1);
-  container.appendChild(prev);
-
-  // Page numbers (show max 5 around current)
-  const start = Math.max(1, currentPage - 2);
-  const end   = Math.min(totalPages, currentPage + 2);
-  for (let i = start; i &lt;= end; i++) {
-    const btn = document.createElement("button");
-    btn.textContent = i;
-    btn.className = i === currentPage ? "active" : "";
-    btn.onclick = () =&gt; loadPage(i);
-    container.appendChild(btn);
+  const { page, totalPages, total, hasNext, hasPrev } = result;
+  if (totalPages &lt;= 1) {
+    container.innerHTML =
+      `&lt;span class="page-info"&gt;Showing ${total} recipe${total !== 1 ? "s" : ""}&lt;/span&gt;`;
+    return;                       // no controls rendered at all
   }
 
-  // Next button
-  const next = document.createElement("button");
-  next.textContent = "Next";
-  next.disabled = currentPage === totalPages;
-  next.onclick = () =&gt; loadPage(currentPage + 1);
-  container.appendChild(next);
-}
-
-async function loadPage(page) {
-  const q = document.getElementById("search-input").value;
-  const res = await fetch(`/api/recipes/search?q=${encodeURIComponent(q)}&amp;page=${page}`);
-  const data = await res.json();
-  renderRecipeTable(data.recipes);
-  renderPagination(data.page, data.totalPages);
+  let html = "";
+  html += `&lt;button ${hasPrev ? "" : "disabled"} onclick="goToPage(${page - 1})"&gt;Previous&lt;/button&gt;`;
+  // ... a window of page numbers, then Next; each calls
+  // goToPage(n) -&gt; currentPage = n; loadRecipes();
 }</code></pre>
 
   <!-- Pagination Mock SVG -->
-  <h4>Pagination UI</h4>
+  <h4>Pagination UI <span class="pill warn">Hand-drawn mockup, not a screenshot</span></h4>
   <svg viewBox="0 0 500 60" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:500px;display:block;margin:.5rem auto">
     <rect width="500" height="60" rx="8" fill="var(--card)" stroke="var(--line)"/>
-    <text x="250" y="20" text-anchor="middle" font-size="10" fill="var(--mute)">Page 3 of 16 (312 results)</text>
+    <text x="250" y="20" text-anchor="middle" font-size="10" fill="var(--mute)">Page 3 of totalPages (total results)</text>
     <!-- Prev -->
     <rect x="100" y="30" width="60" height="22" rx="4" fill="var(--bg)" stroke="var(--line)"/>
     <text x="130" y="45" text-anchor="middle" font-size="10" fill="var(--ink)">Prev</text>
@@ -668,98 +760,77 @@ async function loadPage(page) {
 <!-- ============================================================ -->
 <h2 id="auth">4. Authentication &amp; Security</h2>
 
-<h3>4.1 Email / Password Registration &amp; Login (10 marks)</h3>
+<h3>4.1 Email / Password Registration &amp; Login (10 marks) <span class="pill ok">Hashing verified in repo</span> <span class="pill warn">Never run against a database</span></h3>
 <div class="section-card">
-  <p>Users register with an email and password. The password is hashed using <strong>bcrypt</strong> (12 salt rounds) before storage in Cosmos DB. Login verifies the hash. Sessions use signed JWTs with a 24-hour expiry.</p>
+  <p>Users register with an email and password. The password is hashed using <strong>bcrypt</strong> with 12
+  salt rounds before storage in Cosmos DB; login verifies against the stored hash. Sessions are signed JWTs
+  (HS256) with a 24-hour expiry. The hashing cost factor and the fact that plaintext is never stored are
+  <strong>verifiable right now</strong> by reading <code class="inline-code">backend/auth.py</code> &mdash; that
+  part needs no deployment to check. What is unverified is everything downstream of it: no user has ever been
+  written to a real Cosmos container, because no Cosmos account exists.</p>
+  <p class="sub"><strong>Evidence still needed:</strong> a Cosmos Data Explorer screenshot of one document in
+  the <code class="inline-code">users</code> container showing a
+  <code class="inline-code">$2b$12$&hellip;</code> hash in the password field and no plaintext password; plus a
+  <code class="inline-code">curl</code> transcript of register &rarr; login &rarr; authenticated request. One
+  known residual risk: with Cosmos unset the code falls back to an in-process user dict
+  (<code class="inline-code">_memory_users</code>), so register-then-login can fail across instances &mdash;
+  which is another reason the database has to actually exist before recording.</p>
 
-  <h4>Registration Endpoint</h4>
-<pre><code>// api/auth/register.js
-const bcrypt = require("bcryptjs");
-const { CosmosClient } = require("@azure/cosmos");
+  <h4>Password Hashing and Token Issue <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; actual source, <code class="inline-code">backend/auth.py:64-93</code></span></h4>
+<pre><code># backend/auth.py
+def hash_password(plain: str) -> str:
+    """Hash a plaintext password with bcrypt (12 rounds)."""
+    salt = bcrypt.gensalt(rounds=12)
+    return bcrypt.hashpw(plain.encode("utf-8"), salt).decode("utf-8")
 
-module.exports = async function (context, req) {
-  const { email, password, name } = req.body;
 
-  // Validate input
-  if (!email || !password || password.length &lt; 8) {
-    context.res = { status: 400, body: { error: "Invalid email or password (min 8 chars)" } };
-    return;
-  }
+def verify_password(plain: str, hashed: str) -> bool:
+    """Verify a plaintext password against a bcrypt hash."""
+    try:
+        return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
+    except Exception:
+        logger.exception("Password verification error")
+        return False
 
-  const client = new CosmosClient(process.env.COSMOS_CONNECTION);
-  const container = client.database("nutritionDB").container("users");
 
-  // Check if user already exists
-  const { resources: existing } = await container.items
-    .query({ query: "SELECT * FROM c WHERE c.email = @email",
-             parameters: [{ name: "@email", value: email }] })
-    .fetchAll();
+def create_token(user_id: str, email: str, name: str) -> str:
+    """Create a JWT token with user claims, valid for JWT_EXPIRY_HOURS."""
+    now = datetime.now(timezone.utc)
+    payload = {
+        "sub": user_id,
+        "email": email,
+        "name": name,
+        "iat": now,
+        "exp": now + timedelta(hours=JWT_EXPIRY_HOURS),
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)</code></pre>
 
-  if (existing.length &gt; 0) {
-    context.res = { status: 409, body: { error: "Email already registered" } };
-    return;
-  }
+  <h4>No default signing key <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; <code class="inline-code">backend/auth.py:22-36</code></span></h4>
+<pre><code># A known default signing key would let anyone mint a valid token, so an
+# unset secret is a hard failure in a deployment and only a warning locally.
+# WEBSITE_INSTANCE_ID is set by the Functions host on Azure.
+if not JWT_SECRET:
+    if os.environ.get("WEBSITE_INSTANCE_ID"):
+        raise RuntimeError(
+            "JWT_SECRET app setting is required. Generate one with "
+            "`openssl rand -base64 32` and set it on the Function App."
+        )
+    JWT_SECRET = "local-development-only-do-not-deploy"
+    logger.warning("JWT_SECRET unset; using the local development key")</code></pre>
 
-  // Hash password with bcrypt (12 salt rounds)
-  const passwordHash = await bcrypt.hash(password, 12);
-
-  // Store user - NEVER store plaintext password
-  await container.items.create({
-    id: email,
-    email,
-    name,
-    passwordHash, // bcrypt hash, not plaintext
-    createdAt: new Date().toISOString()
-  });
-
-  context.res = { status: 201, body: { message: "User registered successfully" } };
-};</code></pre>
-
-  <h4>Login Endpoint</h4>
-<pre><code>// api/auth/login.js
-const bcrypt = require("bcryptjs");
-const jwt    = require("jsonwebtoken");
-
-module.exports = async function (context, req) {
-  const { email, password } = req.body;
-
-  const client = new CosmosClient(process.env.COSMOS_CONNECTION);
-  const container = client.database("nutritionDB").container("users");
-
-  const { resources } = await container.items
-    .query({ query: "SELECT * FROM c WHERE c.email = @email",
-             parameters: [{ name: "@email", value: email }] })
-    .fetchAll();
-
-  if (resources.length === 0) {
-    context.res = { status: 401, body: { error: "Invalid credentials" } };
-    return;
-  }
-
-  const user = resources[0];
-
-  // Verify password against stored bcrypt hash
-  const valid = await bcrypt.compare(password, user.passwordHash);
-  if (!valid) {
-    context.res = { status: 401, body: { error: "Invalid credentials" } };
-    return;
-  }
-
-  // Generate JWT token (24h expiry)
-  const token = jwt.sign(
-    { userId: user.id, email: user.email, name: user.name },
-    process.env.JWT_SECRET,
-    { expiresIn: "24h" }
-  );
-
-  context.res = {
-    status: 200,
-    body: { token, user: { email: user.email, name: user.name } }
-  };
-};</code></pre>
+  <h4>Endpoints</h4>
+  <p class="sub"><code class="inline-code">POST /api/auth/register</code>
+  (<code class="inline-code">backend/function_app.py:484</code>) validates the input, rejects a duplicate email
+  with 409, hashes with <code class="inline-code">hash_password</code> and stores the user document.
+  <code class="inline-code">POST /api/auth/login</code>
+  (<code class="inline-code">backend/function_app.py:534</code>) looks the user up, calls
+  <code class="inline-code">verify_password</code>, returns 401 on either a missing user or a bad password, and
+  issues a token with <code class="inline-code">create_token</code>. Earlier revisions of this report printed
+  Node.js implementations of these two endpoints; no such code exists in this repository, and those snippets
+  have been removed.</p>
 
   <!-- Login Page Mock SVG -->
-  <h4>Login Page</h4>
+  <h4>Login Page <span class="pill warn">Hand-drawn mockup, not a screenshot</span></h4>
   <svg viewBox="0 0 400 340" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:400px;display:block;margin:.5rem auto">
     <rect width="400" height="340" rx="12" fill="var(--bg)" stroke="var(--line)"/>
     <!-- Card -->
@@ -790,11 +861,37 @@ module.exports = async function (context, req) {
   </svg>
 </div>
 
-<h3>4.2 OAuth Integration &mdash; Google &amp; GitHub (10 marks)</h3>
+<h3>4.2 OAuth Integration &mdash; Google &amp; GitHub (10 marks) <span class="pill warn">Code complete</span> <span class="pill bad">No OAuth app registered</span></h3>
 <div class="section-card">
-  <p>Users can sign in with their Google or GitHub account via OAuth 2.0. Azure Static Web Apps provides built-in OAuth support, or the app can implement a custom OAuth flow with redirect handling.</p>
+  <p>Both providers are implemented as a <strong>custom authorization-code flow in the Function App</strong>
+  (<code class="inline-code">backend/auth.py:158-266</code>,
+  <code class="inline-code">backend/function_app.py:602-711</code>). There is no Azure Static Web Apps resource
+  and no <code class="inline-code">staticwebapp.config.json</code> in this repository, so the built-in
+  platform auth that an earlier revision of this report described is not what the code does. The implementation
+  is complete and includes two things worth noting: the <code class="inline-code">state</code> parameter is a
+  short-lived signed JWT that the callback verifies before doing anything, and account linking is gated on the
+  provider reporting a <strong>verified</strong> email (GitHub requires a second call to
+  <code class="inline-code">/user/emails</code> to establish that).</p>
 
-  <h4>OAuth Flow</h4>
+  <p><strong>This feature cannot work today, and not because of the code.</strong> No Google Cloud OAuth client
+  and no GitHub OAuth app have been registered, so there is no client ID or secret to configure. The credentials
+  are read from app settings (<code class="inline-code">backend/auth.py:38-53</code>) and
+  <code class="inline-code">deploy.sh:159-164</code> passes them through from the caller's environment &mdash;
+  but if they are unset it deploys empty strings, the consent redirect goes out with an empty
+  <code class="inline-code">client_id</code>, and the provider returns an error page. This item is effectively
+  binary: registered and configured, or zero marks.</p>
+
+  <p class="sub"><strong>Evidence still needed:</strong> a screenshot of the Google Cloud Console OAuth client
+  and the GitHub OAuth app settings page showing the registered redirect URIs (with the secrets redacted); a
+  screenshot of the four app settings present on the Function App; and a recording of one successful consent
+  &rarr; callback &rarr; logged-in dashboard round trip for each provider. <strong>No client secret should ever
+  be committed to this repository.</strong></p>
+  <p class="sub"><strong>Known limitation to disclose rather than hide:</strong> the signed
+  <code class="inline-code">state</code> is not bound to the browser session (no nonce or cookie pairing), so
+  any third party can request a valid state from <code class="inline-code">/api/auth/oauth/google</code>. It
+  defends against a forged or stale callback, but it is not full login-CSRF protection.</p>
+
+  <h4>OAuth Flow <span class="pill warn">Design diagram &middot; never executed</span></h4>
   <svg viewBox="0 0 800 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:800px;display:block;margin:.5rem auto">
     <rect width="800" height="160" rx="8" fill="var(--bg)" stroke="var(--line)"/>
     <text x="400" y="22" text-anchor="middle" font-size="12" font-weight="700" fill="var(--brand)">Google OAuth 2.0 Flow</text>
@@ -823,198 +920,222 @@ module.exports = async function (context, req) {
     <text x="720" y="62" text-anchor="middle" font-size="10" font-weight="600" fill="var(--ok)">Exchange for</text>
     <text x="720" y="76" text-anchor="middle" font-size="10" fill="var(--mute)">JWT + session</text>
     <!-- Bottom note -->
-    <text x="400" y="120" text-anchor="middle" font-size="10" fill="var(--mute)">Google returns: name, email, profile picture (openid, email, profile scopes)</text>
-    <text x="400" y="140" text-anchor="middle" font-size="10" fill="var(--mute)">App creates or updates user record in Cosmos DB, issues session JWT</text>
+    <text x="400" y="118" text-anchor="middle" font-size="10" fill="var(--mute)">Google returns: name, email, email_verified (openid, email, profile scopes)</text>
+    <text x="400" y="134" text-anchor="middle" font-size="10" fill="var(--mute)">App upserts the user in Cosmos DB, issues a session JWT in the redirect fragment</text>
+    <text x="400" y="152" text-anchor="middle" font-size="10" fill="var(--bad)" font-weight="600">Blocked at step 2: no OAuth client registered, so client_id is empty</text>
   </svg>
 
-  <h4>OAuth Callback Handler</h4>
-<pre><code>// api/auth/callback/google.js
-const { OAuth2Client } = require("google-auth-library");
-const jwt = require("jsonwebtoken");
+  <h4>Signed OAuth <code>state</code> <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; actual source, <code class="inline-code">backend/auth.py:108-131</code></span></h4>
+<pre><code># backend/auth.py
+def create_state() -> str:
+    """Mint a short-lived signed OAuth `state` value.
 
-const googleClient = new OAuth2Client(
-  process.env.GOOGLE_CLIENT_ID,
-  process.env.GOOGLE_CLIENT_SECRET,
-  process.env.GOOGLE_REDIRECT_URI
-);
+    Signing it keeps the check stateless: the callback can tell its own
+    redirect apart from one a third party initiated, without a session store.
+    """
+    now = datetime.now(timezone.utc)
+    return jwt.encode(
+        {"purpose": "oauth_state", "iat": now,
+         "exp": now + timedelta(minutes=10)},
+        JWT_SECRET, algorithm=JWT_ALGORITHM,
+    )
 
-module.exports = async function (context, req) {
-  const { code } = req.query;
 
-  // Exchange authorization code for tokens
-  const { tokens } = await googleClient.getToken(code);
-  const ticket = await googleClient.verifyIdToken({
-    idToken: tokens.id_token,
-    audience: process.env.GOOGLE_CLIENT_ID
-  });
+def verify_state(state: str) -> bool:
+    """Check a `state` value returned by an OAuth provider."""
+    if not state:
+        return False
+    try:
+        claims = jwt.decode(state, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return claims.get("purpose") == "oauth_state"
+    except jwt.InvalidTokenError as exc:
+        logger.warning("Rejected OAuth state: %s", exc)
+        return False
+</code></pre>
+  <p class="sub">Both callbacks reject a bad or missing state with a 400 before touching the authorization code
+  (<code class="inline-code">backend/function_app.py:621-622</code>, <code class="inline-code">:658-659</code>).</p>
 
-  const { email, name, picture } = ticket.getPayload();
+  <h4>Credentials the providers require <span class="pill bad">All four unset</span></h4>
+  <p class="sub">The consent URL is built from app settings. Registering the two applications and setting these
+  six values is the entire remaining work for this rubric item &mdash; there is no code left to write.</p>
+<pre><code># backend/auth.py:38-53 reads these; deploy.sh:159-164 passes them through.
+# Empty values deploy successfully and then fail at the consent screen.
+GOOGLE_CLIENT_ID        = os.environ.get("GOOGLE_CLIENT_ID", "")       # NOT SET
+GOOGLE_CLIENT_SECRET    = os.environ.get("GOOGLE_CLIENT_SECRET", "")   # NOT SET
+GOOGLE_REDIRECT_URI     # https://&lt;app&gt;.azurewebsites.net/api/auth/oauth/google/callback
+GITHUB_CLIENT_ID        = os.environ.get("GITHUB_CLIENT_ID", "")       # NOT SET
+GITHUB_CLIENT_SECRET    = os.environ.get("GITHUB_CLIENT_SECRET", "")   # NOT SET
+GITHUB_REDIRECT_URI     # https://&lt;app&gt;.azurewebsites.net/api/auth/oauth/github/callback
 
-  // Create or update user in Cosmos DB
-  const client = new CosmosClient(process.env.COSMOS_CONNECTION);
-  const container = client.database("nutritionDB").container("users");
-
-  await container.items.upsert({
-    id: email,
-    email,
-    name,
-    picture,
-    provider: "google",
-    lastLogin: new Date().toISOString()
-  });
-
-  // Issue JWT session token
-  const token = jwt.sign(
-    { userId: email, email, name, provider: "google" },
-    process.env.JWT_SECRET,
-    { expiresIn: "24h" }
-  );
-
-  // Redirect to dashboard with token
-  context.res = {
-    status: 302,
-    headers: {
-      Location: `/?token=${token}`,
-      "Set-Cookie": `auth_token=${token}; HttpOnly; Secure; SameSite=Strict; Max-Age=86400`
+# backend/auth.py:158-170 - the consent URL, with the signed state attached
+def google_auth_url(state: str = "") -> str:
+    """Build the Google OAuth consent URL."""
+    params = {
+        "client_id": GOOGLE_CLIENT_ID,      # empty today -> provider error
+        "redirect_uri": GOOGLE_REDIRECT_URI,
+        "response_type": "code",
+        "scope": "openid email profile",
+        "access_type": "offline",
+        "state": state,
     }
-  };
-};</code></pre>
-
-  <h4>GitHub OAuth Configuration</h4>
-<pre><code>// staticwebapp.config.json - SWA built-in auth
-{
-  "auth": {
-    "identityProviders": {
-      "github": {
-        "registration": {
-          "clientIdSettingName": "GITHUB_CLIENT_ID",
-          "clientSecretSettingName": "GITHUB_CLIENT_SECRET"
-        }
-      }
-    }
-  },
-  "routes": [
-    { "route": "/login",   "allowedRoles": ["anonymous"] },
-    { "route": "/api/*",   "allowedRoles": ["authenticated"] },
-    { "route": "/*",       "allowedRoles": ["authenticated"] }
-  ],
-  "responseOverrides": {
-    "401": { "redirect": "/login", "statusCode": 302 }
-  }
-}</code></pre>
+    return f"{GOOGLE_AUTH_URL}?{urlencode(params)}"</code></pre>
 </div>
 
-<h3>4.3 Database Encryption &amp; Password Hashing (10 marks)</h3>
+<h3>4.3 Database Encryption &amp; Password Hashing (10 marks) <span class="pill ok">Hashing verified in repo</span> <span class="pill bad">Encryption unevidenced</span></h3>
 <div class="section-card">
-  <p>All sensitive data is protected at multiple layers:</p>
+  <p>Two halves of this rubric item have very different standing, and collapsing them into one green label is
+  what made the earlier version of this report indefensible:</p>
+  <ul style="font-size:.9rem">
+    <li><strong>Password hashing is verifiable today.</strong> bcrypt at 12 rounds, plaintext never stored
+      &mdash; readable in <code class="inline-code">backend/auth.py:64-76</code>. A reviewer can confirm it
+      without any infrastructure.</li>
+    <li><strong>Encryption at rest is true by construction but unevidenced.</strong> Cosmos DB encrypts data at
+      rest with service-managed keys by default; there is no setting to turn on and no way to turn it off. So
+      the moment a Cosmos account exists, the claim is true. <strong>No Cosmos account exists</strong>, and the
+      repository holds no screenshot or portal output showing one. Until then this is a correct statement about
+      a platform, not a demonstrated property of this system. An earlier revision backed the claim with a
+      hardcoded <code class="inline-code">"AES-256"</code> string in the frontend, which is not evidence of
+      anything.</li>
+  </ul>
   <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">
     <div class="card">
       <b style="font-size:1rem">Encryption at Rest</b>
-      <p class="sub" style="font-size:.82rem">Cosmos DB encrypts all data at rest using AES-256 with Microsoft-managed keys. No unencrypted data touches disk.</p>
-      <span class="pill ok">Enabled</span>
+      <p class="sub" style="font-size:.82rem">Cosmos DB encrypts data at rest with service-managed keys by default &mdash; automatic and not configurable off. True once the account exists.</p>
+      <span class="pill bad">No account provisioned</span>
     </div>
     <div class="card">
       <b style="font-size:1rem">Encryption in Transit</b>
-      <p class="sub" style="font-size:.82rem">All connections use TLS 1.2+. HTTPS enforced for every API endpoint and static asset.</p>
-      <span class="pill ok">TLS 1.2</span>
+      <p class="sub" style="font-size:.82rem">Azure Functions and Blob static hosting serve over HTTPS by default. Platform behaviour, not application code; nothing deployed to observe.</p>
+      <span class="pill bad">Not deployed</span>
     </div>
     <div class="card">
       <b style="font-size:1rem">Password Hashing</b>
-      <p class="sub" style="font-size:.82rem">bcrypt with 12 salt rounds. Passwords are never stored in plaintext. Hash comparison on login.</p>
-      <span class="pill ok">bcrypt-12</span>
+      <p class="sub" style="font-size:.82rem">bcrypt with 12 salt rounds. Plaintext is never stored. Hash comparison on login. Readable in <code class="inline-code">auth.py:64-76</code>.</p>
+      <span class="pill ok">Verified in repo</span>
     </div>
     <div class="card">
       <b style="font-size:1rem">Token Security</b>
-      <p class="sub" style="font-size:.82rem">JWT tokens signed with HS256, 24h expiry, HttpOnly + Secure + SameSite=Strict cookies.</p>
-      <span class="pill ok">HS256</span>
+      <p class="sub" style="font-size:.82rem">HS256, 24h expiry, no default signing key. Stored in <strong>localStorage</strong>, sent as a bearer header &mdash; not an HttpOnly cookie, so it is reachable by script.</p>
+      <span class="pill warn">Signing verified &middot; storage is a known weakness</span>
     </div>
   </div>
 
-  <h4>Password Storage: Hash vs. Plaintext</h4>
-<pre><code>// WRONG - Never do this
-await container.items.create({ email, password: "mySecret123" }); // Plaintext!
+  <h4>Password Storage: Hash vs. Plaintext <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; illustrative contrast; see <code class="inline-code">backend/auth.py:64-76</code> for the real implementation</span></h4>
+<pre><code># WRONG - never do this
+users.upsert_item({"id": email, "password": "mySecret123"})   # plaintext!
 
-// CORRECT - Hash with bcrypt before storing
-const bcrypt = require("bcryptjs");
-const SALT_ROUNDS = 12;
-const passwordHash = await bcrypt.hash("mySecret123", SALT_ROUNDS);
-// passwordHash = "$2a$12$LJ3m4ys3Lk8nOfVdKj6XkOdHsYq7f..."
-await container.items.create({ email, passwordHash });
+# CORRECT - what this project does (backend/auth.py + function_app.py:501)
+password_hash = hash_password(password)   # bcrypt.gensalt(rounds=12)
+# password_hash == "$2b$12$LJ3m4ys3Lk8nOfVdKj6XkOdHsYq7f..."
+users.upsert_item({"id": email, "password_hash": password_hash})
 
-// Login verification
-const isValid = await bcrypt.compare(inputPassword, storedHash);
-// Returns true/false without exposing the original password</code></pre>
+# Login verification - returns True/False without recovering the password
+if not verify_password(password, user["password_hash"]):
+    return _error("Invalid email or password", 401)</code></pre>
+  <p class="sub"><strong>Evidence still needed for this item:</strong> (1) an Azure portal screenshot of the
+  Cosmos DB account's <em>Data Encryption</em> blade showing service-managed keys; (2) a Data Explorer
+  screenshot of one <code class="inline-code">users</code> document with a visible
+  <code class="inline-code">$2b$12$</code> prefix and no plaintext field. Both are a few minutes' work
+  <em>after</em> <code class="inline-code">deploy.sh</code> has been run, and neither can be produced before
+  that.</p>
 </div>
 
-<h3>4.4 Auth Gate &mdash; Dashboard Access Control (10 marks)</h3>
+<h3>4.4 Auth Gate &mdash; Dashboard Access Control (10 marks) <span class="pill ok">Guards verified in repo</span> <span class="pill warn">Never exercised against a deployment</span></h3>
 <div class="section-card">
-  <p>The dashboard is protected by an authentication gate. Unauthenticated users are redirected to the login page. Authenticated users see their name and a logout button in the top-right corner of the dashboard header.</p>
+  <p>The gate has two layers, and it is worth being precise about which one is the access control:</p>
+  <ul style="font-size:.9rem">
+    <li><strong>The server-side guard is the control.</strong> Both data endpoints verify the JWT signature and
+      return <code class="inline-code">401</code> without a valid token
+      (<code class="inline-code">backend/function_app.py:165-173</code>, applied at
+      <code class="inline-code">:259-261</code> and <code class="inline-code">:355</code>). The route
+      decorators use <code class="inline-code">AuthLevel.ANONYMOUS</code> so the Functions host does not also
+      demand a function key; the token check is done in code.</li>
+    <li><strong>The browser redirect is a convenience, not a control.</strong>
+      <code class="inline-code">isAuthenticated()</code> only base64-decodes the token and checks
+      <code class="inline-code">exp</code> &mdash; it does <em>not</em> verify the signature, and
+      <code class="inline-code">frontend/auth.js:61-67</code> documents that openly. A forged token therefore
+      still renders the empty dashboard shell. It does not yield any data: the first
+      <code class="inline-code">authFetch</code> gets a 401, the token is cleared, and the browser is sent back
+      to the login page.</li>
+  </ul>
+  <p>The authenticated header shows the user's name and a Logout button
+  (<code class="inline-code">frontend/dashboard.html:19-20</code>, populated at
+  <code class="inline-code">frontend/app.js:64-69</code>, logout at <code class="inline-code">:606-612</code>).</p>
+  <p class="sub"><strong>Evidence still needed:</strong> the single cleanest artefact for this item is a
+  <code class="inline-code">curl</code> transcript showing
+  <code class="inline-code">401 {"error":"Authentication required. Please log in."}</code> from
+  <code class="inline-code">/api/insights</code> with no <code class="inline-code">Authorization</code> header,
+  next to a <code class="inline-code">200</code> for the same URL with a valid bearer token. Plus a screenshot
+  of the dashboard header showing the logged-in name and Logout button. Neither exists today.</p>
 
-  <h4>Auth Middleware</h4>
-<pre><code>// middleware/auth.js
-const jwt = require("jsonwebtoken");
+  <h4>Server-side Guard <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; actual source, <code class="inline-code">backend/function_app.py:165-173, 250-261, 342-355</code></span></h4>
+<pre><code># backend/function_app.py
+def _reject_unauthenticated(req: func.HttpRequest):
+    """Return a 401 response when the request carries no valid JWT, else None.
 
-function authMiddleware(context, req) {
-  const token = req.headers["authorization"]?.replace("Bearer ", "")
-             || req.cookies?.auth_token;
+    The dashboard is behind a login, so the data endpoints it calls have to
+    verify the token themselves; a client-side redirect is not access control.
+    """
+    if get_current_user(req) is None:
+        return _error("Authentication required. Please log in.", 401)
+    return None
 
-  if (!token) {
-    context.res = { status: 401, body: { error: "Authentication required" } };
-    return null;
-  }
 
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    return decoded; // { userId, email, name, provider }
-  } catch (err) {
-    context.res = { status: 401, body: { error: "Invalid or expired token" } };
-    return null;
-  }
-}
+@app.route(route="insights", methods=["GET", "OPTIONS"],
+           auth_level=func.AuthLevel.ANONYMOUS)
+def get_insights_api(req: func.HttpRequest) -> func.HttpResponse:
+    if req.method == "OPTIONS":
+        return func.HttpResponse(status_code=204, headers=_cors_headers())
 
-module.exports = { authMiddleware };</code></pre>
+    denied = _reject_unauthenticated(req)
+    if denied:
+        return denied
+    ...
 
-  <h4>Frontend Auth Gate</h4>
-<pre><code>// auth-gate.js - Redirect to login if not authenticated
-(function checkAuth() {
-  const token = localStorage.getItem("auth_token")
-             || getCookie("auth_token");
+# /api/recipes carries the identical guard at function_app.py:355.
+# get_current_user -> extract_token (Authorization header only, never a query
+# string) -> verify_token (jwt.decode with the HS256 secret).</code></pre>
 
-  if (!token) {
-    window.location.href = "/login";
+  <h4>Frontend Gate and 401 Handling <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; actual source, <code class="inline-code">frontend/app.js:57-69, 221-224</code></span></h4>
+<pre><code>// app.js
+async function initDashboard() {
+  // Convenience redirect only - the signature is NOT checked here.
+  if (!isAuthenticated()) {
+    window.location.href = "login.html";
     return;
   }
 
-  // Decode JWT to get user info (non-sensitive display only)
-  try {
-    const payload = JSON.parse(atob(token.split(".")[1]));
-    if (payload.exp * 1000 &lt; Date.now()) {
-      localStorage.removeItem("auth_token");
-      window.location.href = "/login";
-      return;
-    }
-    // Show user name and logout button
-    document.getElementById("user-name").textContent = payload.name;
-    document.getElementById("auth-section").style.display = "flex";
-  } catch (e) {
-    window.location.href = "/login";
+  // Show user name
+  const user = getCurrentUser();
+  const nameEl = document.getElementById("userName");
+  if (nameEl &amp;&amp; user) {
+    nameEl.textContent = user.name || user.email || "User";
   }
-})();
+  ...
+}
 
-// Logout handler
-document.getElementById("logout-btn").addEventListener("click", () =&gt; {
-  localStorage.removeItem("auth_token");
-  document.cookie = "auth_token=; Max-Age=0; path=/";
-  window.location.href = "/login";
-});</code></pre>
+// Every data call goes through authFetch and honours the server's 401:
+//   if (resp.status === 401) return redirectToLogin();
+function redirectToLogin() {
+  clearToken();
+  window.location.replace("login.html");
+}</code></pre>
 </div>
 
 <!-- ============================================================ -->
 <!-- 5. DASHBOARD UI                                               -->
 <!-- ============================================================ -->
-<h2 id="dashboard">5. Dashboard UI</h2>
+<h2 id="dashboard">5. Dashboard UI <span class="pill warn">Mockup only &middot; no screenshot exists</span></h2>
 <div class="section-card">
-  <p>The full dashboard includes the user authentication header, four chart types, filter/search controls, and pagination. Below is a mock of the authenticated dashboard view.</p>
+  <p>The dashboard implements the user authentication header, four chart types, filter/search controls and
+  pagination. The image below is a <strong>hand-drawn SVG mock of the intended view, not a screenshot of the
+  running application</strong>. No screenshot of this dashboard exists anywhere in the repository, because the
+  application has never been deployed. The numbers inside the mock are placeholders drawn from the local
+  dataset, not values read from a live system.</p>
+  <p class="sub"><strong>Evidence still needed:</strong> one real screenshot of the authenticated dashboard
+  &mdash; charts populated, name and Logout visible in the header, the cache status pill reading
+  <code class="inline-code">Cache: cosmosdb</code> rather than <code class="inline-code">Demo Mode</code>. That
+  single image would replace this mock and carry most of the visual evidence for items 1, 2, 3, 5 and 9.</p>
 
   <!-- Full Dashboard Mock SVG -->
   <svg viewBox="0 0 900 700" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:900px;display:block;margin:1rem auto">
@@ -1092,15 +1213,15 @@ document.getElementById("logout-btn").addEventListener("click", () =&gt; {
     <path d="M755,170 L740,205 A40,40 0 0,1 720,160 Z" fill="var(--bad)" opacity=".6"/>
     <!-- Legend -->
     <rect x="810" y="135" width="8" height="8" rx="2" fill="var(--brand)" opacity=".7"/>
-    <text x="822" y="143" font-size="7" fill="var(--mute)">Keto (24%)</text>
+    <text x="822" y="143" font-size="7" fill="var(--mute)">Keto (20.2%)</text>
     <rect x="810" y="150" width="8" height="8" rx="2" fill="var(--accent)" opacity=".7"/>
-    <text x="822" y="158" font-size="7" fill="var(--mute)">Med (22%)</text>
+    <text x="822" y="158" font-size="7" fill="var(--mute)">Med (20.0%)</text>
     <rect x="810" y="165" width="8" height="8" rx="2" fill="var(--ok)" opacity=".7"/>
-    <text x="822" y="173" font-size="7" fill="var(--mute)">Dash (20%)</text>
+    <text x="822" y="173" font-size="7" fill="var(--mute)">Dash (19.8%)</text>
     <rect x="810" y="180" width="8" height="8" rx="2" fill="var(--warn)" opacity=".7"/>
-    <text x="822" y="188" font-size="7" fill="var(--mute)">Paleo (20%)</text>
+    <text x="822" y="188" font-size="7" fill="var(--mute)">Paleo (19.8%)</text>
     <rect x="810" y="195" width="8" height="8" rx="2" fill="var(--bad)" opacity=".6"/>
-    <text x="822" y="203" font-size="7" fill="var(--mute)">Vegan (13%)</text>
+    <text x="822" y="203" font-size="7" fill="var(--mute)">Vegan (20.2%)</text>
 
     <!-- Filters Section -->
     <text x="20" y="270" font-size="13" font-weight="700" fill="var(--brand)">Filters &amp; Data Interaction</text>
@@ -1173,15 +1294,15 @@ document.getElementById("logout-btn").addEventListener("click", () =&gt; {
     <text x="20" y="525" font-size="13" font-weight="700" fill="var(--brand)">Security &amp; Compliance</text>
     <rect x="20" y="535" width="280" height="65" rx="8" fill="var(--card)" stroke="var(--line)"/>
     <text x="35" y="555" font-size="10" font-weight="600" fill="var(--ink)">Security Status</text>
-    <text x="35" y="572" font-size="9" fill="var(--mute)">Encryption: <tspan fill="var(--ok)" font-weight="600">Enabled (AES-256)</tspan></text>
-    <text x="35" y="588" font-size="9" fill="var(--mute)">Access Control: <tspan fill="var(--ok)" font-weight="600">Authenticated</tspan></text>
+    <text x="35" y="572" font-size="9" fill="var(--mute)">At rest: <tspan fill="var(--warn)" font-weight="600">Cosmos default (unevidenced)</tspan></text>
+    <text x="35" y="588" font-size="9" fill="var(--mute)">Access Control: <tspan fill="var(--ok)" font-weight="600">Bearer JWT, 401 w/o token</tspan></text>
 
     <rect x="310" y="535" width="280" height="65" rx="8" fill="var(--card)" stroke="var(--line)"/>
     <text x="325" y="555" font-size="10" font-weight="600" fill="var(--ink)">OAuth Providers</text>
-    <rect x="325" y="564" width="100" height="22" rx="4" fill="var(--bg)" stroke="var(--line)"/>
-    <text x="375" y="579" text-anchor="middle" font-size="9" fill="var(--ink)">Google</text>
-    <rect x="435" y="564" width="100" height="22" rx="4" fill="var(--bg)" stroke="var(--line)"/>
-    <text x="485" y="579" text-anchor="middle" font-size="9" fill="var(--ink)">GitHub</text>
+    <rect x="325" y="564" width="100" height="22" rx="4" fill="var(--badbg)" stroke="var(--bad)" stroke-dasharray="4,2"/>
+    <text x="375" y="579" text-anchor="middle" font-size="9" fill="var(--bad)">Google (unregistered)</text>
+    <rect x="435" y="564" width="100" height="22" rx="4" fill="var(--badbg)" stroke="var(--bad)" stroke-dasharray="4,2"/>
+    <text x="485" y="579" text-anchor="middle" font-size="9" fill="var(--bad)">GitHub (unregistered)</text>
 
     <rect x="600" y="535" width="280" height="65" rx="8" fill="var(--card)" stroke="var(--line)"/>
     <text x="615" y="555" font-size="10" font-weight="600" fill="var(--ink)">Password Security</text>
@@ -1203,8 +1324,8 @@ document.getElementById("logout-btn").addEventListener("click", () =&gt; {
     <text x="465" y="675" text-anchor="middle" font-size="16" font-weight="700" fill="var(--brand)">Keto</text>
 
     <rect x="560" y="640" width="170" height="45" rx="8" fill="var(--card)" stroke="var(--line)"/>
-    <text x="645" y="655" text-anchor="middle" font-size="9" fill="var(--mute)">Cache Response</text>
-    <text x="645" y="675" text-anchor="middle" font-size="16" font-weight="700" fill="var(--ok)">8 ms</text>
+    <text x="645" y="655" text-anchor="middle" font-size="9" fill="var(--mute)">Cache Source</text>
+    <text x="645" y="675" text-anchor="middle" font-size="14" font-weight="700" fill="var(--mute)">not measured</text>
 
     <rect x="740" y="640" width="140" height="45" rx="8" fill="var(--card)" stroke="var(--line)"/>
     <text x="810" y="655" text-anchor="middle" font-size="9" fill="var(--mute)">Auth Method</text>
@@ -1215,109 +1336,84 @@ document.getElementById("logout-btn").addEventListener("click", () =&gt; {
 <!-- ============================================================ -->
 <!-- 6. KEY CODE SNIPPETS                                          -->
 <!-- ============================================================ -->
-<h2 id="code">6. Key Code Snippets</h2>
+<h2 id="code">6. Honest Failure Modes in the Code</h2>
+<p>This section previously held two Node.js &ldquo;key code snippets&rdquo; for a Redis-backed Express-style API
+that does not exist in this repository. The real implementation is Python
+(<code class="inline-code">backend/function_app.py</code>, <code class="inline-code">cache.py</code>,
+<code class="inline-code">auth.py</code>) and is quoted in context in sections 2 to 4 above, with file and line
+references. What is more useful here is the code that governs what happens when the deployment is
+<em>wrong</em> &mdash; because that is what decides whether a demo proves anything.</p>
 
-<h3>6.1 Redis Cache Read (Dashboard API)</h3>
+<h3>6.1 An empty cache fails loudly instead of faking data <span class="pill ok">Verified in repo</span></h3>
 <div class="section-card">
-<pre><code>// api/dashboard/stats.js - Read from Redis cache
-const redis = require("redis");
+  <p>Hardcoded sample data that mirrors the real result set makes a broken cache visually identical to a working
+  one. The sample paths still exist, but they are off unless explicitly enabled, and an empty cache returns a
+  <code class="inline-code">503</code> with an explanation instead. <code class="inline-code">deploy.sh:158</code>
+  sets <code class="inline-code">ENABLE_DEMO_FALLBACK=false</code>.</p>
+<pre><code># backend/function_app.py:155-162
+def _demo_fallback_enabled() -> bool:
+    """Whether to serve hardcoded sample data when the cache is empty.
 
-module.exports = async function (context, req) {
-  const client = redis.createClient({
-    url: process.env.REDIS_CONNECTION_STRING,
-    password: process.env.REDIS_KEY,
-    tls: { servername: process.env.REDIS_HOST }
-  });
-  await client.connect();
+    Off by default.  The sample data mirrors the real result set, so leaving it
+    on makes a broken cache indistinguishable from a working one -- which is
+    exactly what the Phase 3 demo has to prove.
+    """
+    return os.environ.get("ENABLE_DEMO_FALLBACK", "false").lower() == "true"
 
-  const diets = ["dash", "keto", "mediterranean", "paleo", "vegan"];
-  const stats = {};
 
-  for (const diet of diets) {
-    const data = await client.hGetAll(`diet:${diet}`);
-    stats[diet] = {
-      count:      parseInt(data.count),
-      avgProtein: parseFloat(data.avgProtein),
-      avgCarbs:   parseFloat(data.avgCarbs),
-      avgFat:     parseFloat(data.avgFat),
-    };
-  }
-
-  const totalRecipes = await client.get("total_recipes");
-  await client.disconnect();
-
-  context.res = {
-    status: 200,
-    body: { totalRecipes: parseInt(totalRecipes), diets: stats }
-  };
-};</code></pre>
+# backend/function_app.py:363-374 - what /api/recipes does with a cold cache
+    recipes = get_recipes()
+    source = "cache"
+    if not recipes:
+        if not _demo_fallback_enabled():
+            return _json_response({
+                "error": "No cleaned recipes are cached yet. Upload "
+                         "All_Diets.csv to the raw-data container to run the "
+                         "blob trigger.",
+                "source": "empty",
+            }, 503)
+        recipes = _get_fallback_recipes()
+        source = "fallback"</code></pre>
+  <p class="sub">The dashboard surfaces this honestly too: the status pill reads
+  <code class="inline-code">Sample data (ENABLE_DEMO_FALLBACK is on)</code> when the fallback is active
+  (<code class="inline-code">frontend/app.js:549</code>). <strong>When recording the demo, that pill is the one
+  on-screen signal that distinguishes a working cache from a broken one.</strong> It must read
+  <code class="inline-code">cosmosdb</code>.</p>
 </div>
 
-<h3>6.2 Search / Filter API with Pagination</h3>
+<h3>6.2 What is still unproven, stated plainly</h3>
 <div class="section-card">
-<pre><code>// api/recipes/index.js - Combined filter + search + pagination
-const { CosmosClient } = require("@azure/cosmos");
-const { authMiddleware } = require("../middleware/auth");
-
-module.exports = async function (context, req) {
-  // Verify authentication
-  const user = authMiddleware(context, req);
-  if (!user) return; // 401 already set by middleware
-
-  const diet     = req.query.diet || "all";
-  const keyword  = (req.query.q || "").toLowerCase();
-  const page     = Math.max(1, parseInt(req.query.page) || 1);
-  const pageSize = Math.min(50, parseInt(req.query.pageSize) || 20);
-  const offset   = (page - 1) * pageSize;
-
-  const client = new CosmosClient(process.env.COSMOS_CONNECTION);
-  const container = client.database("nutritionDB").container("recipes");
-
-  // Build dynamic query
-  let conditions = [];
-  let params = [];
-
-  if (diet !== "all") {
-    conditions.push("c.diet_type = @diet");
-    params.push({ name: "@diet", value: diet });
-  }
-  if (keyword) {
-    conditions.push("CONTAINS(LOWER(c.recipe_name), @kw)");
-    params.push({ name: "@kw", value: keyword });
-  }
-
-  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
-
-  // Get count
-  const countQ = { query: `SELECT VALUE COUNT(1) FROM c ${where}`, parameters: params };
-  const { resources: [totalCount] } = await container.items.query(countQ).fetchAll();
-
-  // Get page
-  const dataQ = {
-    query: `SELECT * FROM c ${where} ORDER BY c.recipe_name OFFSET @off LIMIT @lim`,
-    parameters: [...params,
-      { name: "@off", value: offset },
-      { name: "@lim", value: pageSize }
-    ]
-  };
-  const { resources } = await container.items.query(dataQ).fetchAll();
-
-  context.res = {
-    status: 200,
-    body: {
-      user: user.name,
-      diet, keyword, page, pageSize,
-      totalCount, totalPages: Math.ceil(totalCount / pageSize),
-      recipes: resources
-    }
-  };
-};</code></pre>
+  <ul style="font-size:.9rem">
+    <li><strong>Nothing has been provisioned.</strong> <code class="inline-code">deploy.sh</code> creates a
+      resource group, a storage account with the two containers, a serverless Cosmos account with
+      <code class="inline-code">users</code> and <code class="inline-code">cache</code> containers, a
+      Consumption-plan Python 3.11 Function App, the app settings, the static website upload and CORS, and then
+      uploads <code class="inline-code">All_Diets.csv</code> to fire the trigger. It has not been run, and the
+      repository contains no output from it.</li>
+    <li><strong>The cached read path is unoptimized.</strong> <code class="inline-code">get_recipes()</code>
+      pulls every chunk on every request and filters in Python; there is no server-side Cosmos query. This is
+      correct but not necessarily fast, and it has never been timed.</li>
+    <li><strong>Blob-trigger latency is unmeasured.</strong> A Consumption-plan blob trigger polls rather than
+      subscribing to events, so the post-upload invocation can lag by minutes. Either switch to an Event Grid
+      trigger or script the wait into the demo narration.</li>
+    <li><strong>The JWT lives in <code class="inline-code">localStorage</code></strong> and is delivered to the
+      browser in a URL fragment after OAuth. That is simpler than an HttpOnly cookie and measurably weaker
+      against XSS. It is a deliberate trade-off, not a solved problem, and earlier revisions of this report
+      incorrectly claimed HttpOnly cookies were in use.</li>
+    <li><strong>There is no rate limiting</strong> on the login endpoint. bcrypt at 12 rounds makes offline
+      cracking of a stolen hash expensive, but it does not throttle online guessing.</li>
+  </ul>
 </div>
 
 <!-- ============================================================ -->
 <!-- 7. RUBRIC / STATUS TABLE                                      -->
 <!-- ============================================================ -->
-<h2 id="rubric">7. Rubric / Implementation Status</h2>
+<h2 id="rubric">7. Rubric / Implementation Status &amp; Evidence Gaps</h2>
+<p>Statuses use the three-level legend defined at the top of this page. <strong>No item is marked
+&ldquo;Complete&rdquo;</strong>, because completeness for this rubric means a working deployed system that a
+marker can watch, and no part of this project has been deployed. The <em>Status</em> column says what is true of
+the code; the <em>Evidence still needed</em> column says what has to be captured before the same claim can be
+made of the system.</p>
 <div class="scroll">
 <table>
   <thead>
@@ -1325,8 +1421,9 @@ module.exports = async function (context, req) {
       <th style="width:30px">#</th>
       <th>Category</th>
       <th>Marks</th>
-      <th>Implementation</th>
+      <th>Implementation (code, verifiable now)</th>
       <th>Status</th>
+      <th>Evidence still needed</th>
     </tr>
   </thead>
   <tbody>
@@ -1334,81 +1431,131 @@ module.exports = async function (context, req) {
       <td>1</td>
       <td><strong>Performance: Data Cleaning</strong></td>
       <td>10</td>
-      <td>Azure Function with <code class="inline-code">blobTrigger</code> on <code class="inline-code">All_Diets.csv</code>. Cleans, validates, and deduplicates 7,806 recipes. Runs only when file changes.</td>
-      <td><span class="pill ok">Complete</span></td>
+      <td>Azure Function <code class="inline-code">blob_trigger</code> on <code class="inline-code">raw-data/All_Diets.csv</code> cleans and validates the 7,806 recipes and runs only when the file changes. <code class="inline-code">function_app.py:180-243</code>.</td>
+      <td><span class="pill warn">Code complete &middot; unverified</span></td>
+      <td>Portal screenshot of the deployed function; log excerpt with <code class="inline-code">Blob trigger fired</code> and <code class="inline-code">completed in &hellip;s</code> for a real upload. Consumption-plan polling delay must be handled in the demo.</td>
     </tr>
     <tr>
       <td>2</td>
       <td><strong>Performance: Result Calculation</strong></td>
       <td>10</td>
-      <td>Pre-computes average macros per diet, recipe counts, totals. Stores in Azure Redis Cache. Dashboard reads from cache (~8ms vs ~1,850ms).</td>
-      <td><span class="pill ok">Complete</span></td>
+      <td>Pre-computes average macros, recipe counts and totals once per CSV change and writes them to Cosmos (chunked for recipes). Reads come from cache, never a re-parse. <code class="inline-code">cache.py:160-294</code>.</td>
+      <td><span class="pill warn">Code complete &middot; unverified</span></td>
+      <td>Cosmos Data Explorer screenshot of <code class="inline-code">insights_cache</code>, <code class="inline-code">recipes_meta</code> and the <code class="inline-code">recipes_chunk_*</code> docs; a <code class="inline-code">curl</code> showing <code class="inline-code">cache_source: cosmosdb</code>. The &ldquo;~8&nbsp;ms vs ~1,850&nbsp;ms&rdquo; figure was never measured and has been withdrawn.</td>
     </tr>
     <tr>
       <td>3</td>
       <td><strong>Data Interaction: Diet Filter</strong></td>
       <td>5</td>
-      <td>Dropdown filter by diet type (dash, keto, mediterranean, paleo, vegan). Queries Cosmos DB with parameterized query. Updates charts and table.</td>
-      <td><span class="pill ok">Complete</span></td>
+      <td>Dropdown filter by diet type, applied server-side in Python over the cached records (not a Cosmos SQL query). Options populated from the dataset. <code class="inline-code">function_app.py:376-380</code>.</td>
+      <td><span class="pill warn">Code complete &middot; unverified</span></td>
+      <td>Dashboard screenshot with a diet selected and the count updated; <code class="inline-code">curl /api/recipes?diet=keto</code> returning <code class="inline-code">total: 1580</code> from a real cache.</td>
     </tr>
     <tr>
       <td>4</td>
       <td><strong>Data Interaction: Keyword Search</strong></td>
       <td>10</td>
-      <td>Case-insensitive substring search on recipe names using Cosmos DB <code class="inline-code">CONTAINS()</code>. Debounced input with 300ms delay.</td>
-      <td><span class="pill ok">Complete</span></td>
+      <td>Case-insensitive substring search across recipe name, cuisine and diet, server-side in Python. 350&nbsp;ms debounce on input. <code class="inline-code">function_app.py:381-390</code>.</td>
+      <td><span class="pill warn">Code complete &middot; unverified</span></td>
+      <td><code class="inline-code">curl /api/recipes?search=chicken</code> with a real <code class="inline-code">total</code>, plus a matching dashboard screenshot. The result count for any keyword is currently unknown.</td>
     </tr>
     <tr>
       <td>5</td>
       <td><strong>Data Interaction: Pagination</strong></td>
       <td>5</td>
-      <td>Server-side pagination with <code class="inline-code">OFFSET/LIMIT</code>. 20 results per page. Previous/Next + page number buttons. Shows total count and current page.</td>
-      <td><span class="pill ok">Complete</span></td>
+      <td>Server-side slicing, 20 per page, <code class="inline-code">pageSize</code> clamped 1&ndash;100; response carries <code class="inline-code">total</code>, <code class="inline-code">totalPages</code>, <code class="inline-code">hasNext</code>, <code class="inline-code">hasPrev</code>. <code class="inline-code">function_app.py:391-412</code>.</td>
+      <td><span class="pill warn">Code complete &middot; unverified</span></td>
+      <td>Screenshot of page 2 or later with controls visible. Note: on an empty cache with the fallback on, 15 rows give <code class="inline-code">totalPages=1</code> and <strong>no controls render at all</strong> &mdash; the feature would be invisible on video.</td>
     </tr>
     <tr>
       <td>6</td>
       <td><strong>Security: Email/Password Auth</strong></td>
       <td>10</td>
-      <td>Registration with email validation. Login with bcrypt hash comparison. JWT token (24h expiry) stored in HttpOnly cookie.</td>
-      <td><span class="pill ok">Complete</span></td>
+      <td>Registration with validation and duplicate rejection; login via bcrypt hash comparison; HS256 JWT with 24h expiry and no default signing key. Token held in <code class="inline-code">localStorage</code> and sent as a bearer header &mdash; not an HttpOnly cookie. <code class="inline-code">auth.py:22-105</code>.</td>
+      <td><span class="pill ok">Hashing verified in repo</span> <span class="pill warn">No database behind it</span></td>
+      <td><code class="inline-code">curl</code> transcript of register &rarr; login &rarr; authenticated request against a deployment. Without Cosmos, users live in an in-process dict and register-then-login can fail across instances.</td>
     </tr>
     <tr>
       <td>7</td>
       <td><strong>Security: OAuth Login</strong></td>
       <td>10</td>
-      <td>Google OAuth 2.0 with authorization code flow. GitHub OAuth via Azure SWA built-in auth. Both create/update user in Cosmos DB.</td>
-      <td><span class="pill ok">Complete</span></td>
+      <td>Custom authorization-code flow for Google and GitHub in the Function App, with a signed short-lived <code class="inline-code">state</code> and verified-email gating. No Azure SWA built-in auth is used. <code class="inline-code">auth.py:108-266</code>, <code class="inline-code">function_app.py:602-711</code>.</td>
+      <td><span class="pill bad">No OAuth app registered</span></td>
+      <td><strong>Blocking and not a code task:</strong> register a Google Cloud OAuth client and a GitHub OAuth app, then set the four client ID/secret app settings and both redirect URIs. Until then the consent redirect carries an empty <code class="inline-code">client_id</code> and the provider errors. Then: provider console screenshots (secrets redacted) and one successful round trip per provider.</td>
     </tr>
     <tr>
       <td>8</td>
       <td><strong>Security: DB Encryption &amp; Password Hash</strong></td>
       <td>10</td>
-      <td>Cosmos DB encryption at rest (AES-256, Microsoft-managed keys). Passwords stored as bcrypt hashes (12 salt rounds). Never plaintext.</td>
-      <td><span class="pill ok">Complete</span></td>
+      <td>Passwords stored as bcrypt hashes at 12 rounds, never plaintext (<code class="inline-code">auth.py:64-76</code>). Encryption at rest is a Cosmos platform default with service-managed keys &mdash; automatic and not configurable off, so it is true as soon as the account exists.</td>
+      <td><span class="pill ok">Hashing verified in repo</span> <span class="pill bad">Encryption unevidenced</span></td>
+      <td>Portal screenshot of the Cosmos account's Data Encryption blade; Data Explorer screenshot of a <code class="inline-code">users</code> document showing a <code class="inline-code">$2b$12$</code> hash and no plaintext field. Neither can be produced before Cosmos is provisioned.</td>
     </tr>
     <tr>
       <td>9</td>
       <td><strong>Dashboard UI: Auth Gate</strong></td>
       <td>10</td>
-      <td>All routes require authentication. Unauthenticated users redirected to <code class="inline-code">/login</code>. Header shows user name + Logout button (top-right).</td>
-      <td><span class="pill ok">Complete</span></td>
+      <td>Both data endpoints verify the JWT signature and return <code class="inline-code">401</code> without one (<code class="inline-code">function_app.py:165-173</code>). The browser-side redirect does not verify the signature and is a convenience only, so a forged token renders an empty shell but yields no data. Header shows the user's name and a Logout button (<code class="inline-code">dashboard.html:19-20</code>).</td>
+      <td><span class="pill ok">Guards verified in repo</span> <span class="pill warn">Never exercised live</span></td>
+      <td><code class="inline-code">curl</code> showing <code class="inline-code">401</code> from <code class="inline-code">/api/insights</code> with no token, beside a <code class="inline-code">200</code> with a valid one &mdash; the cleanest single artefact for this item. Plus a screenshot of the header with name and Logout.</td>
     </tr>
     <tr>
       <td>10</td>
       <td><strong>Presentation</strong></td>
       <td>20</td>
-      <td>Video walkthrough explaining each feature with live demo. All team members present. Covers architecture, code, and security.</td>
-      <td><span class="pill warn">Pending</span></td>
+      <td>Video walkthrough with a live demo, all team members present, covering architecture, code and security.</td>
+      <td><span class="pill bad">Not started</span></td>
+      <td>The recording itself. It depends on items 1&ndash;9 actually running, so it cannot be made before the system is deployed and the OAuth apps are registered. This is the largest single block of marks on the rubric.</td>
     </tr>
     <tr style="font-weight:600">
       <td></td>
-      <td>Total</td>
+      <td>Score</td>
       <td>100</td>
-      <td></td>
-      <td><span class="pill ok">80/100</span> <span class="pill warn">+20 pending</span></td>
+      <td colspan="3">
+        <p style="margin:.1rem 0"><strong>No self-assigned score.</strong> The previous
+        <span class="pill bad" style="text-decoration:line-through">80/100</span> was withdrawn: it credited work that had never been deployed,
+        evidenced or demonstrated, which is the kind of claim that reads as an integrity problem rather than an
+        optimistic estimate.</p>
+        <p style="margin:.4rem 0;font-weight:400">The plausible outcome is a wide range, and which end it lands
+        on depends on configuration and capture work, not on writing new features:</p>
+        <ul style="font-weight:400;font-size:.88rem;margin:.2rem 0">
+          <li><strong>If submitted as it stands</strong> &mdash; nothing provisioned, no OAuth app, no video
+            &mdash; the realistic range is roughly <strong>30&ndash;45</strong>. Item 10 scores 0, item 7 scores
+            0, and items 1&ndash;5 can only be argued from source code with no running system to show.</li>
+          <li><strong>If <code class="inline-code">deploy.sh</code> is run, the two OAuth apps are registered and
+            configured, the evidence in the right-hand column is captured, and the demo video is recorded</strong>
+            &mdash; the realistic range is roughly <strong>85&ndash;95</strong>, because the implementation work
+            is genuinely done.</li>
+        </ul>
+        <p style="margin:.4rem 0;font-weight:400">Both figures are estimates by the team, not marks. The
+        conditions are listed explicitly so the reader can check which of them currently hold: today,
+        <strong>none of them do</strong>. The per-item driver analysis behind this range is in
+        <code class="inline-code">Project3/review/score-risk-2026-10-02.md</code>; note that its code-level
+        findings were written against an earlier commit and several have since been fixed, while its
+        deployment, OAuth-registration and video findings still stand.</p>
+      </td>
     </tr>
   </tbody>
 </table>
+</div>
+
+<div class="find">
+  <h3 style="margin-top:0">The shortest path from here to defensible</h3>
+  <p class="sub">Ordered by marks unlocked per unit of effort. Steps 1 and 2 require an Azure subscription and
+  provider accounts; nothing here requires new features.</p>
+  <ol style="font-size:.9rem">
+    <li><strong>Run <code class="inline-code">deploy.sh</code>.</strong> Unblocks every &ldquo;unverified&rdquo;
+      status on this page and makes items 1, 2, 8 evidenceable. Delete the resource group afterwards &mdash;
+      billing is per hour and per request.</li>
+    <li><strong>Register the Google and GitHub OAuth applications</strong> and set the four credentials plus the
+      two redirect URIs. Worth 10 marks, requires no code, and is currently a hard zero.</li>
+    <li><strong>Capture the evidence listed in the table above.</strong> Roughly six screenshots and three
+      <code class="inline-code">curl</code> transcripts. Confirm the dashboard status pill reads
+      <code class="inline-code">cosmosdb</code> and not <code class="inline-code">Demo Mode</code> before
+      capturing anything.</li>
+    <li><strong>Record the demo video last</strong>, against the deployed system rather than local fallback
+      data. 20 marks.</li>
+  </ol>
 </div>
 
 <!-- ============================================================ -->
@@ -1416,92 +1563,123 @@ module.exports = async function (context, req) {
 <!-- ============================================================ -->
 <h2 id="security">8. Security Analysis</h2>
 <div class="section-card">
-  <h3>Threat Model &amp; Mitigations</h3>
+  <h3>Threat Model &amp; Controls</h3>
+  <p>A control that exists in source code but has never executed against real infrastructure is
+  <strong>not mitigated</strong>. The earlier version of this table marked all eight rows
+  &ldquo;Mitigated&rdquo;; none of them had been tested against a deployment, and one of them described a control
+  that is not implemented at all. The wording below distinguishes <em>written</em> from <em>verified by
+  reading the code</em> from <em>demonstrated against a running system</em> &mdash; and nothing in this project
+  is yet in the third category.</p>
   <div class="scroll">
   <table>
     <thead>
       <tr>
         <th>Threat</th>
         <th>Layer</th>
-        <th>Mitigation</th>
+        <th>Control as implemented</th>
         <th>Status</th>
+        <th>Evidence still needed</th>
       </tr>
     </thead>
     <tbody>
       <tr>
         <td>Data breach (data at rest)</td>
         <td>Database</td>
-        <td>Cosmos DB AES-256 encryption at rest with Microsoft-managed keys. All data encrypted before writing to disk.</td>
-        <td><span class="pill ok">Mitigated</span></td>
+        <td>Cosmos DB encrypts at rest with service-managed keys by default &mdash; not configurable off, so it is true the moment the account exists. Nothing in the application code implements or affects this.</td>
+        <td><span class="pill bad">No database exists</span></td>
+        <td>Portal screenshot of the Cosmos account's Data Encryption blade. There is no account to screenshot.</td>
       </tr>
       <tr>
         <td>Data interception (data in transit)</td>
         <td>Network</td>
-        <td>TLS 1.2+ enforced on all connections. HTTPS required for all API endpoints and static assets.</td>
-        <td><span class="pill ok">Mitigated</span></td>
+        <td>Azure Functions and Blob static website hosting serve over HTTPS by default. Platform behaviour; the application does not enforce or configure TLS itself.</td>
+        <td><span class="pill bad">Not deployed</span></td>
+        <td>An SSL Labs or <code class="inline-code">curl -v</code> output against the live endpoint showing the negotiated TLS version.</td>
       </tr>
       <tr>
-        <td>Password theft</td>
+        <td>Password theft (stored credentials)</td>
         <td>Application</td>
-        <td>bcrypt with 12 salt rounds. Passwords never stored in plaintext. Hash comparison on login.</td>
-        <td><span class="pill ok">Mitigated</span></td>
+        <td>bcrypt at 12 salt rounds; plaintext is never written. Readable at <code class="inline-code">auth.py:64-76</code>.</td>
+        <td><span class="pill ok">Verified in repo</span></td>
+        <td>Nothing, to confirm the code. To confirm the stored result: one Data Explorer screenshot of a user document.</td>
       </tr>
       <tr>
-        <td>Session hijacking</td>
+        <td>Token forgery</td>
         <td>Application</td>
-        <td>JWT tokens with 24h expiry. HttpOnly + Secure + SameSite=Strict cookies prevent XSS/CSRF access.</td>
-        <td><span class="pill ok">Mitigated</span></td>
+        <td>HS256 signature verified server-side on every protected request. No default signing key: the app raises at import on Azure if <code class="inline-code">JWT_SECRET</code> is unset (<code class="inline-code">auth.py:22-36</code>), and <code class="inline-code">deploy.sh:156</code> generates a random one.</td>
+        <td><span class="pill ok">Verified in repo</span></td>
+        <td>A <code class="inline-code">curl</code> showing a tampered token rejected with 401 by the deployed API.</td>
       </tr>
       <tr>
-        <td>OAuth token leakage</td>
+        <td>Session hijacking / token theft via XSS</td>
+        <td>Application</td>
+        <td><strong>Only partly addressed.</strong> Tokens expire in 24h, but they are stored in <code class="inline-code">localStorage</code> and delivered via a URL fragment after OAuth, so any script running on the page can read one. No HttpOnly cookie is used, contrary to what earlier revisions of this report claimed.</td>
+        <td><span class="pill warn">Known weakness, accepted</span></td>
+        <td>Either move the session to an HttpOnly, Secure, SameSite cookie, or state this trade-off explicitly in the demo. Pretending it is solved is worse than disclosing it.</td>
+      </tr>
+      <tr>
+        <td>OAuth callback forgery / stale callback</td>
         <td>Auth</td>
-        <td>Authorization code flow (not implicit). Tokens exchanged server-side. Client never sees provider tokens.</td>
-        <td><span class="pill ok">Mitigated</span></td>
+        <td>Authorization-code flow (not implicit); the code is exchanged server-side and the client never sees provider tokens. <code class="inline-code">state</code> is a signed 10-minute JWT the callback verifies, rejecting a bad one with 400.</td>
+        <td><span class="pill warn">Code complete &middot; unverified</span></td>
+        <td>Cannot be tested until an OAuth app is registered. Note the residual gap: the state is signed but <strong>not bound to the browser session</strong>, so it is not full login-CSRF protection.</td>
       </tr>
       <tr>
-        <td>SQL/NoSQL injection</td>
+        <td>NoSQL injection</td>
         <td>API</td>
-        <td>Parameterized queries exclusively (<code class="inline-code">@param</code> syntax). No string concatenation in queries.</td>
-        <td><span class="pill ok">Mitigated</span></td>
+        <td>User input never reaches a Cosmos query. Documents are read by id, and filtering and search run in Python over the returned records. The earlier claim of &ldquo;parameterized queries exclusively&rdquo; described code that does not exist &mdash; the actual design avoids query construction altogether.</td>
+        <td><span class="pill ok">Verified in repo</span></td>
+        <td>None for the code. Any future move to server-side Cosmos queries must use parameters.</td>
       </tr>
       <tr>
-        <td>Unauthorized dashboard access</td>
-        <td>Frontend</td>
-        <td>Auth gate redirects unauthenticated users. API middleware validates JWT on every request.</td>
-        <td><span class="pill ok">Mitigated</span></td>
+        <td>Unauthorized data access</td>
+        <td>API</td>
+        <td><code class="inline-code">/api/insights</code> and <code class="inline-code">/api/recipes</code> return 401 without a valid signed token (<code class="inline-code">function_app.py:165-173</code>). The browser-side redirect is <em>not</em> the control and does not verify the signature.</td>
+        <td><span class="pill ok">Guards verified in repo</span></td>
+        <td>The 401-without-token <code class="inline-code">curl</code> transcript against the deployed API.</td>
       </tr>
       <tr>
-        <td>Brute-force login</td>
+        <td>Brute-force / credential stuffing</td>
         <td>Application</td>
-        <td>bcrypt's deliberate slowness (12 rounds ~250ms/hash) makes brute-force impractical. Rate limiting on login endpoint.</td>
-        <td><span class="pill ok">Mitigated</span></td>
+        <td><strong>Not implemented.</strong> bcrypt at 12 rounds makes offline cracking of a stolen hash expensive, but there is no rate limiting, lockout or CAPTCHA anywhere in the codebase, so online guessing is unthrottled. Earlier revisions of this report claimed &ldquo;rate limiting on login endpoint&rdquo;; no such code exists.</td>
+        <td><span class="pill bad">Not implemented</span></td>
+        <td>Implement throttling or lockout on <code class="inline-code">/api/auth/login</code>, or disclose the gap. Not required by the rubric, but the claim should not be made either way.</td>
+      </tr>
+      <tr>
+        <td>Secret leakage</td>
+        <td>Repository</td>
+        <td>No client IDs, client secrets, Cosmos keys or signing keys are committed. <code class="inline-code">local.settings.json</code> is gitignored and only a placeholder example is tracked.</td>
+        <td><span class="pill ok">Verified in repo</span></td>
+        <td>None &mdash; and it must stay that way. No client secret should ever be committed, including for the demo.</td>
       </tr>
     </tbody>
   </table>
   </div>
 
   <h3 style="margin-top:1.2rem">Encryption Summary</h3>
+  <p class="sub">Colour follows the legend at the top of the page: amber for implemented but unverified, red for
+  not yet existing.</p>
   <svg viewBox="0 0 700 140" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;display:block;margin:.5rem auto">
     <rect width="700" height="140" rx="8" fill="var(--bg)" stroke="var(--line)"/>
     <text x="350" y="25" text-anchor="middle" font-size="13" font-weight="700" fill="var(--brand)">Data Protection Layers</text>
     <!-- Layer 1 -->
-    <rect x="20" y="40" width="200" height="80" rx="8" fill="var(--okbg)" stroke="var(--ok)" stroke-width="1.5"/>
-    <text x="120" y="62" text-anchor="middle" font-size="11" font-weight="600" fill="var(--ok)">At Rest</text>
-    <text x="120" y="80" text-anchor="middle" font-size="9" fill="var(--mute)">Cosmos DB: AES-256</text>
-    <text x="120" y="95" text-anchor="middle" font-size="9" fill="var(--mute)">Microsoft-managed keys</text>
-    <text x="120" y="110" text-anchor="middle" font-size="9" fill="var(--mute)">Automatic, zero-config</text>
+    <rect x="20" y="40" width="200" height="80" rx="8" fill="var(--badbg)" stroke="var(--bad)" stroke-width="1.5" stroke-dasharray="5,3"/>
+    <text x="120" y="60" text-anchor="middle" font-size="11" font-weight="600" fill="var(--bad)">At Rest</text>
+    <text x="120" y="77" text-anchor="middle" font-size="9" fill="var(--mute)">Cosmos default, service-managed</text>
+    <text x="120" y="91" text-anchor="middle" font-size="9" fill="var(--mute)">Automatic, cannot be disabled</text>
+    <text x="120" y="107" text-anchor="middle" font-size="9" fill="var(--bad)">No account provisioned</text>
     <!-- Layer 2 -->
-    <rect x="240" y="40" width="200" height="80" rx="8" fill="var(--okbg)" stroke="var(--ok)" stroke-width="1.5"/>
-    <text x="340" y="62" text-anchor="middle" font-size="11" font-weight="600" fill="var(--ok)">In Transit</text>
-    <text x="340" y="80" text-anchor="middle" font-size="9" fill="var(--mute)">TLS 1.2+ everywhere</text>
-    <text x="340" y="95" text-anchor="middle" font-size="9" fill="var(--mute)">HTTPS enforced</text>
-    <text x="340" y="110" text-anchor="middle" font-size="9" fill="var(--mute)">Certificate managed by Azure</text>
+    <rect x="240" y="40" width="200" height="80" rx="8" fill="var(--badbg)" stroke="var(--bad)" stroke-width="1.5" stroke-dasharray="5,3"/>
+    <text x="340" y="60" text-anchor="middle" font-size="11" font-weight="600" fill="var(--bad)">In Transit</text>
+    <text x="340" y="77" text-anchor="middle" font-size="9" fill="var(--mute)">HTTPS by default on Functions</text>
+    <text x="340" y="91" text-anchor="middle" font-size="9" fill="var(--mute)">Certificate managed by Azure</text>
+    <text x="340" y="107" text-anchor="middle" font-size="9" fill="var(--bad)">Nothing deployed to observe</text>
     <!-- Layer 3 -->
-    <rect x="460" y="40" width="220" height="80" rx="8" fill="var(--okbg)" stroke="var(--ok)" stroke-width="1.5"/>
-    <text x="570" y="62" text-anchor="middle" font-size="11" font-weight="600" fill="var(--ok)">Application Layer</text>
-    <text x="570" y="80" text-anchor="middle" font-size="9" fill="var(--mute)">bcrypt password hashing (12 rounds)</text>
-    <text x="570" y="95" text-anchor="middle" font-size="9" fill="var(--mute)">JWT tokens (HS256, 24h expiry)</text>
-    <text x="570" y="110" text-anchor="middle" font-size="9" fill="var(--mute)">HttpOnly + Secure cookies</text>
+    <rect x="460" y="40" width="220" height="80" rx="8" fill="var(--warnbg)" stroke="var(--warn)" stroke-width="1.5"/>
+    <text x="570" y="60" text-anchor="middle" font-size="11" font-weight="600" fill="var(--warn)">Application Layer</text>
+    <text x="570" y="77" text-anchor="middle" font-size="9" fill="var(--ok)">bcrypt hashing, 12 rounds (verified in repo)</text>
+    <text x="570" y="91" text-anchor="middle" font-size="9" fill="var(--ok)">JWT HS256, 24h, no default key</text>
+    <text x="570" y="107" text-anchor="middle" font-size="9" fill="var(--warn)">Token in localStorage, not HttpOnly</text>
   </svg>
 </div>
 
@@ -1513,12 +1691,12 @@ module.exports = async function (context, req) {
   <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(250px,1fr))">
     <div class="card">
       <b style="font-size:1.1rem">Yuandong Yang</b>
-      <p class="sub" style="font-size:.85rem">Performance optimization (blob trigger, Redis caching), architecture design, Cosmos DB setup, data cleaning function, report authoring.</p>
+      <p class="sub" style="font-size:.85rem">Performance optimization (blob trigger, chunked Cosmos cache), architecture design, data cleaning function, deploy script, report authoring.</p>
       <div>
         <span class="tag">Blob Trigger</span>
-        <span class="tag">Redis Cache</span>
-        <span class="tag">Cosmos DB</span>
+        <span class="tag">Cosmos Cache</span>
         <span class="tag">Architecture</span>
+        <span class="tag">Deploy Script</span>
       </div>
     </div>
     <div class="card">
@@ -1533,7 +1711,7 @@ module.exports = async function (context, req) {
     </div>
     <div class="card">
       <b style="font-size:1.1rem">Justin Norman-Rance</b>
-      <p class="sub" style="font-size:.85rem">Data interaction features (diet filter, keyword search, pagination), dashboard UI integration, API endpoints, presentation preparation.</p>
+      <p class="sub" style="font-size:.85rem">Data interaction features (diet filter, keyword search, pagination), dashboard UI integration, API endpoints, presentation preparation (not yet started).</p>
       <div>
         <span class="tag">Filters</span>
         <span class="tag">Search</span>
@@ -1547,54 +1725,87 @@ module.exports = async function (context, req) {
 <!-- ============================================================ -->
 <!-- 10. CHALLENGES & SOLUTIONS                                    -->
 <!-- ============================================================ -->
-<h2 id="challenges">10. Challenges &amp; Solutions</h2>
+<h2 id="challenges">10. Design Decisions &amp; Open Problems</h2>
+<p>This section previously described debugging episodes that never happened &mdash; a Premium-plan cold-start
+fix, Redis connection pooling, a Google <code class="inline-code">redirect_uri_mismatch</code> resolved in the
+Cloud Console, an RU/s throttling fix, and a migration to HttpOnly cookies. None of that work exists in this
+repository, and some of it describes infrastructure that was never created. Those rows have been removed. What
+follows is traceable to the code, and the last two rows are problems that are still open.</p>
 <div class="section-card">
   <div class="scroll">
   <table>
     <thead>
       <tr>
         <th style="width:30px">#</th>
-        <th>Challenge</th>
-        <th>Impact</th>
-        <th>Solution</th>
+        <th>Problem</th>
+        <th>Why it matters</th>
+        <th>What was actually done</th>
+        <th>Status</th>
       </tr>
     </thead>
     <tbody>
       <tr>
         <td>1</td>
-        <td><strong>Blob trigger cold start latency</strong></td>
-        <td>Azure Functions on Consumption plan can take 5-15 seconds for cold starts, delaying data processing.</td>
-        <td>Configured "Always Ready" instances on the Premium plan for the blob trigger function. Added retry logic for transient failures. Cold start now &lt;1s.</td>
+        <td><strong>CSV data quality</strong></td>
+        <td>The raw CSV has duplicate recipes, inconsistent diet-type casing and invalid numeric values.</td>
+        <td>The cleaning step normalizes diet types, deduplicates and validates numeric fields before anything is cached (<code class="inline-code">backend/nutrition.py</code>, called from the blob trigger).</td>
+        <td><span class="pill ok">Implemented</span></td>
       </tr>
       <tr>
         <td>2</td>
-        <td><strong>Redis connection pooling</strong></td>
-        <td>Creating a new Redis connection per request caused connection exhaustion under load.</td>
-        <td>Implemented a singleton connection pattern with <code class="inline-code">redis.createClient()</code> reused across invocations. Added connection health checks and automatic reconnection.</td>
+        <td><strong>A process-local cache is invisible to other instances</strong></td>
+        <td>On Azure Functions the blob trigger and the HTTP handlers are not guaranteed to share a process, so an in-memory cache leaves the API with nothing to serve &mdash; and search, filter and pagination then operate on whatever fallback exists.</td>
+        <td>Recipes are persisted to Cosmos, mirroring the insights path, so any instance can read them (<code class="inline-code">cache.py:216-294</code>).</td>
+        <td><span class="pill ok">Implemented</span></td>
       </tr>
       <tr>
         <td>3</td>
-        <td><strong>OAuth callback URL mismatch</strong></td>
-        <td>Google OAuth returned "redirect_uri_mismatch" errors during development because localhost and deployed URLs differed.</td>
-        <td>Configured multiple redirect URIs in Google Cloud Console. Used environment variables for dynamic callback URL construction. Added <code class="inline-code">staticwebapp.config.json</code> route rules.</td>
+        <td><strong>The dataset exceeds the Cosmos document limit</strong></td>
+        <td>A Cosmos document may not exceed 2&nbsp;MB; the cleaned dataset serializes to roughly 1.2&nbsp;MB and would break on any growth.</td>
+        <td>Records are split into chunks of 2,000 with a <code class="inline-code">recipes_meta</code> document holding the count. Orphan chunks from a larger previous dataset are deleted before the new count is published, and a reader that finds a chunk missing discards the whole set rather than serving a partial one (<code class="inline-code">cache.py:30, 224-252, 269-294</code>).</td>
+        <td><span class="pill ok">Implemented</span></td>
       </tr>
       <tr>
         <td>4</td>
-        <td><strong>Cosmos DB query cost (RU/s)</strong></td>
-        <td>Full-text search queries on 7,806 recipes consumed high RU/s, risking throttling (429 errors).</td>
-        <td>Pre-computed search results into Redis. Used Cosmos DB <code class="inline-code">CONTAINS()</code> with partition key targeting. Added indexing policy for recipe_name field. Implemented pagination to limit result set size.</td>
+        <td><strong>Realistic sample data hid a broken cache</strong></td>
+        <td>The fallback returned the real 7,806-row aggregate numbers, so an empty cache looked identical to a working one &mdash; which is precisely what this phase has to prove.</td>
+        <td>Fallbacks are now opt-in via <code class="inline-code">ENABLE_DEMO_FALLBACK</code>, default off, and an empty cache returns 503 with an explanation. The dashboard status pill names the source on screen (<code class="inline-code">function_app.py:155-162</code>, <code class="inline-code">frontend/app.js:549</code>).</td>
+        <td><span class="pill ok">Implemented</span></td>
       </tr>
       <tr>
         <td>5</td>
-        <td><strong>JWT token management across tabs</strong></td>
-        <td>Token stored in localStorage was accessible to XSS attacks. Multiple tabs could have stale tokens after logout.</td>
-        <td>Moved token to HttpOnly cookies (inaccessible to JavaScript). Used <code class="inline-code">BroadcastChannel</code> API to synchronize logout across browser tabs. SameSite=Strict prevents CSRF.</td>
+        <td><strong>A client-side redirect is not access control</strong></td>
+        <td>The browser gate does not verify the token signature, so on its own it protects nothing.</td>
+        <td>Both data endpoints verify the signature server-side and return 401 without a valid token; the frontend sends a bearer header and honours the 401 by clearing the token and redirecting (<code class="inline-code">function_app.py:165-173</code>, <code class="inline-code">frontend/app.js:111, 171, 221-224</code>).</td>
+        <td><span class="pill ok">Implemented</span></td>
       </tr>
       <tr>
         <td>6</td>
-        <td><strong>CSV data quality issues</strong></td>
-        <td>Raw CSV contained duplicate recipes, inconsistent diet type casing ("Keto" vs "keto"), and negative nutritional values.</td>
-        <td>Blob trigger function normalizes all diet types to lowercase, deduplicates by recipe name, validates numeric fields (&ge; 0), and logs rejected rows for review.</td>
+        <td><strong>A known default signing key is a universal forgery</strong></td>
+        <td>Any deployment shipping a documented default <code class="inline-code">JWT_SECRET</code> lets anyone mint a valid session token.</td>
+        <td>The app raises at import on Azure when <code class="inline-code">JWT_SECRET</code> is unset and only falls back to a clearly-named local key under <code class="inline-code">func start</code>; <code class="inline-code">deploy.sh:156</code> generates a random secret (<code class="inline-code">auth.py:22-36</code>).</td>
+        <td><span class="pill ok">Implemented</span></td>
+      </tr>
+      <tr>
+        <td>7</td>
+        <td><strong>Redis has no free tier</strong></td>
+        <td>Provisioning Azure Cache for Redis would exceed a student credit, but the rubric accepts either an external cache or a database.</td>
+        <td>Cosmos DB serverless is the cache of record; Redis code remains as an optional read-through layer that activates only when <code class="inline-code">REDIS_HOST</code> is set (<code class="inline-code">deploy.sh:13-16</code>, <code class="inline-code">cache.py:48-56</code>).</td>
+        <td><span class="pill ok">Implemented</span></td>
+      </tr>
+      <tr>
+        <td>8</td>
+        <td><strong>Blob-trigger polling delay</strong></td>
+        <td>A Consumption-plan blob trigger polls rather than subscribing to events, so the invocation after an upload can lag by minutes &mdash; long enough to stall a live demo of &ldquo;cleaning runs once per CSV change&rdquo;.</td>
+        <td><strong>Nothing yet.</strong> The options are an Event Grid blob trigger or scripting the wait into the narration.</td>
+        <td><span class="pill bad">Open</span></td>
+      </tr>
+      <tr>
+        <td>9</td>
+        <td><strong>Cached reads are unoptimized</strong></td>
+        <td><code class="inline-code">get_recipes()</code> reads every chunk on every request and filters in Python, so the cached path is not automatically fast and has never been timed.</td>
+        <td><strong>Nothing yet.</strong> Correct but unmeasured; a server-side Cosmos query would be the fix if measurement shows it matters.</td>
+        <td><span class="pill bad">Open</span></td>
       </tr>
     </tbody>
   </table>
@@ -1615,34 +1826,44 @@ module.exports = async function (context, req) {
     <span class="sub">Diet Types</span>
   </div>
   <div class="card">
-    <b>231x</b>
-    <span class="sub">Performance Improvement</span>
+    <b>0</b>
+    <span class="sub">Azure Resources Provisioned</span>
   </div>
   <div class="card">
-    <b>3</b>
-    <span class="sub">Auth Methods</span>
+    <b>0</b>
+    <span class="sub">Screenshots / Logs / Recordings</span>
   </div>
   <div class="card">
-    <b>AES-256</b>
-    <span class="sub">Encryption at Rest</span>
+    <b>0</b>
+    <span class="sub">OAuth Apps Registered</span>
   </div>
 </div>
 
 <div class="find" style="margin-top:1rem">
-  <h3 style="margin-top:0">Key Deliverables</h3>
+  <h3 style="margin-top:0">Deliverables &mdash; what exists and what does not</h3>
+  <h4 style="margin-top:.6rem">Written and reviewable in this repository</h4>
   <ul style="font-size:.9rem">
-    <li><strong>Blob Trigger Function:</strong> Automatic data cleaning when <code class="inline-code">All_Diets.csv</code> changes</li>
-    <li><strong>Redis Cache:</strong> Pre-computed aggregations for sub-10ms dashboard loads</li>
-    <li><strong>Diet Filter + Keyword Search:</strong> Parameterized Cosmos DB queries with pagination</li>
-    <li><strong>Email/Password Auth:</strong> bcrypt hashing, JWT sessions, registration flow</li>
-    <li><strong>OAuth Integration:</strong> Google and GitHub login via OAuth 2.0</li>
-    <li><strong>Database Encryption:</strong> Cosmos DB AES-256 encryption at rest</li>
-    <li><strong>Auth Gate:</strong> Protected routes, user name + logout in header</li>
-    <li><strong>Presentation:</strong> Video demo covering all implementations (pending)</li>
+    <li><strong>Blob Trigger Function:</strong> data cleaning fires when <code class="inline-code">All_Diets.csv</code> changes <span class="pill warn">unverified</span></li>
+    <li><strong>Durable Cache:</strong> pre-computed aggregations and chunked recipe records in Cosmos, readable from any instance <span class="pill warn">unverified</span></li>
+    <li><strong>Diet Filter, Keyword Search, Pagination:</strong> one server-side endpoint over the cached records <span class="pill warn">unverified</span></li>
+    <li><strong>Email/Password Auth:</strong> bcrypt-12 hashing, HS256 JWT sessions, no default signing key <span class="pill ok">verified in repo</span></li>
+    <li><strong>OAuth Code:</strong> Google and GitHub authorization-code flows with signed <code class="inline-code">state</code> and verified-email gating <span class="pill warn">unverified</span></li>
+    <li><strong>Auth Gate:</strong> 401 on the data endpoints without a valid token; name and Logout in the header <span class="pill ok">verified in repo</span></li>
+    <li><strong>Deploy Script:</strong> provisions storage, Cosmos serverless, the Function App and the static site <span class="pill bad">never run</span></li>
+  </ul>
+  <h4 style="margin-top:.8rem">Not yet in existence</h4>
+  <ul style="font-size:.9rem">
+    <li><strong>Any deployed environment.</strong> No resource group, no Cosmos account, no Function App, no live URL. <span class="pill bad">Not done</span></li>
+    <li><strong>Any evidence artefact.</strong> No screenshots, no log excerpts, no <code class="inline-code">curl</code> transcripts, no measured timings. <span class="pill bad">Not done</span></li>
+    <li><strong>Registered OAuth applications.</strong> Third-party login cannot succeed until they exist and the credentials are set. <span class="pill bad">Not done</span></li>
+    <li><strong>Encryption-at-rest evidence.</strong> True by platform default once Cosmos exists; nothing in the repository shows it. <span class="pill bad">Not done</span></li>
+    <li><strong>The demo video.</strong> 20 of 100 marks, not started, and dependent on all of the above. <span class="pill bad">Not done</span></li>
   </ul>
 </div>
 
 <footer>
+  <p><strong>Status as of 2026-10-02:</strong> code complete, nothing deployed, no evidence captured, demo not
+  recorded. No self-assigned score.</p>
   <p>CPSY 300 &mdash; Cloud Computing &mdash; Project 3: Improve Cloud Dashboard</p>
   <p>Yuandong Yang &middot; Ethan Bayarsaikhan &middot; Justin Norman-Rance &middot; 2026-10-02</p>
   <p><a href="https://github.com/YUANDONG-YANG/cloud-computing" target="_blank">github.com/YUANDONG-YANG/cloud-computing</a></p>
