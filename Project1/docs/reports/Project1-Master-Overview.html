@@ -205,6 +205,17 @@ Shared logic: nutrition.py (used by batch and function, so results must match)</
 <ul><li>The function is a manually invoked script, not an Azure Functions host; Azurite offers no event triggers. The NoSQL store is a JSON file; the registry is local.</li>
 <li>Upload was scripted rather than done through Azure Storage Explorer.</li>
 <li>The benchmark covers aggregation only; the 20x workload repeats the same rows. Most of the image-size saving comes from dropping the full base image and pip cache.</li></ul></div>
+<h2 id="todo">TODO for teammates (Ethan Bayarsaikhan, Justin Norman-Rance)</h2>
+<p class='sub'>Code, Tasks 1-5 and the PDF report are done by Yuandong. The items below need real input from each member. Do not invent records.</p>
+<ul>
+<li><b>[ ] Contribution Report (5 marks, required):</b> open <code>docs/reports/Contribution-Report.html</code> and send Yuandong, for each member: student ID, tasks done, hours spent, meetings attended (date, duration), commit/PR/review links. Fields in [brackets] are empty.</li>
+<li><b>[ ] GitHub activity (Ethan, Justin):</b> accept the repository invitation, then make at least one real commit or pull request of your own work and review one another's changes. All 7 current commits are by Yuandong, so collaboration evidence is missing.</li>
+<li><b>[ ] Meeting and communication evidence:</b> screenshot Teams chat or calendar showing meetings and task division; state how often the team communicated.</li>
+<li><b>[ ] Video presentation (10 marks, required):</b> every member appears on camera and presents their own part (see <code>Video-Guide.html</code> and the 11-slide deck, about 8 minutes). Agree who presents which Task: ______________________.</li>
+<li><b>[ ] Task 3 screenshot (Yuandong or whoever has the VM):</b> install Azure Storage Explorer, connect to Azurite, upload All_Diets.csv to container <code>datasets</code>, and capture a screenshot with date and time.</li>
+<li><b>[ ] Optional, Task 2/4:</b> push the image to Docker Hub (set <code>DOCKERHUB_USERNAME</code> variable and <code>DOCKERHUB_TOKEN</code> secret) and screenshot it.</li>
+<li><b>[ ] Final step (Yuandong):</b> after the above, re-export the PDF and zip the submission.</li>
+</ul>
 <h2>10. Action checklist before submission</h2>
 <ol>
 <li><b>Clean Git:</b> done for the current tree; history still holds the removed files.</li>

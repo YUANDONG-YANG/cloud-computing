@@ -1,1 +1,126 @@
-<!doctype html><meta charset="utf-8"><title>Project 1 Video Guide</title><style>body{font:16px/1.55 Arial;max-width:1000px;margin:40px auto;color:#17324d}table{border-collapse:collapse;width:100%}td,th{border:1px solid #aab;padding:10px;text-align:left}h1,h2{color:#0f766e}.pending{background:#fff1cc;padding:15px}@media print{body{margin:0;font-size:11pt}}</style><h1>Team video — demonstration guide</h1><p>Suggested 7–9 minutes; adapt to the instructor’s presentation requirements. Each member must appear on camera and explain their actual work. Start with names, course and project title.</p><ol><li><b>Architecture (45 seconds):</b> explain the CSV → analysis and Blob → function → JSON paths. Say explicitly that Azure services are simulated locally.</li><li><b>Analysis (2 minutes):</b> run <code>docker compose run --rm analysis</code>; show all three charts, the top-five CSV, cleaning rules and undefined ratios. Explain why keto wins the mean comparison while Mediterranean wins the total comparison.</li><li><b>Container deployment (1 minute):</b> show Dockerfile and Compose; run <code>docker compose ps</code>. Explain output mounts and the local registry push/pull.</li><li><b>Function (1 minute):</b> run upload, then the function; show five JSON documents. Explain why the Compose endpoint is azurite, and why this manual function is not a real Azure trigger.</li><li><b>CI/CD (1 minute):</b> show workflow stages and a REAL successful GitHub Actions run after pushing. Show pytest and the batch/Blob comparison. Do not present local logs as remote Actions evidence.</li><li><b>Enhancements (1 minute):</b> show the one-page report and actual size/timing data. Explain benchmark scope and the replicated workload.</li><li><b>Contributions and close (45 seconds):</b> each person identifies their own changes and reviews, supported by real commits/PRs.</li></ol><p>Recording checklist: faces visible; terminal date/time visible; readable text; microphone checked; no account tokens displayed; video plays after export; include the file or approved link in the final submission.</p>
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Project 1 Video Guide</title>
+<style>
+body{font:16px/1.6 Arial,sans-serif;max-width:980px;margin:32px auto;padding:0 18px;color:#17324d}
+h1,h2{color:#0f766e}h3{margin-bottom:4px}
+table{border-collapse:collapse;width:100%;margin:10px 0}td,th{border:1px solid #aab;padding:8px 10px;text-align:left;vertical-align:top}th{background:#eef6f5}
+.say{background:#f3f8ff;border-left:5px solid #2563eb;padding:10px 14px;margin:10px 0}
+.do{background:#f6fff3;border-left:5px solid #16a34a;padding:10px 14px;margin:10px 0}
+.warn{background:#fff1cc;border-left:5px solid #d97706;padding:10px 14px;margin:10px 0}
+code{background:#eef;padding:1px 5px;border-radius:3px}pre{background:#10202f;color:#e8f1f8;padding:12px;overflow:auto;border-radius:6px}
+.box{display:inline-block;width:14px;height:14px;border:2px solid #17324d;margin-right:8px;vertical-align:middle}
+@media print{body{margin:0;font-size:11pt}h2{page-break-before:always}h2.first{page-break-before:avoid}}
+</style></head><body>
+
+<h1>Project 1 — Team Video Guide</h1>
+<p>Goal: a 7–9 minute video in which <b>all three members appear on camera and present their own part</b> (worth 10 marks: "clear presentation by all team members; covers project parts logically and confidently"). You do not need to be technical. Each part below has a <b>word-for-word script</b> you can read or put in your own words, and tells you exactly what to show on screen.</p>
+
+<div class="warn"><b>Fill in before recording.</b> Replace the names below if you want a different split. Whoever has the Ubuntu VM and Docker (Yuandong) runs the live demos; the other two show web pages and documents only, with no commands to type.</div>
+
+<h2 class="first">1. Who says what (timeline)</h2>
+<table>
+<tr><th>Time</th><th>Speaker</th><th>Topic</th><th>What is on screen</th></tr>
+<tr><td>0:00–0:45</td><td>Member B: Ethan Bayarsaikhan</td><td>Introduction and what the project is</td><td>Title slide or <code>Project1-Presentation.html</code>, slide 1–2</td></tr>
+<tr><td>0:45–2:45</td><td>Member A: Yuandong Yang</td><td>Task 1: analysis and charts</td><td>VM terminal running the analysis, then the 3 charts</td></tr>
+<tr><td>2:45–4:15</td><td>Member A: Yuandong Yang</td><td>Task 2 (Docker) and Task 3 (Azurite and function)</td><td>VM terminal: Compose, upload, function, JSON file</td></tr>
+<tr><td>4:15–5:45</td><td>Member B: Ethan Bayarsaikhan</td><td>Task 4: CI/CD with GitHub Actions</td><td>GitHub page: Actions tab, run #4 (green)</td></tr>
+<tr><td>5:45–7:00</td><td>Member C: Justin Norman-Rance</td><td>Task 5: enhancements</td><td><code>Enhancement-Report.pdf</code> table</td></tr>
+<tr><td>7:00–8:00</td><td>Member C: Justin Norman-Rance, then all</td><td>Teamwork and wrap-up</td><td>Contribution report, GitHub contributors page</td></tr>
+</table>
+<p>Total about 8 minutes. Stay under 9. If someone runs long, shorten the "what to say" parts, not the demos.</p>
+
+<h2>2. Plain-language glossary (read this first)</h2>
+<table>
+<tr><th>Term</th><th>What it means, in one sentence</th></tr>
+<tr><td>Dataset (<code>All_Diets.csv</code>)</td><td>A spreadsheet of 7,806 recipes. Each row has a diet type (keto, vegan…), cuisine, and grams of protein, carbs and fat.</td></tr>
+<tr><td>Pandas / Python script</td><td>A program that reads the spreadsheet and does the maths for us (averages, rankings).</td></tr>
+<tr><td>Docker / container</td><td>A sealed box holding our program and everything it needs, so it runs the same on any computer.</td></tr>
+<tr><td>Docker Compose</td><td>A recipe file that starts several containers together with one command.</td></tr>
+<tr><td>Registry</td><td>An app store for containers. We used a local one instead of Docker Hub.</td></tr>
+<tr><td>Azurite</td><td>A free fake copy of Microsoft Azure's file storage that runs on our own laptop, so we do not need to pay for or use real Azure.</td></tr>
+<tr><td>Blob storage</td><td>Cloud "folders" for files. Our CSV is stored there.</td></tr>
+<tr><td>Serverless function</td><td>A small program that runs only when asked, reads a file from cloud storage and writes results. Ours is started manually.</td></tr>
+<tr><td>Simulated NoSQL database</td><td>A file of JSON records (<code>results.json</code>) that stands in for a cloud database such as Cosmos DB.</td></tr>
+<tr><td>CI/CD, GitHub Actions</td><td>A robot on GitHub that, every time we upload code, automatically builds it, tests it and runs it, then reports pass or fail.</td></tr>
+</table>
+
+<h2>3. Before you record (everyone)</h2>
+<p><span class="box"></span>Face clearly visible, good light in front of you (not behind), quiet room.<br>
+<span class="box"></span>Microphone works; do a 10-second test recording and listen to it.<br>
+<span class="box"></span>Close chat apps, email, and anything private. <b>Never show passwords, tokens or secrets.</b><br>
+<span class="box"></span>Screen text is readable: zoom the browser to 125–150%; for the terminal use a large font.<br>
+<span class="box"></span>The screen date and time must be visible during the demos (Ubuntu top bar clock or Windows taskbar).<br>
+<span class="box"></span>Everyone has the files open and ready: <code>Project1-Presentation.html</code>, <code>Enhancement-Report.pdf</code>, the GitHub repository page, <code>Contribution-Report.html</code>.</p>
+
+<h3>How to record with Microsoft Teams</h3>
+<ol>
+<li>Create a Teams meeting (Calendar → Meet now). Everyone joins and turns their <b>camera on</b>.</li>
+<li>Click <b>… (More) → Record and transcribe → Start recording</b>.</li>
+<li>When it is your turn, click <b>Share</b> → pick <b>Window</b> (the one you want to show), then speak. Click <b>Stop sharing</b> when done. Your camera stays on.</li>
+<li>After the last person, click <b>… → Stop recording</b> and leave the meeting.</li>
+<li>The recording appears in the meeting chat (and in OneDrive) after a few minutes. Download the .mp4 and <b>play it once</b> to check that all three faces and the screens are visible.</li>
+</ol>
+<div class="do"><b>Tip:</b> record each person's part as one take. If someone makes a mistake, pause two seconds, repeat the sentence, and we will leave it or re-record that part. Practise once out loud before the real recording.</div>
+
+<h2>4. Member B — Ethan Bayarsaikhan (non-technical friendly)</h2>
+<h3>Part 1: Introduction (0:00–0:45)</h3>
+<p class="do"><b>Show:</b> your face and the first slide of <code>Project1-Presentation.html</code>.</p>
+<div class="say"><b>Say:</b> "Hello, we are team [team name], students of CPSY 300 at SAIT. I am Ethan Bayarsaikhan, and with me are Yuandong Yang and Justin Norman-Rance. Our project is called Cloud-Native Nutritional Insights. We take a dataset of about 7,800 recipes from five diets, such as keto and vegan, and work out how much protein, carbs and fat each diet has. We then package the program in a container, run it as a small cloud-style function, and set up an automatic build pipeline. Everything is simulated on our own computers, so no real Azure resources were used. Yuandong will start with the analysis."</div>
+
+<h3>Part 2: Task 4 — CI/CD with GitHub Actions (4:15–5:45)</h3>
+<p class="do"><b>Show (no typing needed):</b></p>
+<ol class="do">
+<li>Open the GitHub repository in your browser (<code>github.com/YUANDONG-YANG/cloud-computing</code>).</li>
+<li>Click the <b>Actions</b> tab, then open <b>run #4</b> (green tick, "Build test and simulated deployment", about 1 min 23 s).</li>
+<li>Point at the green steps in the list on the left or in the run summary.</li>
+<li>Go back to the repository and open <code>.github/workflows/deploy.yml</code>. Just scroll through it; you do not have to read it.</li>
+</ol>
+<div class="say"><b>Say:</b> "Task 4 is the automatic pipeline. Every time we upload code to GitHub, a robot called GitHub Actions starts. This is our workflow file, deploy.yml. It does five things in order. First it builds our Docker image. Second it runs automatic tests and a style check on the Python code. Third it runs the whole data flow: the analysis, starting the fake Azure storage, uploading the data, and running the function. Fourth it checks that the two ways of calculating give the same answer. Fifth it pushes the image to a local registry as a practice deployment. Here is a real run, number 4. Every step has a green tick, so the build, tests and simulated deployment all passed, in about one minute twenty seconds. If someone breaks the code, this turns red and we see it straight away. We did not use real Azure or the cloud for any of this."</div>
+<div class="warn"><b>Important:</b> show the real run on GitHub, not a screenshot. Do not scroll to the Settings page, where secrets are listed.</div>
+
+<h2>5. Member A — Yuandong Yang (runs the live demos)</h2>
+<p class="do"><b>Setup:</b> Ubuntu VM, terminal in the <code>Project1</code> folder, large font, clock visible. Before recording run <code>docker compose down -v</code> then <code>mkdir -p output simulated_nosql</code> so you start clean.</p>
+
+<h3>Part 1: Task 1 — analysis (0:45–2:45)</h3>
+<pre>docker compose run --rm analysis</pre>
+<p class="do"><b>Show:</b> the printed table, then open the three charts from <code>output/</code> (bar chart, heatmap, scatter), then <code>top5_protein_recipes.csv</code>.</p>
+<div class="say"><b>Say:</b> "I wrote data_analysis.py using Pandas. It cleans the data, then calculates the average protein, carbs and fat for each diet, the five highest-protein recipes per diet, the most common cuisines, and two new ratios: protein-to-carbs and carbs-to-fat. This table is the result. Keto has the highest average protein, about 101 grams per recipe, while Mediterranean has the highest total protein, about 177 thousand grams, simply because it has more recipes. Here are the three charts: a bar chart of average nutrients per diet, a heatmap that shows the same numbers as colours, and a scatter plot of the top five protein recipes by cuisine. Each chart carries a generation timestamp."</div>
+
+<h3>Part 2: Tasks 2 and 3 — Docker, Azurite, function (2:45–4:15)</h3>
+<pre>docker compose up -d --wait azurite
+docker compose ps
+docker compose run --rm upload
+docker compose run --rm --no-deps function
+cat simulated_nosql/results.json</pre>
+<p class="do"><b>Show:</b> the Dockerfile for a few seconds; <code>docker compose ps</code> output (azurite healthy); upload message; function message; the JSON file with five diet records. Optional: Azure Storage Explorer window showing <code>datasets/All_Diets.csv</code>.</p>
+<div class="say"><b>Say:</b> "Task 2: the program is packaged in this Dockerfile, so it runs the same everywhere. Docker Compose starts everything with one command, and we pushed the image to a local registry as practice. Task 3: Azurite is a free copy of Azure file storage running on this machine. First I upload All_Diets.csv into it. Then our function connects to that storage with the Azure Blob SDK, downloads the CSV, calculates the averages and stores the results as JSON records, which stand in for a cloud NoSQL database like Cosmos DB. This is the result file: five records, one per diet. Azurite cannot trigger functions by itself, so we start the function by hand."</div>
+
+<h2>6. Member C — Justin Norman-Rance (non-technical friendly)</h2>
+<h3>Part 1: Task 5 — enhancements (5:45–7:00)</h3>
+<p class="do"><b>Show:</b> <code>Enhancement-Report.pdf</code> (one page). Point at the table with Before, After, Change.</p>
+<div class="say"><b>Say:</b> "For Task 5 we chose two improvements. First, a smaller Docker image. We rebuilt the image so that build-only files and the download cache are left out. That reduced the image from about 698 megabytes to 568 megabytes, which is 18.6 percent smaller, so it is faster to store and move. Second, faster data processing. The old code scanned the data separately for every diet and nutrient. The new code does one grouped calculation for everything. On our real data of 7,806 rows it went from 13.7 milliseconds to 1.2, about 11 times faster, and on a 20 times bigger test file it was 7.6 times faster. We read Docker's and Pandas' official documentation to choose these methods. We also state the limits honestly: we measured image size and calculation time only, not cold-start time or cloud cost."</div>
+
+<h3>Part 2: Teamwork and wrap-up (7:00–8:00)</h3>
+<p class="do"><b>Show:</b> the filled <code>Contribution-Report.html</code> and the GitHub repository's <b>Insights → Contributors</b> page (or the commit list).</p>
+<div class="say"><b>Say:</b> "Here is how we worked as a team." <i>[Fill with true facts, for example:]</i> "We met [how often] on [Teams / in person] and agreed who did which task. Yuandong built the analysis, Docker and the function. Ethan set up and explained the pipeline. Justin did the enhancement research and report. [Add your real GitHub commits, pull requests and review activity.] The full details, hours and meeting records are in our contribution report."</div>
+<p class="do"><b>Then all three appear on screen together</b> and each says one sentence, e.g. "Thank you for watching. I am [name] and I worked on [part]."</p>
+
+<h2>7. Likely questions and short answers</h2>
+<table>
+<tr><th>Question</th><th>Simple answer</th></tr>
+<tr><td>Did you use real Azure?</td><td>No. Azurite simulates Azure Blob storage on our own machine, and a JSON file simulates the NoSQL database.</td></tr>
+<tr><td>Is the function really serverless?</td><td>It follows the same design (read from storage, process, save), but we start it manually; Azurite has no real triggers.</td></tr>
+<tr><td>Why is Mediterranean the winner in total but keto in average?</td><td>Mediterranean has more recipes, so the total is larger. Keto recipes have more protein on average.</td></tr>
+<tr><td>Why a local registry, not Docker Hub?</td><td>The assignment allows either. A local registry needs no account or secrets.</td></tr>
+<tr><td>What does CI/CD do?</td><td>It automatically builds and tests our code on every upload and tells us if something breaks.</td></tr>
+<tr><td>What did you not measure?</td><td>Cold-start time and cloud cost. We only measured image size and calculation time.</td></tr>
+</table>
+
+<h2>8. Final checklist</h2>
+<p><span class="box"></span>All three faces visible during their own part.<br>
+<span class="box"></span>Date and time visible in the terminal demos.<br>
+<span class="box"></span>Each member's speaking part is clear and about the stated length.<br>
+<span class="box"></span>No passwords, tokens or personal data on screen.<br>
+<span class="box"></span>Video exported to .mp4, plays from start to end, and is included in the final zip (or the approved link is included).</p>
+</body></html>
