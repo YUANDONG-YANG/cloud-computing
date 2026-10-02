@@ -6,6 +6,7 @@ verification, and OAuth helpers for Google and GitHub.
 import os
 import json
 import logging
+import secrets
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 from urllib.parse import urlencode
@@ -127,14 +128,18 @@ def create_state() -> str:
     """
     now = datetime.now(timezone.utc)
     return jwt.encode(
-        {"purpose": "oauth_state", "iat": now,
-         "exp": now + timedelta(minutes=10)},
+        # `jti` makes every state unique.  Without it the payload is just
+        # iat/exp, so two flows starting in the same second get byte-identical
+        # states and the cookie check below would accept one flow's state in
+        # another flow's browser.
+        {"purpose": "oauth_state", "jti": secrets.token_urlsafe(16),
+         "iat": now, "exp": now + timedelta(minutes=10)},
         JWT_SECRET, algorithm=JWT_ALGORITHM,
     )
 
 
 def verify_state(state: str) -> bool:
-    """Check a `state` value returned by an OAuth provider."""
+    """Check that a `state` value was signed by us and has not expired."""
     if not state:
         return False
     try:
@@ -143,6 +148,68 @@ def verify_state(state: str) -> bool:
     except jwt.InvalidTokenError as exc:
         logger.warning("Rejected OAuth state: %s", exc)
         return False
+
+
+# ---------------------------------------------------------------------------
+# Binding the state to the browser that started the flow
+#
+# A signed state proves only that *we* minted it, and /auth/oauth/<provider>
+# hands one to anybody who asks.  An attacker can therefore fetch a valid state
+# and feed their own authorization code to the callback in a victim's browser,
+# logging the victim into the attacker's account.  Echoing the same value in an
+# HttpOnly cookie closes that: the callback requires the query parameter and
+# the cookie to match, and an attacker cannot set a cookie on our domain.
+# ---------------------------------------------------------------------------
+
+OAUTH_STATE_COOKIE = "p3_oauth_state"
+OAUTH_STATE_MAX_AGE = 600
+
+
+def state_cookie(state: str) -> str:
+    """Set-Cookie value binding `state` to the browser starting the flow."""
+    parts = [
+        f"{OAUTH_STATE_COOKIE}={state}",
+        "Path=/",
+        "HttpOnly",
+        # Lax, not Strict: the provider redirects back by top-level navigation,
+        # and Strict would withhold the cookie on that cross-site hop.
+        "SameSite=Lax",
+        f"Max-Age={OAUTH_STATE_MAX_AGE}",
+    ]
+    if os.environ.get("WEBSITE_INSTANCE_ID"):
+        # Azure serves HTTPS; `func start` is plain HTTP, where Secure would
+        # stop the cookie being stored at all.
+        parts.append("Secure")
+    return "; ".join(parts)
+
+
+def clear_state_cookie() -> str:
+    """Set-Cookie value expiring the state cookie once the flow completes."""
+    return f"{OAUTH_STATE_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0"
+
+
+def read_cookie(req, name: str) -> str:
+    """Read one cookie from an Azure Functions HTTP request."""
+    for item in (req.headers.get("Cookie", "") or "").split(";"):
+        key, _, value = item.strip().partition("=")
+        if key == name:
+            return value
+    return ""
+
+
+def verify_state_request(req) -> bool:
+    """Check the OAuth `state`: signed by us, unexpired, and this browser's."""
+    from_provider = req.params.get("state", "")
+    if not verify_state(from_provider):
+        return False
+    from_cookie = read_cookie(req, OAUTH_STATE_COOKIE)
+    if not from_cookie:
+        logger.warning("OAuth callback carried no state cookie")
+        return False
+    if not secrets.compare_digest(from_provider, from_cookie):
+        logger.warning("OAuth state did not match the state cookie")
+        return False
+    return True
 
 
 def extract_token(req) -> Optional[str]:

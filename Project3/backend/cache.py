@@ -25,6 +25,18 @@ logger = logging.getLogger(__name__)
 CACHE_KEY = "insights_cache"
 RECIPES_META_KEY = "recipes_meta"
 
+# Nothing is ever queried inside the cached payloads: chunk documents are read
+# by id and the only queries filter on `id`.  Indexing every path inside a
+# 2,000-element `records` array would charge write RUs for an index no read
+# uses, so both payload subtrees are excluded.  deploy.sh applies the same
+# policy when it creates the container.
+CACHE_INDEXING_POLICY = {
+    "indexingMode": "consistent",
+    "automatic": True,
+    "includedPaths": [{"path": "/*"}],
+    "excludedPaths": [{"path": "/records/*"}, {"path": "/data/*"}],
+}
+
 # A Cosmos document may not exceed 2 MB.  The full cleaned dataset serializes
 # to roughly 1.2 MB, so it is split across documents of this many records.
 CHUNK_SIZE = 2000
@@ -105,6 +117,7 @@ def _get_cosmos():
         _cosmos_container = db.create_container_if_not_exists(
             id=os.environ.get("COSMOS_CACHE_CONTAINER", "cache"),
             partition_key=PartitionKey(path="/partitionKey"),
+            indexing_policy=CACHE_INDEXING_POLICY,
         )
         logger.info("Cosmos DB cache container ready")
     except Exception as exc:

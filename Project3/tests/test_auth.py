@@ -216,8 +216,9 @@ def test_state_without_the_expected_purpose_is_rejected():
 # ---------------------------------------------------------------------------
 
 class FakeRequest:
-    def __init__(self, headers=None):
+    def __init__(self, headers=None, params=None):
         self.headers = headers or {}
+        self.params = params or {}
 
 
 def test_extract_token_reads_the_bearer_header():
@@ -242,3 +243,80 @@ def test_get_current_user_round_trip():
     assert auth.get_current_user(FakeRequest()) is None
     assert auth.get_current_user(
         FakeRequest({"Authorization": "Bearer garbage"})) is None
+
+
+# ---------------------------------------------------------------------------
+# Binding the OAuth state to the browser that started the flow
+#
+# verify_state alone only proves we signed the value, and the consent endpoint
+# hands a signed state to anyone who asks.  These tests pin the extra check.
+# ---------------------------------------------------------------------------
+
+def _callback(state_param, state_cookie_value):
+    """A callback request carrying a state parameter and a state cookie."""
+    headers = {}
+    if state_cookie_value is not None:
+        headers["Cookie"] = f"{auth.OAUTH_STATE_COOKIE}={state_cookie_value}"
+    return FakeRequest(headers, {"state": state_param})
+
+
+def test_state_cookie_is_http_only_and_lax():
+    cookie = auth.state_cookie("abc")
+    assert cookie.startswith(f"{auth.OAUTH_STATE_COOKIE}=abc")
+    assert "HttpOnly" in cookie
+    # Lax, not Strict: the provider redirects back cross-site by top-level
+    # navigation, and Strict would withhold the cookie on that hop.
+    assert "SameSite=Lax" in cookie
+    assert f"Max-Age={auth.OAUTH_STATE_MAX_AGE}" in cookie
+
+
+def test_state_cookie_is_secure_only_on_azure(monkeypatch):
+    monkeypatch.delenv("WEBSITE_INSTANCE_ID", raising=False)
+    assert "Secure" not in auth.state_cookie("abc")
+    monkeypatch.setenv("WEBSITE_INSTANCE_ID", "instance-1")
+    assert "Secure" in auth.state_cookie("abc")
+
+
+def test_clear_state_cookie_expires_it():
+    assert "Max-Age=0" in auth.clear_state_cookie()
+
+
+def test_read_cookie_picks_the_named_value():
+    req = FakeRequest({"Cookie": "other=1; p3_oauth_state=wanted; third=3"})
+    assert auth.read_cookie(req, "p3_oauth_state") == "wanted"
+    assert auth.read_cookie(req, "absent") == ""
+    assert auth.read_cookie(FakeRequest(), "p3_oauth_state") == ""
+
+
+def test_matching_state_and_cookie_is_accepted():
+    state = auth.create_state()
+    assert auth.verify_state_request(_callback(state, state)) is True
+
+
+def test_state_without_a_cookie_is_rejected():
+    """The attack verify_state alone allows: a valid state, someone else's browser."""
+    state = auth.create_state()
+    assert auth.verify_state_request(_callback(state, None)) is False
+
+
+def test_state_not_matching_the_cookie_is_rejected():
+    attacker_state = auth.create_state()
+    victim_state = auth.create_state()
+    assert auth.verify_state_request(
+        _callback(attacker_state, victim_state)) is False
+
+
+def test_unsigned_state_is_rejected_even_when_the_cookie_agrees():
+    assert auth.verify_state_request(_callback("forged", "forged")) is False
+
+
+def test_missing_state_parameter_is_rejected():
+    assert auth.verify_state_request(_callback("", "")) is False
+
+
+def test_each_state_is_unique():
+    """Without a nonce the payload is just iat/exp, so two flows starting in
+    the same second produced byte-identical states and the cookie check above
+    would accept one flow's state in another flow's browser."""
+    states = {auth.create_state() for _ in range(20)}
+    assert len(states) == 20

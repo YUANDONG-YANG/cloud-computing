@@ -1,0 +1,14 @@
+# Project 3 (Phase 3) backend test run
+# Date:    2026-10-02 22:50 UTC
+# Command: python -m pytest -q  (from Project3/)
+# Python:  Python 3.10.12  pytest 9.1.1
+
+........................................................................ [ 66%]
+.....................................                                    [100%]
+=============================== warnings summary ===============================
+tests/test_auth.py: 13 warnings
+
+tests/test_auth.py: 14 warnings
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+109 passed, 27 warnings in 5.63s

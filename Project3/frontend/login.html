@@ -84,12 +84,12 @@
     </div>
   </div>
 
+  <script src="config.js"></script>
   <script src="auth.js"></script>
   <script>
     // API base URL (adjust for your environment)
-    const API_BASE = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
-      ? "http://localhost:7071/api"
-      : "/api";
+    // Resolved by config.js, which deploy.sh rewrites with the Function App URL.
+    const API_BASE = window.API_BASE;
 
     // If already logged in, redirect to dashboard
     if (isAuthenticated()) {

@@ -88,8 +88,8 @@ should ever reach this repository.
 # Status after the fixes
 
 Everything in this section is code that exists in the repository and is covered by
-`Project3/tests/` (99 tests, run with `python -m pytest Project3/tests -q`). None of it has run
-against real Azure infrastructure.
+`Project3/tests/` (109 tests, run with `python -m pytest -q` from `Project3/`; captured output in
+`docs/evidence/tests.log`). None of it has run against real Azure infrastructure.
 
 ## Fixed
 
@@ -113,6 +113,19 @@ copy, which can hold a different dataset than the metadata describes.
 The per-diet counts in the sample data were also invented — it claimed dash 1,546, keto 1,580,
 mediterranean 1,564, paleo 1,543, vegan 1,573, while the dataset holds 1,745, 1,512, 1,753, 1,274
 and 1,522. Corrected, and the same wrong figures were corrected in the overview report.
+
+## Second pass — three further defects found and fixed
+
+| Defect | Fix |
+|---|---|
+| The deployed frontend could not reach the backend at all. `app.js` resolved `API_BASE` to a relative `"/api"` for any non-localhost host, but `deploy.sh` publishes the frontend to the storage account's `$web` static website, which has no `/api` reverse proxy — only Azure Static Web Apps does. Every data call would have returned 404 against the storage domain, and the dashboard would have looked simply empty | `frontend/config.js` resolves the API base from an `__API_BASE__` placeholder; `deploy.sh` substitutes `https://<function-app>.azurewebsites.net/api` into a staging copy before upload and aborts if the substitution did not take |
+| The OAuth `state` was signed but not bound to a browser. `/api/auth/oauth/<provider>` hands a valid signed state to anyone who asks, so an attacker could obtain one and feed their own authorization code to the callback in a victim's browser, logging the victim into the attacker's account | The same value is echoed in a short-lived `HttpOnly; SameSite=Lax` cookie, and `verify_state_request` requires the query parameter and the cookie to match. An attacker cannot set a cookie on our domain |
+| `create_state()` carried only `iat`/`exp`, so every state minted within the same second was byte-identical — which would have made the cookie binding above vacuous for concurrent logins | A random `jti` makes each state unique; `test_each_state_is_unique` pins it |
+
+Cosmos side, while in there: the `cache` container now ships an indexing policy that excludes
+`/records/*` and `/data/*`. Chunk documents are read by id and no query ever looks inside them, so
+the default "index everything" policy was charging write RUs on a 2,000-element array per chunk for
+an index nothing reads. `deploy.sh` and `backend/cache.py` apply the same policy.
 
 ## Still outstanding — this is where the marks are
 

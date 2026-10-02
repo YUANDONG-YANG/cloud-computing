@@ -116,15 +116,35 @@ az cosmosdb sql database create \
   --name "$COSMOS_DATABASE" \
   --output none || echo "    (database already exists)"
 
-for container in users cache; do
-  az cosmosdb sql container create \
-    --account-name "$COSMOS_ACCOUNT" \
-    --resource-group "$RESOURCE_GROUP" \
-    --database-name "$COSMOS_DATABASE" \
-    --name "$container" \
-    --partition-key-path "/partitionKey" \
-    --output none || echo "    (container $container already exists)"
-done
+# The cache container holds the pre-computed payloads: a 2,000-element
+# `records` array per chunk document, and the insights blob under `data`.
+# Nothing queries inside either - chunks are read by id - so indexing those
+# subtrees would charge write RUs for an index no read ever uses.  Excluding
+# them is the single cheapest performance win on the Cosmos side.
+# backend/cache.py applies the same policy if it creates the container first.
+CACHE_INDEX_POLICY='{
+  "indexingMode": "consistent",
+  "automatic": true,
+  "includedPaths": [{"path": "/*"}],
+  "excludedPaths": [{"path": "/records/*"}, {"path": "/data/*"}]
+}'
+
+az cosmosdb sql container create \
+  --account-name "$COSMOS_ACCOUNT" \
+  --resource-group "$RESOURCE_GROUP" \
+  --database-name "$COSMOS_DATABASE" \
+  --name users \
+  --partition-key-path "/partitionKey" \
+  --output none || echo "    (container users already exists)"
+
+az cosmosdb sql container create \
+  --account-name "$COSMOS_ACCOUNT" \
+  --resource-group "$RESOURCE_GROUP" \
+  --database-name "$COSMOS_DATABASE" \
+  --name cache \
+  --partition-key-path "/partitionKey" \
+  --idx "$CACHE_INDEX_POLICY" \
+  --output none || echo "    (container cache already exists)"
 
 # ---- 4. Function App ----
 echo "[4/6] Creating Function App..."
@@ -182,8 +202,24 @@ az storage blob service-properties update \
   --404-document login.html \
   --output none
 
+# The static website has no /api reverse proxy, so the frontend must call the
+# Function App by its absolute URL.  config.js ships with an __API_BASE__
+# placeholder; substitute it into a staging copy and upload that, leaving the
+# repository copy untouched.
+FUNCTION_API_BASE="https://${FUNCTION_APP}.azurewebsites.net/api"
+STAGING_DIR=$(mktemp -d)
+trap 'rm -rf "$STAGING_DIR"' EXIT
+cp -R frontend/. "$STAGING_DIR"/
+sed -i "s|__API_BASE__|${FUNCTION_API_BASE}|g" "$STAGING_DIR/config.js"
+grep -q "$FUNCTION_API_BASE" "$STAGING_DIR/config.js" || {
+  echo "ERROR: could not set the API base in config.js; the dashboard would" >&2
+  echo "       call the storage domain and every request would 404." >&2
+  exit 1
+}
+echo "    Frontend will call $FUNCTION_API_BASE"
+
 az storage blob upload-batch \
-  --source frontend/ \
+  --source "$STAGING_DIR" \
   --destination '$web' \
   --account-name "$STORAGE_ACCOUNT" \
   --overwrite true \

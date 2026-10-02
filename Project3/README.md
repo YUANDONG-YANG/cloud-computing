@@ -60,6 +60,23 @@ Azure Services
    Stale chunks from a larger previous dataset are deleted before the new
    count is published, so a reader never sees a mixed set.
 4. `/api/insights` and `/api/recipes` only ever read. They never recalculate.
+
+### How the frontend finds the backend
+
+`frontend/config.js` resolves `window.API_BASE` in this order:
+
+1. the value `deploy.sh` substitutes for its `__API_BASE__` placeholder, i.e.
+   `https://<function-app>.azurewebsites.net/api`;
+2. `http://localhost:7071/api` when the page is opened on localhost;
+3. same-origin `/api` otherwise.
+
+Step 1 is required, not cosmetic. The frontend is served from the storage
+account's `$web` static website, which has **no `/api` reverse proxy** — only
+Azure Static Web Apps provides one. Without the substitution a relative `/api`
+resolves against the storage domain and every data request returns 404, which
+looks like an empty dashboard rather than an error. `deploy.sh` substitutes into
+a staging copy and aborts if it did not take, so the repository copy keeps its
+placeholder.
    Read order is Redis (if configured) → Cosmos DB → in-process dict.
 5. The status pill on the dashboard names the store the response actually came
    from (`Served from Cosmos DB`, `Served from Redis`, `Served from in-process
@@ -132,8 +149,8 @@ curl http://localhost:7071/api/health
 #    "recipes_cached" should be true and "recipe_count" 7806.
 
 # 7. Serve the frontend on port 8080 — the origin must match the CORS entry
-#    in local.settings.json, and app.js only points at localhost:7071 when the
-#    page itself is on localhost.
+#    in local.settings.json, and config.js only points at localhost:7071 when
+#    the page itself is on localhost.
 cd ../frontend
 python -m http.server 8080
 #    Then visit http://localhost:8080/login.html and register an account.
@@ -310,6 +327,7 @@ Project3/
     dashboard.html        Protected analytics dashboard
     app.js                Chart rendering, search, pagination, status pill
     auth.js               JWT storage, auth state, authFetch
+    config.js             Resolves the API base URL (see below)
     styles.css            Custom styles
   docker-compose.yml      Local dev stack (Azurite; optional Redis profile)
   deploy.sh               Azure CLI deployment script

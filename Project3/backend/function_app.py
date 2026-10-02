@@ -24,7 +24,8 @@ from nutrition import clean_data, precompute_all, df_to_records
 from auth import (
     hash_password, verify_password,
     create_token, get_current_user,
-    create_state, verify_state,
+    create_state, state_cookie, clear_state_cookie,
+    verify_state_request, verify_state,
     google_auth_url, google_exchange_code,
     github_auth_url, github_exchange_code,
 )
@@ -619,10 +620,14 @@ def oauth_google(req: func.HttpRequest) -> func.HttpResponse:
     if req.method == "OPTIONS":
         return func.HttpResponse(status_code=204, headers=_cors_headers())
 
-    url = google_auth_url(create_state())
+    state = create_state()
     return func.HttpResponse(
         status_code=302,
-        headers={**_cors_headers(), "Location": url},
+        headers={
+            **_cors_headers(),
+            "Location": google_auth_url(state),
+            "Set-Cookie": state_cookie(state),
+        },
     )
 
 
@@ -632,7 +637,7 @@ def oauth_google_callback(req: func.HttpRequest) -> func.HttpResponse:
     if req.method == "OPTIONS":
         return func.HttpResponse(status_code=204, headers=_cors_headers())
 
-    if not verify_state(req.params.get("state", "")):
+    if not verify_state_request(req):
         return _error("Invalid or expired OAuth state", 400)
 
     code = req.params.get("code", "")
@@ -656,10 +661,14 @@ def oauth_github(req: func.HttpRequest) -> func.HttpResponse:
     if req.method == "OPTIONS":
         return func.HttpResponse(status_code=204, headers=_cors_headers())
 
-    url = github_auth_url(create_state())
+    state = create_state()
     return func.HttpResponse(
         status_code=302,
-        headers={**_cors_headers(), "Location": url},
+        headers={
+            **_cors_headers(),
+            "Location": github_auth_url(state),
+            "Set-Cookie": state_cookie(state),
+        },
     )
 
 
@@ -669,7 +678,7 @@ def oauth_github_callback(req: func.HttpRequest) -> func.HttpResponse:
     if req.method == "OPTIONS":
         return func.HttpResponse(status_code=204, headers=_cors_headers())
 
-    if not verify_state(req.params.get("state", "")):
+    if not verify_state_request(req):
         return _error("Invalid or expired OAuth state", 400)
 
     code = req.params.get("code", "")
@@ -721,5 +730,10 @@ def _handle_oauth_user(info: dict) -> func.HttpResponse:
     redirect_url = f"{frontend_url}/index.html#token={token}"
     return func.HttpResponse(
         status_code=302,
-        headers={**_cors_headers(), "Location": redirect_url},
+        headers={
+            **_cors_headers(),
+            "Location": redirect_url,
+            # The flow is over; the state cookie must not outlive it.
+            "Set-Cookie": clear_state_cookie(),
+        },
     )

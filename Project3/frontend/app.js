@@ -9,10 +9,8 @@
 /* ------------------------------------------------------------------
  * Configuration
  * ----------------------------------------------------------------*/
-const API_BASE =
-  window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
-    ? "http://localhost:7071/api"
-    : "/api";
+// Resolved by config.js, which deploy.sh rewrites with the Function App URL.
+const API_BASE = window.API_BASE;
 
 /* ------------------------------------------------------------------
  * State
