@@ -178,6 +178,22 @@ across the two uploads: 5 diet types, 19 cuisine types in both versions.
    and `updated_at` fields of the `/api/insights` response are the hard
    evidence; the UI pill shows `source` but not `updated_at`.
 
+#### One failure state to recognise on camera
+
+The blob trigger writes insights first and recipes second
+(`store_insights` then `store_recipes` in `blob_trigger_clean`). If the first
+write succeeds and the second does not, you get a coherent but confusing
+screen: **the four charts show the new dataset while the recipe table reports
+503 and the pagination disappears.** That combination means exactly one thing —
+a partial cache write — and never that search or pagination is broken.
+
+If you see it, do not improvise or debug on camera. Stop, re-upload the same
+file with `--overwrite true`, wait for a second trigger invocation, and confirm
+with `/api/health` that `insights_cached` is `true` *and* `recipe_count`
+matches the row count for that version (7,806 for v1, 7,272 for v2). Then
+resume. Checking both fields together — not just one — is what distinguishes a
+complete write from a half-finished one.
+
 ---
 
 ### (a) Caching: computed once, served from the DB thereafter

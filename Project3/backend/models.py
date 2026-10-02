@@ -69,11 +69,29 @@ class CacheEntry:
 
 # Validation helpers -------------------------------------------------------
 
+def _text_field(body: dict, key: str) -> str:
+    """Return a string field from a request body, or "" when it is not one.
+
+    JSON bodies arrive from the network, so a field may be a number, a list or
+    null.  Returning "" lets the checks below reject it as missing instead of
+    raising out of the handler, which the host would report as a 500.
+    """
+    value = body.get(key)
+    return value.strip() if isinstance(value, str) else ""
+
+
 def validate_registration(body: dict) -> tuple[bool, str]:
     """Return (ok, error_message) for a registration request body."""
-    email = (body.get("email") or "").strip()
-    password = body.get("password", "")
-    name = (body.get("name") or "").strip()
+    # `[]` and `"hi"` are valid JSON; only an object can be a registration.
+    if not isinstance(body, dict):
+        return False, "A JSON object with email, password and name is required."
+
+    email = _text_field(body, "email")
+    password = body.get("password")
+    name = _text_field(body, "name")
+
+    if not isinstance(password, str):
+        return False, "Password must be text."
 
     if not email or "@" not in email:
         return False, "A valid email address is required."
@@ -91,9 +109,14 @@ def validate_registration(body: dict) -> tuple[bool, str]:
 
 def validate_login(body: dict) -> tuple[bool, str]:
     """Return (ok, error_message) for a login request body."""
-    email = (body.get("email") or "").strip()
-    password = body.get("password", "")
+    if not isinstance(body, dict):
+        return False, "A JSON object with email and password is required."
 
+    email = _text_field(body, "email")
+    password = body.get("password")
+
+    if not isinstance(password, str):
+        return False, "Password must be text."
     if not email:
         return False, "Email is required."
     if not password:

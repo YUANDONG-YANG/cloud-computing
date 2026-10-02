@@ -314,14 +314,18 @@ function renderHeatmap(data) {
   const nutrients = ["Protein", "Carbs", "Fat"];
   const values = hm.values || [];
 
-  // Build bubble-style heatmap using scatter with point sizes
+  // Build bubble-style heatmap using scatter with point sizes.
+  // Guard the divisor: Math.max() of an empty array is -Infinity, and an
+  // all-zero macro column would make every radius NaN, which Chart.js drops.
   const points = [];
-  const maxVal = Math.max(...values.flat());
+  const flat = values.flat().filter(Number.isFinite);
+  const maxVal = flat.length ? Math.max(...flat) : 0;
+  const scale = maxVal > 0 ? maxVal : 1;
 
   for (let row = 0; row < values.length; row++) {
     for (let col = 0; col < (values[row] || []).length; col++) {
       const val = values[row][col];
-      points.push({ x: col, y: row, r: Math.max(8, (val / maxVal) * 30), v: val });
+      points.push({ x: col, y: row, r: Math.max(8, (val / scale) * 30), v: val });
     }
   }
 
@@ -331,7 +335,7 @@ function renderHeatmap(data) {
       datasets: [{
         data: points,
         backgroundColor: points.map(p => {
-          const ratio = p.v / maxVal;
+          const ratio = p.v / scale;
           const r = Math.round(37 + ratio * 180);
           const g = Math.round(99 + (1 - ratio) * 100);
           const b = Math.round(235 - ratio * 100);
@@ -386,6 +390,14 @@ function renderHeatmap(data) {
   });
 }
 
+/** First argument that is a finite number, else 0. */
+function firstNumber(...candidates) {
+  for (const c of candidates) {
+    if (Number.isFinite(c)) return c;
+  }
+  return 0;
+}
+
 function renderScatter(data) {
   const ctx = document.getElementById("scatterChart");
   if (!ctx) return;
@@ -397,9 +409,11 @@ function renderScatter(data) {
   topRecipes.forEach(r => {
     const diet = r.diet || r.Diet_type || "unknown";
     if (!dietGroups[diet]) dietGroups[diet] = [];
+    // `||` would treat a legitimate 0 g as absent and fall through to the
+    // next alternative, so pick the first key that is actually a number.
     dietGroups[diet].push({
-      x: r.carbs || r["Carbs(g)"] || 0,
-      y: r.protein || r["Protein(g)"] || 0,
+      x: firstNumber(r.carbs, r["Carbs(g)"]),
+      y: firstNumber(r.protein, r["Protein(g)"]),
       label: r.recipe || r.Recipe_name || "",
     });
   });
@@ -455,15 +469,19 @@ function renderRecipeTable(recipes) {
   }
 
   tbody.innerHTML = recipes.map((r, i) => {
-    const diet = (r.Diet_type || "").toLowerCase();
+    // Every interpolated value originates in the uploaded CSV. clean_data
+    // strips and casefolds the text columns but does not sanitise markup, so
+    // escaping here is what stops a crafted Diet_type from breaking out of the
+    // class attribute and reading the token out of localStorage.
+    const diet = escapeHtml((r.Diet_type || "").toLowerCase());
     return `<tr>
       <td>${(currentPage - 1) * currentPageSize + i + 1}</td>
       <td>${escapeHtml(r.Recipe_name || "")}</td>
       <td><span class="diet-badge ${diet}">${diet}</span></td>
       <td>${escapeHtml(r.Cuisine_type || "")}</td>
-      <td>${r["Protein(g)"] || 0}</td>
-      <td>${r["Carbs(g)"] || 0}</td>
-      <td>${r["Fat(g)"] || 0}</td>
+      <td>${escapeHtml(formatMacro(r["Protein(g)"]))}</td>
+      <td>${escapeHtml(formatMacro(r["Carbs(g)"]))}</td>
+      <td>${escapeHtml(formatMacro(r["Fat(g)"]))}</td>
     </tr>`;
   }).join("");
 }
@@ -472,6 +490,21 @@ function escapeHtml(str) {
   const div = document.createElement("div");
   div.textContent = str;
   return div.innerHTML;
+}
+
+/**
+ * Render a macronutrient cell. A plain `value || 0` would be fine for a real
+ * 0 but would also print "0" for a missing value, claiming a measurement that
+ * was never there; an em dash says "not available" instead.
+ */
+function formatMacro(value) {
+  // The API sends JSON numbers, but accept a numeric string too so a
+  // hand-edited cache document still renders instead of reading as missing.
+  // 44 rows in the dataset hold a legitimate 0 g macro, so 0 must print as 0.
+  const n = typeof value === "number" ? value
+          : (typeof value === "string" && value.trim() !== "" ? Number(value)
+                                                             : NaN);
+  return Number.isFinite(n) ? String(n) : "\u2014";
 }
 
 /* ------------------------------------------------------------------

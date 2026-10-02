@@ -147,10 +147,17 @@ footer{text-align:center;padding:2rem 1rem;color:var(--mute);font-size:.85rem;bo
 <span class="pill bad">0 Azure resources provisioned</span>
 Azure Cache for Redis is deliberately <em>not</em> provisioned &mdash; it has no free tier, and the rubric accepts
 either an external cache or a database. Cosmos DB serverless is the cache of record
-(<code class="inline-code">deploy.sh:13-16</code>, <code class="inline-code">deploy.sh:88-96</code>). There is
+(<code class="inline-code">deploy.sh, the cost note in its header</code>, <code class="inline-code">deploy.sh, the Cosmos account step</code>). There is
 also no Azure Static Web Apps resource and no <code class="inline-code">staticwebapp.config.json</code>: the
 frontend is static files served from Blob Storage static website hosting, and all authentication is
-implemented in the Function App rather than by a platform auth provider.</p>
+implemented in the Function App rather than by a platform auth provider.
+That hosting choice has one consequence worth stating plainly, because it is easy to get wrong:
+static website hosting serves files and nothing else &mdash; it will not proxy
+<code class="inline-code">/api</code> through to the Function App. The frontend therefore has to call
+the Function App by absolute URL. <code class="inline-code">frontend/config.js</code> carries an
+<code class="inline-code">__API_BASE__</code> placeholder that
+<code class="inline-code">deploy.sh</code> substitutes at upload time, falling back to
+<code class="inline-code">http://localhost:7071/api</code> when the page is opened locally.</p>
 
 <div class="section-card">
 <h3>Architecture Diagram <span class="pill warn">Target design &middot; not provisioned</span></h3>
@@ -387,7 +394,7 @@ def blob_trigger_clean(myblob: func.InputStream):
   <code class="inline-code">/api/insights</code> showing <code class="inline-code">"cache_source":&nbsp;"cosmosdb"</code>
   rather than <code class="inline-code">"memory"</code> or a 503. Neither exists today.</p>
 
-  <h4>Caching Logic <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; actual source, <code class="inline-code">backend/cache.py:216-294</code></span></h4>
+  <h4>Caching Logic <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; actual source, <code class="inline-code">backend/cache.py:229-317</code></span></h4>
 <pre><code># backend/cache.py
 CHUNK_SIZE = 2000   # a Cosmos document may not exceed 2 MB
 
@@ -776,7 +783,7 @@ function renderPagination(result) {
   (<code class="inline-code">_memory_users</code>), so register-then-login can fail across instances &mdash;
   which is another reason the database has to actually exist before recording.</p>
 
-  <h4>Password Hashing and Token Issue <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; actual source, <code class="inline-code">backend/auth.py:64-93</code></span></h4>
+  <h4>Password Hashing and Token Issue <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; actual source, <code class="inline-code">backend/auth.py:65-95</code></span></h4>
 <pre><code># backend/auth.py
 def hash_password(plain: str) -> str:
     """Hash a plaintext password with bcrypt (12 rounds)."""
@@ -820,10 +827,10 @@ if not JWT_SECRET:
 
   <h4>Endpoints</h4>
   <p class="sub"><code class="inline-code">POST /api/auth/register</code>
-  (<code class="inline-code">backend/function_app.py:484</code>) validates the input, rejects a duplicate email
+  (<code class="inline-code">backend/function_app.py:486</code>) validates the input, rejects a duplicate email
   with 409, hashes with <code class="inline-code">hash_password</code> and stores the user document.
   <code class="inline-code">POST /api/auth/login</code>
-  (<code class="inline-code">backend/function_app.py:534</code>) looks the user up, calls
+  (<code class="inline-code">backend/function_app.py:536</code>) looks the user up, calls
   <code class="inline-code">verify_password</code>, returns 401 on either a missing user or a bad password, and
   issues a token with <code class="inline-code">create_token</code>. Earlier revisions of this report printed
   Node.js implementations of these two endpoints; no such code exists in this repository, and those snippets
@@ -864,8 +871,8 @@ if not JWT_SECRET:
 <h3>4.2 OAuth Integration &mdash; Google &amp; GitHub (10 marks) <span class="pill warn">Code complete</span> <span class="pill bad">No OAuth app registered</span></h3>
 <div class="section-card">
   <p>Both providers are implemented as a <strong>custom authorization-code flow in the Function App</strong>
-  (<code class="inline-code">backend/auth.py:158-266</code>,
-  <code class="inline-code">backend/function_app.py:602-711</code>). There is no Azure Static Web Apps resource
+  (<code class="inline-code">backend/auth.py:123-212, 239-346</code>,
+  <code class="inline-code">backend/function_app.py:617-739</code>). There is no Azure Static Web Apps resource
   and no <code class="inline-code">staticwebapp.config.json</code> in this repository, so the built-in
   platform auth that an earlier revision of this report described is not what the code does. The implementation
   is complete and includes two things worth noting: the <code class="inline-code">state</code> parameter is a
@@ -876,7 +883,7 @@ if not JWT_SECRET:
   <p><strong>This feature cannot work today, and not because of the code.</strong> No Google Cloud OAuth client
   and no GitHub OAuth app have been registered, so there is no client ID or secret to configure. The credentials
   are read from app settings (<code class="inline-code">backend/auth.py:38-53</code>) and
-  <code class="inline-code">deploy.sh:159-164</code> passes them through from the caller's environment &mdash;
+  <code class="inline-code">deploy.sh, the app-settings step</code> passes them through from the caller's environment &mdash;
   but if they are unset it deploys empty strings, the consent redirect goes out with an empty
   <code class="inline-code">client_id</code>, and the provider returns an error page. This item is effectively
   binary: registered and configured, or zero marks.</p>
@@ -925,40 +932,70 @@ if not JWT_SECRET:
     <text x="400" y="152" text-anchor="middle" font-size="10" fill="var(--bad)" font-weight="600">Blocked at step 2: no OAuth client registered, so client_id is empty</text>
   </svg>
 
-  <h4>Signed OAuth <code>state</code> <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; actual source, <code class="inline-code">backend/auth.py:108-131</code></span></h4>
+  <h4>OAuth <code>state</code>, signed and bound to the browser <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; actual source, <code class="inline-code">backend/auth.py:123-212</code></span></h4>
+<p style="margin:.4rem 0 .6rem">
+  A signed <code class="inline-code">state</code> on its own proves only that <em>this
+  application</em> minted it &mdash; and <code class="inline-code">/api/auth/oauth/&lt;provider&gt;</code>
+  hands a valid one to anybody who requests it. An attacker could therefore fetch a state and feed
+  their own authorization code to the callback in a victim's browser, logging the victim into the
+  attacker's account. The same value is also written to a short-lived
+  <code class="inline-code">HttpOnly</code> cookie, and the callback requires the two to match; an
+  attacker cannot set a cookie on this origin. This is the only cookie the application uses &mdash;
+  the session token itself is not in a cookie, but in
+  <code class="inline-code">localStorage</code>, sent as an
+  <code class="inline-code">Authorization: Bearer</code> header.
+</p>
 <pre><code># backend/auth.py
 def create_state() -> str:
-    """Mint a short-lived signed OAuth `state` value.
-
-    Signing it keeps the check stateless: the callback can tell its own
-    redirect apart from one a third party initiated, without a session store.
-    """
+    """Mint a short-lived signed OAuth `state` value."""
     now = datetime.now(timezone.utc)
     return jwt.encode(
-        {"purpose": "oauth_state", "iat": now,
-         "exp": now + timedelta(minutes=10)},
+        # `jti` makes every state unique.  Without it the payload is just
+        # iat/exp, so two flows starting in the same second get byte-identical
+        # states and the cookie check below would accept one flow's state in
+        # another flow's browser.
+        {"purpose": "oauth_state", "jti": secrets.token_urlsafe(16),
+         "iat": now, "exp": now + timedelta(minutes=10)},
         JWT_SECRET, algorithm=JWT_ALGORITHM,
     )
 
 
-def verify_state(state: str) -> bool:
-    """Check a `state` value returned by an OAuth provider."""
-    if not state:
+OAUTH_STATE_COOKIE = "p3_oauth_state"
+OAUTH_STATE_MAX_AGE = 600
+
+
+def state_cookie(state: str) -> str:
+    """Set-Cookie value binding `state` to the browser starting the flow."""
+    parts = [
+        f"{OAUTH_STATE_COOKIE}={state}",
+        "Path=/", "HttpOnly",
+        # Lax, not Strict: the provider redirects back by top-level
+        # navigation, and Strict would withhold the cookie on that hop.
+        "SameSite=Lax",
+        f"Max-Age={OAUTH_STATE_MAX_AGE}",
+    ]
+    if os.environ.get("WEBSITE_INSTANCE_ID"):
+        parts.append("Secure")   # Azure is HTTPS; `func start` is not
+    return "; ".join(parts)
+
+
+def verify_state_request(req) -> bool:
+    """Check the OAuth `state`: signed by us, unexpired, and this browser's."""
+    from_provider = req.params.get("state", "")
+    if not verify_state(from_provider):
         return False
-    try:
-        claims = jwt.decode(state, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        return claims.get("purpose") == "oauth_state"
-    except jwt.InvalidTokenError as exc:
-        logger.warning("Rejected OAuth state: %s", exc)
+    from_cookie = read_cookie(req, OAUTH_STATE_COOKIE)
+    if not from_cookie:
+        logger.warning("OAuth callback carried no state cookie")
         return False
 </code></pre>
   <p class="sub">Both callbacks reject a bad or missing state with a 400 before touching the authorization code
-  (<code class="inline-code">backend/function_app.py:621-622</code>, <code class="inline-code">:658-659</code>).</p>
+  (<code class="inline-code">backend/function_app.py:640</code>, <code class="inline-code">:681</code>).</p>
 
   <h4>Credentials the providers require <span class="pill bad">All four unset</span></h4>
   <p class="sub">The consent URL is built from app settings. Registering the two applications and setting these
   six values is the entire remaining work for this rubric item &mdash; there is no code left to write.</p>
-<pre><code># backend/auth.py:38-53 reads these; deploy.sh:159-164 passes them through.
+<pre><code># backend/auth.py:39-55 reads these; deploy.sh, the app-settings step passes them through.
 # Empty values deploy successfully and then fail at the consent screen.
 GOOGLE_CLIENT_ID        = os.environ.get("GOOGLE_CLIENT_ID", "")       # NOT SET
 GOOGLE_CLIENT_SECRET    = os.environ.get("GOOGLE_CLIENT_SECRET", "")   # NOT SET
@@ -967,7 +1004,7 @@ GITHUB_CLIENT_ID        = os.environ.get("GITHUB_CLIENT_ID", "")       # NOT SET
 GITHUB_CLIENT_SECRET    = os.environ.get("GITHUB_CLIENT_SECRET", "")   # NOT SET
 GITHUB_REDIRECT_URI     # https://&lt;app&gt;.azurewebsites.net/api/auth/oauth/github/callback
 
-# backend/auth.py:158-170 - the consent URL, with the signed state attached
+# backend/auth.py:239-250 - the consent URL, with the signed state attached
 def google_auth_url(state: str = "") -> str:
     """Build the Google OAuth consent URL."""
     params = {
@@ -987,7 +1024,7 @@ def google_auth_url(state: str = "") -> str:
   what made the earlier version of this report indefensible:</p>
   <ul style="font-size:.9rem">
     <li><strong>Password hashing is verifiable today.</strong> bcrypt at 12 rounds, plaintext never stored
-      &mdash; readable in <code class="inline-code">backend/auth.py:64-76</code>. A reviewer can confirm it
+      &mdash; readable in <code class="inline-code">backend/auth.py:65-95</code>. A reviewer can confirm it
       without any infrastructure.</li>
     <li><strong>Encryption at rest is true by construction but unevidenced.</strong> Cosmos DB encrypts data at
       rest with service-managed keys by default; there is no setting to turn on and no way to turn it off. So
@@ -1010,7 +1047,7 @@ def google_auth_url(state: str = "") -> str:
     </div>
     <div class="card">
       <b style="font-size:1rem">Password Hashing</b>
-      <p class="sub" style="font-size:.82rem">bcrypt with 12 salt rounds. Plaintext is never stored. Hash comparison on login. Readable in <code class="inline-code">auth.py:64-76</code>.</p>
+      <p class="sub" style="font-size:.82rem">bcrypt with 12 salt rounds. Plaintext is never stored. Hash comparison on login. Readable in <code class="inline-code">auth.py:65-95</code>.</p>
       <span class="pill ok">Verified in repo</span>
     </div>
     <div class="card">
@@ -1020,11 +1057,11 @@ def google_auth_url(state: str = "") -> str:
     </div>
   </div>
 
-  <h4>Password Storage: Hash vs. Plaintext <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; illustrative contrast; see <code class="inline-code">backend/auth.py:64-76</code> for the real implementation</span></h4>
+  <h4>Password Storage: Hash vs. Plaintext <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; illustrative contrast; see <code class="inline-code">backend/auth.py:65-95</code> for the real implementation</span></h4>
 <pre><code># WRONG - never do this
 users.upsert_item({"id": email, "password": "mySecret123"})   # plaintext!
 
-# CORRECT - what this project does (backend/auth.py + function_app.py:501)
+# CORRECT - what this project does (backend/auth.py + function_app.py:503)
 password_hash = hash_password(password)   # bcrypt.gensalt(rounds=12)
 # password_hash == "$2b$12$LJ3m4ys3Lk8nOfVdKj6XkOdHsYq7f..."
 users.upsert_item({"id": email, "password_hash": password_hash})
@@ -1046,7 +1083,7 @@ if not verify_password(password, user["password_hash"]):
   <ul style="font-size:.9rem">
     <li><strong>The server-side guard is the control.</strong> Both data endpoints verify the JWT signature and
       return <code class="inline-code">401</code> without a valid token
-      (<code class="inline-code">backend/function_app.py:165-173</code>, applied at
+      (<code class="inline-code">backend/function_app.py:166-174</code>, applied at
       <code class="inline-code">:259-261</code> and <code class="inline-code">:355</code>). The route
       decorators use <code class="inline-code">AuthLevel.ANONYMOUS</code> so the Functions host does not also
       demand a function key; the token check is done in code.</li>
@@ -1068,7 +1105,7 @@ if not verify_password(password, user["password_hash"]):
   next to a <code class="inline-code">200</code> for the same URL with a valid bearer token. Plus a screenshot
   of the dashboard header showing the logged-in name and Logout button. Neither exists today.</p>
 
-  <h4>Server-side Guard <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; actual source, <code class="inline-code">backend/function_app.py:165-173, 250-261, 342-355</code></span></h4>
+  <h4>Server-side Guard <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; actual source, <code class="inline-code">backend/function_app.py:166-174, 251-262, 343-359</code></span></h4>
 <pre><code># backend/function_app.py
 def _reject_unauthenticated(req: func.HttpRequest):
     """Return a 401 response when the request carries no valid JWT, else None.
@@ -1092,7 +1129,7 @@ def get_insights_api(req: func.HttpRequest) -> func.HttpResponse:
         return denied
     ...
 
-# /api/recipes carries the identical guard at function_app.py:355.
+# /api/recipes carries the identical guard at function_app.py:357.
 # get_current_user -> extract_token (Authorization header only, never a query
 # string) -> verify_token (jwt.decode with the HS256 secret).</code></pre>
 
@@ -1205,23 +1242,25 @@ function redirectToLogin() {
     <rect x="665" y="85" width="220" height="160" rx="8" fill="var(--card)" stroke="var(--line)"/>
     <text x="775" y="105" text-anchor="middle" font-size="10" font-weight="600" fill="var(--ink)">Pie - Recipes by Diet</text>
     <circle cx="755" cy="170" r="45" fill="none" stroke="var(--line)" stroke-width="1"/>
-    <!-- Pie segments (approximated with arcs) -->
-    <circle cx="755" cy="170" r="40" fill="var(--brand)" opacity=".7"/>
-    <path d="M755,170 L755,130 A40,40 0 0,1 790,155 Z" fill="var(--accent)" opacity=".7"/>
-    <path d="M755,170 L790,155 A40,40 0 0,1 785,200 Z" fill="var(--ok)" opacity=".7"/>
-    <path d="M755,170 L785,200 A40,40 0 0,1 740,205 Z" fill="var(--warn)" opacity=".7"/>
-    <path d="M755,170 L740,205 A40,40 0 0,1 720,160 Z" fill="var(--bad)" opacity=".6"/>
+    <!-- Pie segments: real shares of the 7,806-row dataset (see the table in 2.2).
+         An earlier revision drew five near-equal fifths from the withdrawn
+         invented counts; paleo is in fact noticeably the smallest slice. -->
+    <path d="M755,170 L755.0,130.0 A40,40 0 0,1 794.5,163.6 Z" fill="var(--accent)" opacity=".7"/>
+    <path d="M755,170 L794.5,163.6 A40,40 0 0,1 767.8,207.9 Z" fill="var(--ok)" opacity=".7"/>
+    <path d="M755,170 L767.8,207.9 A40,40 0 0,1 723.7,194.9 Z" fill="var(--bad)" opacity=".6"/>
+    <path d="M755,170 L723.7,194.9 A40,40 0 0,1 720.8,149.3 Z" fill="var(--brand)" opacity=".7"/>
+    <path d="M755,170 L720.8,149.3 A40,40 0 0,1 755.0,130.0 Z" fill="var(--warn)" opacity=".7"/>
     <!-- Legend -->
-    <rect x="810" y="135" width="8" height="8" rx="2" fill="var(--brand)" opacity=".7"/>
-    <text x="822" y="143" font-size="7" fill="var(--mute)">Keto (20.2%)</text>
-    <rect x="810" y="150" width="8" height="8" rx="2" fill="var(--accent)" opacity=".7"/>
-    <text x="822" y="158" font-size="7" fill="var(--mute)">Med (20.0%)</text>
-    <rect x="810" y="165" width="8" height="8" rx="2" fill="var(--ok)" opacity=".7"/>
-    <text x="822" y="173" font-size="7" fill="var(--mute)">Dash (19.8%)</text>
-    <rect x="810" y="180" width="8" height="8" rx="2" fill="var(--warn)" opacity=".7"/>
-    <text x="822" y="188" font-size="7" fill="var(--mute)">Paleo (19.8%)</text>
-    <rect x="810" y="195" width="8" height="8" rx="2" fill="var(--bad)" opacity=".6"/>
-    <text x="822" y="203" font-size="7" fill="var(--mute)">Vegan (20.2%)</text>
+    <rect x="810" y="135" width="8" height="8" rx="2" fill="var(--accent)" opacity=".7"/>
+    <text x="822" y="143" font-size="7" fill="var(--mute)">Med (22.5%)</text>
+    <rect x="810" y="150" width="8" height="8" rx="2" fill="var(--ok)" opacity=".7"/>
+    <text x="822" y="158" font-size="7" fill="var(--mute)">Dash (22.4%)</text>
+    <rect x="810" y="165" width="8" height="8" rx="2" fill="var(--bad)" opacity=".6"/>
+    <text x="822" y="173" font-size="7" fill="var(--mute)">Vegan (19.5%)</text>
+    <rect x="810" y="180" width="8" height="8" rx="2" fill="var(--brand)" opacity=".7"/>
+    <text x="822" y="188" font-size="7" fill="var(--mute)">Keto (19.4%)</text>
+    <rect x="810" y="195" width="8" height="8" rx="2" fill="var(--warn)" opacity=".7"/>
+    <text x="822" y="203" font-size="7" fill="var(--mute)">Paleo (16.3%)</text>
 
     <!-- Filters Section -->
     <text x="20" y="270" font-size="13" font-weight="700" fill="var(--brand)">Filters &amp; Data Interaction</text>
@@ -1348,7 +1387,7 @@ references. What is more useful here is the code that governs what happens when 
 <div class="section-card">
   <p>Hardcoded sample data that mirrors the real result set makes a broken cache visually identical to a working
   one. The sample paths still exist, but they are off unless explicitly enabled, and an empty cache returns a
-  <code class="inline-code">503</code> with an explanation instead. <code class="inline-code">deploy.sh:158</code>
+  <code class="inline-code">503</code> with an explanation instead. <code class="inline-code">deploy.sh, the app-settings step</code>
   sets <code class="inline-code">ENABLE_DEMO_FALLBACK=false</code>.</p>
 <pre><code># backend/function_app.py:155-162
 def _demo_fallback_enabled() -> bool:
@@ -1387,9 +1426,14 @@ def _demo_fallback_enabled() -> bool:
     <li><strong>Nothing has been provisioned.</strong> <code class="inline-code">deploy.sh</code> creates a
       resource group, a storage account with the two containers, a serverless Cosmos account with
       <code class="inline-code">users</code> and <code class="inline-code">cache</code> containers, a
-      Consumption-plan Python 3.11 Function App, the app settings, the static website upload and CORS, and then
-      uploads <code class="inline-code">All_Diets.csv</code> to fire the trigger. It has not been run, and the
-      repository contains no output from it.</li>
+      Consumption-plan Python 3.11 Function App, the app settings and the static website upload, and then
+      uploads <code class="inline-code">All_Diets.csv</code> to fire the trigger. It deliberately does not
+      configure CORS at the platform layer: the application emits those headers itself on every response path,
+      including the <code class="inline-code">OPTIONS</code> pre-flight and the 401 from the auth gate, and a
+      response carrying <code class="inline-code">Access-Control-Allow-Origin</code> twice is rejected by every
+      browser. That makes the <code class="inline-code">FRONTEND_URL</code> setting load-bearing &mdash; it is
+      the origin the application echoes, and it falls back to <code class="inline-code">*</code> when unset.
+      The script has not been run, and the repository contains no output from it.</li>
     <li><strong>The cached read path is unoptimized.</strong> <code class="inline-code">get_recipes()</code>
       pulls every chunk on every request and filters in Python; there is no server-side Cosmos query. This is
       correct but not necessarily fast, and it has never been timed.</li>
@@ -1439,7 +1483,7 @@ made of the system.</p>
       <td>2</td>
       <td><strong>Performance: Result Calculation</strong></td>
       <td>10</td>
-      <td>Pre-computes average macros, recipe counts and totals once per CSV change and writes them to Cosmos (chunked for recipes). Reads come from cache, never a re-parse. <code class="inline-code">cache.py:160-294</code>.</td>
+      <td>Pre-computes average macros, recipe counts and totals once per CSV change and writes them to Cosmos (chunked for recipes). Reads come from cache, never a re-parse. <code class="inline-code">cache.py:173-317</code>.</td>
       <td><span class="pill warn">Code complete &middot; unverified</span></td>
       <td>Cosmos Data Explorer screenshot of <code class="inline-code">insights_cache</code>, <code class="inline-code">recipes_meta</code> and the <code class="inline-code">recipes_chunk_*</code> docs; a <code class="inline-code">curl</code> showing <code class="inline-code">cache_source: cosmosdb</code>. The &ldquo;~8&nbsp;ms vs ~1,850&nbsp;ms&rdquo; figure was never measured and has been withdrawn.</td>
     </tr>
@@ -1449,7 +1493,7 @@ made of the system.</p>
       <td>5</td>
       <td>Dropdown filter by diet type, applied server-side in Python over the cached records (not a Cosmos SQL query). Options populated from the dataset. <code class="inline-code">function_app.py:376-380</code>.</td>
       <td><span class="pill warn">Code complete &middot; unverified</span></td>
-      <td>Dashboard screenshot with a diet selected and the count updated; <code class="inline-code">curl /api/recipes?diet=keto</code> returning <code class="inline-code">total: 1580</code> from a real cache.</td>
+      <td>Dashboard screenshot with a diet selected and the count updated; <code class="inline-code">curl /api/recipes?diet=keto</code> returning <code class="inline-code">total: 1512</code> (v1; 1,513 after the v2 upload) from a real cache.</td>
     </tr>
     <tr>
       <td>4</td>
@@ -1471,7 +1515,7 @@ made of the system.</p>
       <td>6</td>
       <td><strong>Security: Email/Password Auth</strong></td>
       <td>10</td>
-      <td>Registration with validation and duplicate rejection; login via bcrypt hash comparison; HS256 JWT with 24h expiry and no default signing key. Token held in <code class="inline-code">localStorage</code> and sent as a bearer header &mdash; not an HttpOnly cookie. <code class="inline-code">auth.py:22-105</code>.</td>
+      <td>Registration with validation and duplicate rejection; login via bcrypt hash comparison; HS256 JWT with 24h expiry and no default signing key. Token held in <code class="inline-code">localStorage</code> and sent as a bearer header &mdash; not an HttpOnly cookie. <code class="inline-code">auth.py:22-120</code>.</td>
       <td><span class="pill ok">Hashing verified in repo</span> <span class="pill warn">No database behind it</span></td>
       <td><code class="inline-code">curl</code> transcript of register &rarr; login &rarr; authenticated request against a deployment. Without Cosmos, users live in an in-process dict and register-then-login can fail across instances.</td>
     </tr>
@@ -1479,7 +1523,7 @@ made of the system.</p>
       <td>7</td>
       <td><strong>Security: OAuth Login</strong></td>
       <td>10</td>
-      <td>Custom authorization-code flow for Google and GitHub in the Function App, with a signed short-lived <code class="inline-code">state</code> and verified-email gating. No Azure SWA built-in auth is used. <code class="inline-code">auth.py:108-266</code>, <code class="inline-code">function_app.py:602-711</code>.</td>
+      <td>Custom authorization-code flow for Google and GitHub in the Function App, with a signed short-lived <code class="inline-code">state</code> and verified-email gating. No Azure SWA built-in auth is used. <code class="inline-code">auth.py:123-346</code>, <code class="inline-code">function_app.py:617-739</code>.</td>
       <td><span class="pill bad">No OAuth app registered</span></td>
       <td><strong>Blocking and not a code task:</strong> register a Google Cloud OAuth client and a GitHub OAuth app, then set the four client ID/secret app settings and both redirect URIs. Until then the consent redirect carries an empty <code class="inline-code">client_id</code> and the provider errors. Then: provider console screenshots (secrets redacted) and one successful round trip per provider.</td>
     </tr>
@@ -1487,7 +1531,7 @@ made of the system.</p>
       <td>8</td>
       <td><strong>Security: DB Encryption &amp; Password Hash</strong></td>
       <td>10</td>
-      <td>Passwords stored as bcrypt hashes at 12 rounds, never plaintext (<code class="inline-code">auth.py:64-76</code>). Encryption at rest is a Cosmos platform default with service-managed keys &mdash; automatic and not configurable off, so it is true as soon as the account exists.</td>
+      <td>Passwords stored as bcrypt hashes at 12 rounds, never plaintext (<code class="inline-code">auth.py:65-95</code>). Encryption at rest is a Cosmos platform default with service-managed keys &mdash; automatic and not configurable off, so it is true as soon as the account exists.</td>
       <td><span class="pill ok">Hashing verified in repo</span> <span class="pill bad">Encryption unevidenced</span></td>
       <td>Portal screenshot of the Cosmos account's Data Encryption blade; Data Explorer screenshot of a <code class="inline-code">users</code> document showing a <code class="inline-code">$2b$12$</code> hash and no plaintext field. Neither can be produced before Cosmos is provisioned.</td>
     </tr>
@@ -1495,7 +1539,7 @@ made of the system.</p>
       <td>9</td>
       <td><strong>Dashboard UI: Auth Gate</strong></td>
       <td>10</td>
-      <td>Both data endpoints verify the JWT signature and return <code class="inline-code">401</code> without one (<code class="inline-code">function_app.py:165-173</code>). The browser-side redirect does not verify the signature and is a convenience only, so a forged token renders an empty shell but yields no data. Header shows the user's name and a Logout button (<code class="inline-code">dashboard.html:19-20</code>).</td>
+      <td>Both data endpoints verify the JWT signature and return <code class="inline-code">401</code> without one (<code class="inline-code">function_app.py:166-174</code>). The browser-side redirect does not verify the signature and is a convenience only, so a forged token renders an empty shell but yields no data. Header shows the user's name and a Logout button (<code class="inline-code">dashboard.html:19-20</code>).</td>
       <td><span class="pill ok">Guards verified in repo</span> <span class="pill warn">Never exercised live</span></td>
       <td><code class="inline-code">curl</code> showing <code class="inline-code">401</code> from <code class="inline-code">/api/insights</code> with no token, beside a <code class="inline-code">200</code> with a valid one &mdash; the cleanest single artefact for this item. Plus a screenshot of the header with name and Logout.</td>
     </tr>
@@ -1599,14 +1643,14 @@ made of the system.</p>
       <tr>
         <td>Password theft (stored credentials)</td>
         <td>Application</td>
-        <td>bcrypt at 12 salt rounds; plaintext is never written. Readable at <code class="inline-code">auth.py:64-76</code>.</td>
+        <td>bcrypt at 12 salt rounds; plaintext is never written. Readable at <code class="inline-code">auth.py:65-95</code>.</td>
         <td><span class="pill ok">Verified in repo</span></td>
         <td>Nothing, to confirm the code. To confirm the stored result: one Data Explorer screenshot of a user document.</td>
       </tr>
       <tr>
         <td>Token forgery</td>
         <td>Application</td>
-        <td>HS256 signature verified server-side on every protected request. No default signing key: the app raises at import on Azure if <code class="inline-code">JWT_SECRET</code> is unset (<code class="inline-code">auth.py:22-36</code>), and <code class="inline-code">deploy.sh:156</code> generates a random one.</td>
+        <td>HS256 signature verified server-side on every protected request. No default signing key: the app raises at import on Azure if <code class="inline-code">JWT_SECRET</code> is unset (<code class="inline-code">auth.py:22-36</code>), and <code class="inline-code">deploy.sh, the app-settings step</code> generates a random one.</td>
         <td><span class="pill ok">Verified in repo</span></td>
         <td>A <code class="inline-code">curl</code> showing a tampered token rejected with 401 by the deployed API.</td>
       </tr>
@@ -1634,7 +1678,7 @@ made of the system.</p>
       <tr>
         <td>Unauthorized data access</td>
         <td>API</td>
-        <td><code class="inline-code">/api/insights</code> and <code class="inline-code">/api/recipes</code> return 401 without a valid signed token (<code class="inline-code">function_app.py:165-173</code>). The browser-side redirect is <em>not</em> the control and does not verify the signature.</td>
+        <td><code class="inline-code">/api/insights</code> and <code class="inline-code">/api/recipes</code> return 401 without a valid signed token (<code class="inline-code">function_app.py:166-174</code>). The browser-side redirect is <em>not</em> the control and does not verify the signature.</td>
         <td><span class="pill ok">Guards verified in repo</span></td>
         <td>The 401-without-token <code class="inline-code">curl</code> transcript against the deployed API.</td>
       </tr>
@@ -1747,22 +1791,22 @@ follows is traceable to the code, and the last two rows are problems that are st
       <tr>
         <td>1</td>
         <td><strong>CSV data quality</strong></td>
-        <td>The raw CSV has duplicate recipes, inconsistent diet-type casing and invalid numeric values.</td>
-        <td>The cleaning step normalizes diet types, deduplicates and validates numeric fields before anything is cached (<code class="inline-code">backend/nutrition.py</code>, called from the blob trigger).</td>
+        <td>Repeated recipe names and unusable numeric values. Measured on <code class="inline-code">All_Diets.csv</code>: 372 (diet, recipe&nbsp;name) pairs occur more than once, accounting for 662 extra rows &mdash; but only 91 of those rows repeat the same macro values. 284 of the groups carry <em>different</em> macros, so they are distinct extractions of the same dish, not duplicates. Diet-type casing is in fact already consistent in this file.</td>
+        <td>Whitespace is stripped and diet and cuisine are case-folded defensively; macros are coerced to numeric, values that are negative or non-finite are discarded and replaced with the column mean, and the number of imputed values is recorded in <code class="inline-code">df.attrs</code>. Rows are deliberately <strong>not</strong> deduplicated: with 284 groups holding different macros, collapsing by name would discard real observations and shift every average. An earlier revision of this report claimed the cleaning step deduplicated &mdash; it does not, and should not (<code class="inline-code">backend/nutrition.py:13-42</code>).</td>
         <td><span class="pill ok">Implemented</span></td>
       </tr>
       <tr>
         <td>2</td>
         <td><strong>A process-local cache is invisible to other instances</strong></td>
         <td>On Azure Functions the blob trigger and the HTTP handlers are not guaranteed to share a process, so an in-memory cache leaves the API with nothing to serve &mdash; and search, filter and pagination then operate on whatever fallback exists.</td>
-        <td>Recipes are persisted to Cosmos, mirroring the insights path, so any instance can read them (<code class="inline-code">cache.py:216-294</code>).</td>
+        <td>Recipes are persisted to Cosmos, mirroring the insights path, so any instance can read them (<code class="inline-code">cache.py:229-317</code>).</td>
         <td><span class="pill ok">Implemented</span></td>
       </tr>
       <tr>
         <td>3</td>
         <td><strong>The dataset exceeds the Cosmos document limit</strong></td>
         <td>A Cosmos document may not exceed 2&nbsp;MB; the cleaned dataset serializes to roughly 1.2&nbsp;MB and would break on any growth.</td>
-        <td>Records are split into chunks of 2,000 with a <code class="inline-code">recipes_meta</code> document holding the count. Orphan chunks from a larger previous dataset are deleted before the new count is published, and a reader that finds a chunk missing discards the whole set rather than serving a partial one (<code class="inline-code">cache.py:30, 224-252, 269-294</code>).</td>
+        <td>Records are split into chunks of 2,000 with a <code class="inline-code">recipes_meta</code> document holding the count. Orphan chunks from a larger previous dataset are deleted before the new count is published, and a reader that finds a chunk missing discards the whole set rather than serving a partial one (<code class="inline-code">cache.py:42, 229-281, 282-317</code>).</td>
         <td><span class="pill ok">Implemented</span></td>
       </tr>
       <tr>
@@ -1776,21 +1820,21 @@ follows is traceable to the code, and the last two rows are problems that are st
         <td>5</td>
         <td><strong>A client-side redirect is not access control</strong></td>
         <td>The browser gate does not verify the token signature, so on its own it protects nothing.</td>
-        <td>Both data endpoints verify the signature server-side and return 401 without a valid token; the frontend sends a bearer header and honours the 401 by clearing the token and redirecting (<code class="inline-code">function_app.py:165-173</code>, <code class="inline-code">frontend/app.js:111, 171, 221-224</code>).</td>
+        <td>Both data endpoints verify the signature server-side and return 401 without a valid token; the frontend sends a bearer header and honours the 401 by clearing the token and redirecting (<code class="inline-code">function_app.py:166-174</code>, <code class="inline-code">frontend/app.js:111, 171, 221-224</code>).</td>
         <td><span class="pill ok">Implemented</span></td>
       </tr>
       <tr>
         <td>6</td>
         <td><strong>A known default signing key is a universal forgery</strong></td>
         <td>Any deployment shipping a documented default <code class="inline-code">JWT_SECRET</code> lets anyone mint a valid session token.</td>
-        <td>The app raises at import on Azure when <code class="inline-code">JWT_SECRET</code> is unset and only falls back to a clearly-named local key under <code class="inline-code">func start</code>; <code class="inline-code">deploy.sh:156</code> generates a random secret (<code class="inline-code">auth.py:22-36</code>).</td>
+        <td>The app raises at import on Azure when <code class="inline-code">JWT_SECRET</code> is unset and only falls back to a clearly-named local key under <code class="inline-code">func start</code>; <code class="inline-code">deploy.sh, the app-settings step</code> generates a random secret (<code class="inline-code">auth.py:22-36</code>).</td>
         <td><span class="pill ok">Implemented</span></td>
       </tr>
       <tr>
         <td>7</td>
         <td><strong>Redis has no free tier</strong></td>
         <td>Provisioning Azure Cache for Redis would exceed a student credit, but the rubric accepts either an external cache or a database.</td>
-        <td>Cosmos DB serverless is the cache of record; Redis code remains as an optional read-through layer that activates only when <code class="inline-code">REDIS_HOST</code> is set (<code class="inline-code">deploy.sh:13-16</code>, <code class="inline-code">cache.py:48-56</code>).</td>
+        <td>Cosmos DB serverless is the cache of record; Redis code remains as an optional read-through layer that activates only when <code class="inline-code">REDIS_HOST</code> is set (<code class="inline-code">deploy.sh, the cost note in its header</code>, <code class="inline-code">cache.py:48-56</code>).</td>
         <td><span class="pill ok">Implemented</span></td>
       </tr>
       <tr>
@@ -1802,6 +1846,20 @@ follows is traceable to the code, and the last two rows are problems that are st
       </tr>
       <tr>
         <td>9</td>
+        <td><strong>The deployed frontend could not reach the backend</strong></td>
+        <td>The frontend resolved its API base to a relative <code class="inline-code">/api</code> for any non-localhost host, but it is served from the storage account's <code class="inline-code">$web</code> static website, which has no <code class="inline-code">/api</code> reverse proxy &mdash; only Azure Static Web Apps provides one. Every data request would have returned 404 against the storage domain, and because the dashboard degrades quietly the result would have looked like an empty dashboard rather than an error.</td>
+        <td><code class="inline-code">frontend/config.js</code> resolves <code class="inline-code">window.API_BASE</code> from an <code class="inline-code">__API_BASE__</code> placeholder; <code class="inline-code">deploy.sh</code> substitutes <code class="inline-code">https://&lt;function-app&gt;.azurewebsites.net/api</code> into a staging copy before upload and aborts if the substitution did not take, so a silent mis-deploy is not possible (<code class="inline-code">frontend/config.js</code>, <code class="inline-code">deploy.sh, the frontend-upload step</code>).</td>
+        <td><span class="pill ok">Implemented</span></td>
+      </tr>
+      <tr>
+        <td>10</td>
+        <td><strong>Indexing the cached payloads cost write RUs for nothing</strong></td>
+        <td>Cosmos indexes every path by default. Each chunk document holds a 2,000-element <code class="inline-code">records</code> array, and the insights document holds its aggregates under <code class="inline-code">data</code> &mdash; so every blob-trigger write was paying to index thousands of nested fields. No query reads them: chunks are fetched by id.</td>
+        <td>The <code class="inline-code">cache</code> container ships an indexing policy excluding <code class="inline-code">/records/*</code> and <code class="inline-code">/data/*</code>. <code class="inline-code">deploy.sh</code> applies it at creation and <code class="inline-code">cache.py</code> applies the same policy if it creates the container first, so the two cannot drift (<code class="inline-code">cache.py:33-40</code>, <code class="inline-code">deploy.sh, the Cosmos container step</code>). The saving is in write RUs per CSV change and has not been measured yet.</td>
+        <td><span class="pill ok">Implemented</span></td>
+      </tr>
+      <tr>
+        <td>11</td>
         <td><strong>Cached reads are unoptimized</strong></td>
         <td><code class="inline-code">get_recipes()</code> reads every chunk on every request and filters in Python, so the cached path is not automatically fast and has never been timed.</td>
         <td><strong>Nothing yet.</strong> Correct but unmeasured; a server-side Cosmos query would be the fix if measurement shows it matters.</td>

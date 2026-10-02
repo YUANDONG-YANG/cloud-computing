@@ -1,0 +1,13 @@
+# Test-only dependencies. The runtime ones are in requirements.txt and are the
+# only ones deployed to Azure -- keep pytest out of the deployment package.
+#
+#   python -m venv .venv && source .venv/bin/activate
+#   pip install -r backend/requirements.txt -r backend/requirements-dev.txt
+#   python -m pytest -q            # from Project3/, see pytest.ini
+#
+# The suite imports the backend modules directly (tests/conftest.py puts
+# backend/ on sys.path), so the runtime requirements are needed too: the
+# nutrition tests exercise pandas and numpy, and the auth tests bcrypt and PyJWT.
+-r requirements.txt
+
+pytest>=8.0

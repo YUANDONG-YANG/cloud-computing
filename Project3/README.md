@@ -58,8 +58,15 @@ Azure Services
    1.2 MB, so chunking is what makes the dataset readable from *any* function
    instance instead of only the one that happened to handle the blob trigger.
    Stale chunks from a larger previous dataset are deleted before the new
-   count is published, so a reader never sees a mixed set.
+   count is published, and a reader that finds a chunk missing reports the
+   cache as empty rather than returning a partial or spliced dataset — so a
+   reader never sees a mixed set.
 4. `/api/insights` and `/api/recipes` only ever read. They never recalculate.
+5. A cached dataset that is genuinely empty is distinct from nothing being
+   cached: the first answers 200 with zero results, the second answers 503.
+   `/api/health` reports the same distinction via `recipes_cached` and
+   `recipe_count`, read from the metadata document so a health check never
+   pulls the whole dataset back out of Cosmos.
 
 ### How the frontend finds the backend
 
@@ -159,6 +166,28 @@ python -m http.server 8080
 Opening `frontend/login.html` as a `file://` URL does not work: the page would
 have a `null` origin, which CORS rejects.
 
+### Tests
+
+The backend has a 143-test suite covering cleaning and aggregation, password
+hashing, token and OAuth-state handling, validation, and the cache layer
+(including the chunked Cosmos path with no Cosmos account present). No Azure
+resources are needed to run it.
+
+```bash
+# From Project3/
+python -m pip install -r backend/requirements-dev.txt   # pytest + runtime deps
+python -m pytest -q
+```
+
+`backend/requirements-dev.txt` pins pytest and pulls in `requirements.txt`, so
+it is the only install needed. `pytest.ini` sets the test path and makes
+`backend/` importable, which is why the command runs from `Project3/` rather
+than from `backend/`.
+
+The captured output of a real run is committed at `docs/evidence/tests.log`.
+That file is evidence, not decoration: regenerate it with the same command
+rather than editing it by hand.
+
 ### Environment variables
 
 Set these in `backend/local.settings.json` locally, or as Function App
@@ -209,7 +238,9 @@ decorator, so changing the setting alone does not move the trigger.
 
 Register an OAuth app at the provider and set the callback URL to exactly
 `http://localhost:7071/api/auth/oauth/<github|google>/callback`. The callback
-verifies a signed, 10-minute `state` value minted by the backend and then
+verifies a signed, 10-minute `state` value minted by the backend **and** that it
+matches a short-lived `HttpOnly; SameSite=Lax` cookie set when the flow started,
+so a state obtained by someone else cannot be replayed in your browser. It then
 redirects to `FRONTEND_URL/index.html#token=<jwt>` — the token travels in the
 URL **fragment**, which browsers do not send to servers and do not record in
 referrer headers or access logs. `index.html` reads it, stores it, and cleans
@@ -233,9 +264,17 @@ export GOOGLE_CLIENT_ID=...    GOOGLE_CLIENT_SECRET=...
 `raw-data` and `clean-data`, plus the static website), a **serverless** Cosmos
 DB account with the `users` and `cache` containers, and a Function App on the
 Consumption plan. It then publishes the function code, uploads the frontend to
-the static website, adds the frontend origin to the Function App's CORS
-allow-list, sets `FRONTEND_URL`, and finally uploads `All_Diets.csv` to
-`raw-data` to fire the blob trigger. It generates a random `JWT_SECRET` and
+the static website, sets `FRONTEND_URL`, and finally uploads `All_Diets.csv` to
+`raw-data` to fire the blob trigger.
+
+It deliberately does **not** run `az functionapp cors add`. The application
+emits the full set of CORS headers itself from `_cors_headers()`, on every
+response path including the `OPTIONS` pre-flight and the 401 from the auth gate.
+Configuring CORS at the platform layer as well would make both emit
+`Access-Control-Allow-Origin`, and a response carrying that header twice is
+rejected by every browser. That makes the `FRONTEND_URL` app setting
+load-bearing: it is the origin the application echoes, and if it is unset the
+header falls back to `*`. It generates a random `JWT_SECRET` and
 sets `ENABLE_DEMO_FALLBACK=false`.
 
 No Redis is provisioned. Azure Cache for Redis has no free tier, and the code

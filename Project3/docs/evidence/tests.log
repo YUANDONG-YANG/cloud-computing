@@ -1,14 +1,18 @@
 # Project 3 (Phase 3) backend test run
-# Date:    2026-10-02 22:50 UTC
-# Command: python -m pytest -q  (from Project3/)
-# Python:  Python 3.10.12  pytest 9.1.1
+# Date:    2026-10-02 23:09 UTC
+# Command: python -m pytest -q   (run from Project3/)
+# Install: pip install -r backend/requirements-dev.txt
+# Python:  Python 3.10.12   pytest 9.1.1
+#
+# Captured output. Do not hand-edit: regenerate by running the command above.
 
-........................................................................ [ 66%]
-.....................................                                    [100%]
+........................................................................ [ 50%]
+.......................................................................  [100%]
 =============================== warnings summary ===============================
 tests/test_auth.py: 13 warnings
+tests/test_oauth_accounts.py: 8 warnings
 
 tests/test_auth.py: 14 warnings
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-109 passed, 27 warnings in 5.63s
+143 passed, 35 warnings in 5.94s

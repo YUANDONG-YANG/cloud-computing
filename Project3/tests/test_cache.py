@@ -274,20 +274,42 @@ def test_meta_is_written_last(container):
                                           "recipes_chunk_001"]
 
 
-def test_failed_chunk_write_leaves_previous_meta_intact(
-        container, monkeypatch):
+def test_failed_chunk_write_reads_back_as_a_miss(container, monkeypatch):
+    """A rewrite that dies partway must leave the cache reading as empty.
+
+    The metadata is retired before the chunks are touched, so there is no
+    moment where it describes a set that is only half replaced.
+    """
     good = records(5, tag="good")
     cache.store_recipes(good)
-    previous_meta = copy.deepcopy(container.items[("cache", "recipes_meta")])
 
     container.fail_writes_from = len(container.write_calls)
     cache.store_recipes(records(cache.CHUNK_SIZE * 2, tag="bad"))
-
-    assert container.items[("cache", "recipes_meta")] == previous_meta
     container.fail_writes_from = None
+
+    assert ("cache", "recipes_meta") not in container.items
+    drop_memory(monkeypatch)
+    assert cache.get_recipes() is None
+
+
+def test_failed_chunk_rewrite_never_serves_a_spliced_dataset(
+        container, monkeypatch):
+    """The defect this guards: chunks are replaced one at a time, so a failure
+    on a later chunk used to leave chunk 0 holding the new dataset and chunk 1
+    the old one, with metadata that still vouched for the pair.  get_recipes
+    then returned half of each as though it were a single valid dataset."""
+    cache.store_recipes(records(cache.CHUNK_SIZE * 2, tag="GOOD"))
+
+    # First replacement chunk succeeds, the second fails.
+    container.fail_writes_from = len(container.write_calls) + 1
+    cache.store_recipes(records(cache.CHUNK_SIZE * 2, tag="BAD"))
+    container.fail_writes_from = None
+
     drop_memory(monkeypatch)
     got = cache.get_recipes()
-    assert got is None or len(got) == len(good)
+    if got is not None:
+        tags = {r["Recipe_name"].split("-")[0] for r in got}
+        assert len(tags) == 1, f"spliced two datasets together: {sorted(tags)}"
 
 
 def test_stored_records_are_json_serializable(container):
@@ -396,3 +418,91 @@ def test_successful_connection_is_reused(redis_reset):
     for _ in range(4):
         assert cache._get_redis() is first
     assert fake.constructions == 1
+
+
+# ---------------------------------------------------------------------------
+# "Cached but empty" is not the same as "nothing cached"
+# ---------------------------------------------------------------------------
+
+def test_health_reports_an_empty_cached_dataset_as_cached(container,
+                                                          monkeypatch):
+    """/api/recipes answers 200 with zero results for an empty cached dataset,
+    so the health check must not call the same state uncached."""
+    monkeypatch.setattr(cache, "_memory_store", {"recipes_cache": []})
+    status = cache.get_cache_status()
+    assert cache.get_recipes() == []
+    assert status["recipes_cached"] is True
+    assert status["recipe_count"] == 0
+
+
+def test_health_reports_nothing_cached_when_nothing_is(container):
+    status = cache.get_cache_status()
+    assert cache.get_recipes() is None
+    assert status["recipes_cached"] is False
+    assert status["recipe_count"] == 0
+
+
+def test_health_count_comes_from_metadata_not_a_stale_local_copy(
+        container, monkeypatch):
+    """Cosmos holds an empty dataset while this instance still has the old
+    list in memory; the reported count must follow Cosmos."""
+    cache.store_recipes([])
+    monkeypatch.setitem(cache._memory_store, "recipes_cache", records(7806))
+    assert cache.get_cache_status()["recipe_count"] == 0
+
+
+# ---------------------------------------------------------------------------
+# A Redis mirror that cannot be refreshed must not keep serving
+# ---------------------------------------------------------------------------
+
+class FailingWriteRedis:
+    """Reads fine, refuses writes -- a transient Azure Cache error."""
+
+    def __init__(self, seeded):
+        self.store = dict(seeded)
+        self.deleted: list = []
+
+    def get(self, key):
+        return self.store.get(key)
+
+    def set(self, key, value):
+        raise RuntimeError("simulated transient Redis write error")
+
+    def delete(self, key):
+        self.deleted.append(key)
+        self.store.pop(key, None)
+
+    def ping(self):
+        return True
+
+
+def test_stale_recipes_are_dropped_when_the_redis_mirror_fails(
+        container, monkeypatch):
+    """Redis is read before Cosmos and the keys carry no TTL, so a value that
+    cannot be refreshed would be served ahead of the fresh Cosmos copy for as
+    long as the cache lived."""
+    stale = FailingWriteRedis({"recipes_cache": json.dumps(
+        [{"Recipe_name": "OLD-recipe-0"}])})
+    monkeypatch.setattr(cache, "_redis_client", stale)
+    monkeypatch.setattr(cache, "_redis_tried", True)
+
+    cache.store_recipes(records(3, tag="NEW"))
+
+    assert "recipes_cache" in stale.deleted
+    drop_memory(monkeypatch)
+    got = cache.get_recipes()
+    assert [r["Recipe_name"].split("-")[0] for r in got] == ["NEW"] * 3
+
+
+def test_stale_insights_are_dropped_when_the_redis_mirror_fails(
+        container, monkeypatch):
+    stale = FailingWriteRedis({cache.CACHE_KEY: json.dumps(
+        {"data": {"total_recipes": 1}, "updated_at": "old"})})
+    monkeypatch.setattr(cache, "_redis_client", stale)
+    monkeypatch.setattr(cache, "_redis_tried", True)
+
+    cache.store_insights({"total_recipes": 7806})
+
+    assert cache.CACHE_KEY in stale.deleted
+    drop_memory(monkeypatch)
+    assert cache.get_insights()["data"]["total_recipes"] == 7806

@@ -88,7 +88,7 @@ should ever reach this repository.
 # Status after the fixes
 
 Everything in this section is code that exists in the repository and is covered by
-`Project3/tests/` (109 tests, run with `python -m pytest -q` from `Project3/`; captured output in
+`Project3/tests/` (143 tests, run with `python -m pytest -q` from `Project3/`; captured output in
 `docs/evidence/tests.log`). None of it has run against real Azure infrastructure.
 
 ## Fixed

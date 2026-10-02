@@ -705,17 +705,27 @@ def _handle_oauth_user(info: dict) -> func.HttpResponse:
     # Only an email the provider says it verified may claim an existing
     # account; otherwise anyone able to set an unverified address at the
     # provider could take over that account.
-    if not user and email and info.get("email_verified"):
+    verified_email = bool(email) and bool(info.get("email_verified"))
+    if not user and verified_email:
         user = _find_user_by_email(email)
         if user:
+            # Record the provider too, not just its subject id: the
+            # provider+provider_id lookup above is how this account is found
+            # next time, and it only matches when both agree.
+            user.provider = provider
             user.provider_id = provider_id
             user.last_login = datetime.now(timezone.utc).isoformat()
             _save_user(user)
 
     if not user:
-        # Create new user
+        # An address the provider would not vouch for must not become this
+        # account's identity either.  Users are keyed by email, so reusing an
+        # unverified address that already belongs to someone would overwrite
+        # their account -- clearing its password hash and locking them out --
+        # which is the same takeover the check above refuses.
         user = User(
-            email=email or f"{provider}_{provider_id}@oauth.local",
+            email=email if verified_email
+            else f"{provider}_{provider_id}@oauth.local",
             name=name or "OAuth User",
             provider=provider,
             provider_id=provider_id,

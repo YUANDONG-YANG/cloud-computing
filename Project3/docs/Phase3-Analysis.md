@@ -9,7 +9,13 @@
 
 Phase 3 builds on Phase 2's deployed dashboard. Focus areas: **performance optimization** and **security (authentication)**.
 
-The Azure Function reads All_Diets.csv from Blob Storage, performs data cleaning and visualization, displayed on the dashboard hosted from Azure Static Web App. Phase 3 improves this with caching, user auth, and data interaction.
+The Azure Function reads All_Diets.csv from Blob Storage, performs data cleaning and visualization, displayed on a static dashboard. Phase 3 improves this with caching, user auth, and data interaction.
+
+> Note on hosting: this phase ships the frontend as static files on the storage account's
+> Blob Storage **static website** (`$web`), not on Azure Static Web Apps. The difference
+> matters because static website hosting does not proxy `/api` to the Function App, so the
+> frontend calls it by absolute URL — see `frontend/config.js` and the `__API_BASE__`
+> substitution in `deploy.sh`.
 
 ---
 
@@ -124,13 +130,13 @@ The provided UI skeleton includes:
 **Key findings:**
 - Highest mean protein: keto (101.27 g)
 - Highest total protein: mediterranean (177,249.89 g)
-- Recipe counts (approx): dash ~1561, keto ~1890, mediterranean ~1752, paleo ~1553, vegan ~1050
+- Recipe counts: dash 1,745, keto 1,512, mediterranean 1,753, paleo 1,274, vegan 1,522 (exact, counted from `All_Diets.csv`; an earlier revision of this document gave ~1561/~1890/~1752/~1553/~1050, which was wrong)
 
 ---
 
 ## 7. What Needs to Be Built (Report Plan)
 
-1. **Enhanced architecture diagram** — Blob Trigger → Azure Function → Redis/Cosmos DB → Static Web App (with Auth layer)
+1. **Enhanced architecture diagram** — Blob Trigger → Azure Function → Cosmos DB (serverless; Redis optional, only when `REDIS_HOST` is set) → Blob Storage static website (with auth enforced in the Function App)
 2. **Performance section** — blob trigger code, caching strategy, before/after comparison
 3. **Data interaction section** — filter, search, pagination with code and mock UI
 4. **Auth & Security section:**
@@ -158,14 +164,17 @@ Trigger: Azure Blob Storage (All_Diets.csv)
 Action: Clean data → compute aggregations → store in Redis/Cosmos DB
 ```
 
-**HTTP API Functions:**
-- `GET /api/insights` — returns cached visualization data
-- `GET /api/recipes?diet=X&search=Y&page=N` — filtered/searched recipes with pagination
+**HTTP API Functions** (reconciled with the routes actually in
+`backend/function_app.py`; this list was drafted before the code existed):
+- `GET /api/insights` — cached visualization data. **Requires a bearer token**: 401 without one, 503 when nothing is cached
+- `GET /api/recipes?diet=X&search=Y&page=N&pageSize=M` — filter, search, pagination. Same token requirement and same 503 behaviour
+- `GET /api/health` — cache and security status (public, no token)
 - `POST /api/auth/register` — register new user
 - `POST /api/auth/login` — login with email/password
-- `GET /api/auth/oauth/google` — initiate Google OAuth
-- `GET /api/auth/oauth/google/callback` — handle OAuth callback
-- `POST /api/auth/logout` — logout
+- `GET /api/auth/me` — current user, from the bearer token
+- `POST /api/auth/logout` — logout (the client discards the token)
+- `GET /api/auth/oauth/google` and `GET /api/auth/oauth/google/callback`
+- `GET /api/auth/oauth/github` and `GET /api/auth/oauth/github/callback`
 
 ### Frontend
 - Login/Register page (shown first)

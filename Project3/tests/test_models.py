@@ -6,6 +6,8 @@ to the limit they protect.
 """
 import json
 
+import pytest
+
 import models
 
 
@@ -137,3 +139,57 @@ def test_from_dict_ignores_unknown_cosmos_fields():
 
 def test_each_user_gets_a_distinct_id():
     assert models.User().id != models.User().id
+
+
+# ---------------------------------------------------------------------------
+# Malformed request bodies must be rejected, not raise
+#
+# These bodies are all valid JSON, so they reach the validators intact. Before
+# the type checks they raised AttributeError/TypeError out of the handler,
+# which the Functions host turns into a 500 -- telling a caller the server
+# broke when in fact their request was bad.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("body", [[], "a string", 42, None])
+def test_registration_rejects_a_body_that_is_not_an_object(body):
+    ok, msg = models.validate_registration(body)
+    assert ok is False
+    assert "JSON object" in msg
+
+
+@pytest.mark.parametrize("body", [[], "a string", 42, None])
+def test_login_rejects_a_body_that_is_not_an_object(body):
+    ok, msg = models.validate_login(body)
+    assert ok is False
+    assert "JSON object" in msg
+
+
+@pytest.mark.parametrize("password", [12345678, ["abcdefgh"], {"a": 1}, None])
+def test_registration_rejects_a_password_that_is_not_text(password):
+    ok, msg = models.validate_registration(
+        {"email": "a@b.com", "password": password, "name": "A"})
+    assert ok is False
+    assert "text" in msg
+
+
+@pytest.mark.parametrize("password", [12345678, ["x"], None])
+def test_login_rejects_a_password_that_is_not_text(password):
+    ok, msg = models.validate_login({"email": "a@b.com", "password": password})
+    assert ok is False
+    assert "text" in msg
+
+
+@pytest.mark.parametrize("field,value", [
+    ("email", 5), ("email", ["a@b.com"]), ("name", 7), ("name", {}),
+])
+def test_registration_rejects_non_text_email_and_name(field, value):
+    body = {"email": "a@b.com", "password": "abcdefgh", "name": "A"}
+    body[field] = value
+    ok, _ = models.validate_registration(body)
+    assert ok is False
+
+
+def test_a_well_formed_registration_still_passes():
+    ok, msg = models.validate_registration(
+        {"email": "a@b.com", "password": "abcdefgh", "name": "A"})
+    assert (ok, msg) == (True, "")

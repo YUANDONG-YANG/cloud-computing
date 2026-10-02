@@ -25,10 +25,11 @@ about. Nothing was run against Azure — no subscription.
 | `node --check` on all frontend JS | clean |
 | `python -m py_compile` on all backend modules | clean |
 
-Note on the test count: `review/score-risk-2026-10-02.md:91` says 99 tests.
-That was true of the committed state — a run against it gave exactly 99 — and
-the suite has since grown to 109. Both numbers were right when written; quote
-109 going forward.
+Note on the test count: this number keeps moving because the suite is still
+growing. A run gave 99 against the committed state, 109 during this audit, and
+143 after the OAuth-state and backend-defect tests landed.
+`review/score-risk-2026-10-02.md:91` now says 143; `docs/evidence/tests.log` is
+regenerated from a real run and is the figure to quote.
 
 `Project3/` has no `.flake8`, so flake8 falls back to 79 columns and reports
 long lines that Projects 1 and 2 do not (both pin `max-line-length = 110`).
@@ -105,6 +106,14 @@ overview report"; that claim is false — these survived.
 | 1 | `docs/reports/Project3-Master-Overview.html:1216,1218,1220,1222,1224` | pie chart: Keto 20.2 %, Med 20.0 %, Dash 19.8 %, Paleo 19.8 %, Vegan 20.2 % | mediterranean **22.5 %**, dash **22.4 %**, vegan **19.5 %**, keto **19.4 %**, paleo **16.3 %**. The printed values are the withdrawn invented counts over 7,806 (1580/7806 = 20.24 %, …). The chart contradicts the report's own correct table at `:499-519` |
 | 2 | same file `:1452` | `curl /api/recipes?diet=keto` → `total: 1580` given as the acceptance criterion | keto is **1,512** (v1) / 1,513 (v2). Whoever runs this on camera will see 1,512 and think the cache is broken |
 | 3 | `docs/Phase3-Analysis.md:127` | "dash ~1561, keto ~1890, mediterranean ~1752, paleo ~1553, vegan ~1050" | dash **1745**, keto **1512**, mediterranean **1753**, paleo **1274**, vegan **1522**. A *third* distinct set of invented counts, summing to 7,806 so it looks self-consistent; keto is off by 378. The macro table directly above it is correct, which makes these look authoritative |
+
+**Status of findings 1–3: all three are now fixed.** The pie-chart wedges and
+legend were redrawn from the real counts (paleo is visibly the smallest slice,
+not an equal fifth), the `total: 1580` acceptance criterion is now `total: 1512`,
+and `Phase3-Analysis.md` carries the exact counts with a note recording the
+correction. Finding 4 (two CORS layers) is also resolved: `deploy.sh` no longer
+calls `az functionapp cors add`, and the application owns the headers, which
+makes the `FRONTEND_URL` setting load-bearing.
 
 ### Priority 2 — `deploy.sh` defects that strand a half-provisioned deployment
 

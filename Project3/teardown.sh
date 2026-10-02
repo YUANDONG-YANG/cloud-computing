@@ -18,9 +18,28 @@
 
 set -euo pipefail
 
-RESOURCE_GROUP="cpsy300-project3-rg"
+# Must match whatever deploy.sh used, including an override.
+RESOURCE_GROUP="${RESOURCE_GROUP:-cpsy300-project3-rg}"
 
-if ! az group exists --name "$RESOURCE_GROUP" | grep -q true; then
+command -v az >/dev/null 2>&1 || {
+  echo "ERROR: the Azure CLI (az) is not installed or not on PATH." >&2
+  echo "       Delete the resource group from the portal instead -- until it is" >&2
+  echo "       gone, the resources keep billing." >&2
+  exit 1
+}
+
+# Check the login separately from the group's existence. Piping `az group
+# exists` into `grep -q true` conflates them: when the CLI is not logged in the
+# pipeline fails, which reads as "the group is not there" and this script would
+# cheerfully report nothing to delete while the resources carried on billing.
+az account show --output none 2>/dev/null || {
+  echo "ERROR: not logged in to Azure, so whether '$RESOURCE_GROUP' still" >&2
+  echo "       exists cannot be determined. Run 'az login' and try again." >&2
+  echo "       Do not assume the resources are gone." >&2
+  exit 1
+}
+
+if [[ "$(az group exists --name "$RESOURCE_GROUP" -o tsv)" != "true" ]]; then
   echo "Resource group '$RESOURCE_GROUP' does not exist. Nothing to delete."
   exit 0
 fi

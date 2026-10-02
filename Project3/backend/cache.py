@@ -159,6 +159,18 @@ def _cosmos_delete(doc_id: str) -> None:
         pass  # Already gone, which is the desired state.
 
 
+def _redis_discard(client, key: str) -> None:
+    """Delete a Redis key, ignoring failures.
+
+    Used after a failed mirror write: a key that cannot be refreshed must not
+    stay behind, because reads prefer Redis and nothing here sets a TTL.
+    """
+    try:
+        client.delete(key)
+    except Exception as exc:
+        logger.warning("Could not drop stale Redis key %s: %s", key, exc)
+
+
 # ---------------------------------------------------------------------------
 # Local-only fallback
 # ---------------------------------------------------------------------------
@@ -189,7 +201,11 @@ def store_insights(data: dict) -> bool:
             r.set(CACHE_KEY, json.dumps(payload))
             logger.info("Insights mirrored to Redis")
         except Exception as exc:
-            logger.warning("Redis write failed: %s", exc)
+            # Redis is read first and the keys carry no TTL, so leaving the
+            # previous value in place would serve it indefinitely over the
+            # fresh copy in Cosmos.  Drop the key and let reads fall through.
+            logger.warning("Redis write failed (%s); dropping the stale key", exc)
+            _redis_discard(r, CACHE_KEY)
 
     _memory_store[CACHE_KEY] = payload
     return wrote or bool(r)
@@ -240,6 +256,15 @@ def store_recipes(recipes_list: list) -> bool:
     previous = _cosmos_read(RECIPES_META_KEY) or {}
     previous_count = int(previous.get("chunk_count", 0))
 
+    # Retire the metadata before touching the chunks.  The chunk documents are
+    # replaced one at a time, so mid-rewrite the set is a mixture of the new
+    # dataset and the old one; a reader that still trusted the old metadata
+    # would splice the two and serve the result as if it were valid.  With the
+    # metadata gone the cache reads as empty until the new set is complete,
+    # which is the honest answer and the one the endpoints turn into a 503.
+    if previous:
+        _cosmos_delete(RECIPES_META_KEY)
+
     wrote = True
     for index, chunk in enumerate(chunks):
         if not _cosmos_write({
@@ -252,7 +277,7 @@ def store_recipes(recipes_list: list) -> bool:
 
     if wrote:
         # Drop chunks left over from a larger previous dataset before
-        # publishing the new count, so a reader never sees a mixed set.
+        # publishing the new count.
         for index in range(len(chunks), previous_count):
             _cosmos_delete(f"recipes_chunk_{index:03d}")
 
@@ -273,7 +298,9 @@ def store_recipes(recipes_list: list) -> bool:
             r.set("recipes_cache", json.dumps(recipes_list))
             logger.info("Recipes mirrored to Redis (%d records)", total)
         except Exception as exc:
-            logger.warning("Redis recipe write failed: %s", exc)
+            logger.warning("Redis recipe write failed (%s); dropping the "
+                           "stale key", exc)
+            _redis_discard(r, "recipes_cache")
 
     _memory_store["recipes_cache"] = recipes_list
     return wrote or bool(r)
@@ -326,13 +353,23 @@ def get_cache_status() -> dict:
     meta = _cosmos_read(RECIPES_META_KEY) or {}
     local = _memory_store.get("recipes_cache")
 
+    # A cached dataset that happens to be empty is still a cached dataset, so
+    # these test for presence rather than truthiness.  Reporting it as absent
+    # would contradict /api/recipes, which answers 200 with zero results.
+    if meta:
+        recipes_cached = True
+        recipe_count = int(meta.get("record_count", 0))
+    else:
+        recipes_cached = local is not None
+        recipe_count = len(local) if local is not None else 0
+
     return {
         "redis": "connected" if _get_redis() else "not in use",
         "cosmosdb": "connected" if _get_cosmos() else "not configured",
         "insights_cached": insights is not None,
         "insights_updated_at": (insights or {}).get("updated_at", ""),
-        "recipes_cached": bool(meta) or bool(local),
-        "recipe_count": int(meta.get("record_count", 0)) or len(local or []),
+        "recipes_cached": recipes_cached,
+        "recipe_count": recipe_count,
         "recipes_updated_at": meta.get("updated_at", ""),
         "source": (insights or {}).get("cache_source", "none"),
     }
