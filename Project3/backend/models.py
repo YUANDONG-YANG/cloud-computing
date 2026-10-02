@@ -6,7 +6,6 @@ the authentication and caching layers.
 import uuid
 from datetime import datetime, timezone
 from dataclasses import dataclass, field, asdict
-from typing import Optional
 
 
 @dataclass

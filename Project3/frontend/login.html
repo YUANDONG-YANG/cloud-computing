@@ -240,6 +240,31 @@
     function oauthGitHub() {
       window.location.href = API_BASE + "/auth/oauth/github";
     }
+
+    /*
+     * A failed OAuth callback redirects back here with ?error=<reason> rather
+     * than leaving the visitor on a JSON page at the API's own hostname. Turn
+     * the reason into something a person can act on, then scrub it from the
+     * URL so a refresh does not replay the message.
+     */
+    (function showOAuthError() {
+      var reason = new URLSearchParams(window.location.search).get("error");
+      if (!reason) return;
+
+      var messages = {
+        oauth_state:
+          "That sign-in link had expired, or it was not started from this " +
+          "browser. Please try again.",
+        oauth_no_code:
+          "The provider did not return an authorization code. Please try again.",
+        oauth_google_failed: "Google could not confirm your sign-in. Please try again.",
+        oauth_github_failed: "GitHub could not confirm your sign-in. Please try again.",
+        account_not_saved:
+          "Your account could not be saved. Please try again in a moment."
+      };
+      showError(messages[reason] || "Sign-in failed. Please try again.");
+      window.history.replaceState({}, document.title, window.location.pathname);
+    })();
   </script>
 </body>
 </html>

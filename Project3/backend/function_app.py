@@ -14,6 +14,7 @@ import io
 import json
 import logging
 import os
+from urllib.parse import quote
 import time
 from datetime import datetime, timezone
 
@@ -31,7 +32,7 @@ from auth import (
 )
 from cache import (
     store_insights, get_insights,
-    store_recipes, get_recipes,
+    store_recipes, get_recipes_with_source,
     get_cache_status,
 )
 from models import User, validate_registration, validate_login
@@ -44,13 +45,22 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 _users_container = None
+_users_tried = False
 
 
 def _get_users():
-    """Get or initialize the Cosmos DB users container."""
-    global _users_container
+    """Get or initialize the Cosmos DB users container.
+
+    A failed or absent configuration is remembered, matching `cache.py`:
+    without that, every lookup and every save pays the connect timeout again
+    and a single login can stall for tens of seconds.
+    """
+    global _users_container, _users_tried
     if _users_container is not None:
         return _users_container
+    if _users_tried:
+        return None
+    _users_tried = True
     try:
         from azure.cosmos import CosmosClient, PartitionKey
         endpoint = os.environ.get("COSMOS_ENDPOINT", "")
@@ -116,16 +126,27 @@ def _find_user_by_provider(provider: str, provider_id: str):
     return None
 
 
-def _save_user(user: User):
-    """Persist a user to Cosmos DB or the memory fallback."""
+def _save_user(user: User) -> bool:
+    """Persist a user. Returns False only when a durable write was attempted
+    and failed.
+
+    With Cosmos unconfigured the memory store is the intended local-development
+    path, so that returns True. When Cosmos *is* configured but the upsert
+    fails, the caller must not report success: the user would exist on this
+    instance alone, and a later login routed elsewhere would be told the
+    password is wrong.
+    """
     container = _get_users()
     if container:
         try:
             container.upsert_item(user.to_dict())
-            return
+            return True
         except Exception as exc:
-            logger.warning("User save failed: %s", exc)
+            logger.error("Durable user save failed for %s: %s", user.email, exc)
+            _memory_users[user.email] = user
+            return False
     _memory_users[user.email] = user
+    return True
 
 
 def _cors_headers():
@@ -361,8 +382,7 @@ def get_recipes_api(req: func.HttpRequest) -> func.HttpResponse:
 
     # None means nothing is cached; an empty list means the cached dataset is
     # genuinely empty, which is a valid answer rather than a cache miss.
-    recipes = get_recipes()
-    source = "cache"
+    recipes, source = get_recipes_with_source()
     if recipes is None:
         if not _demo_fallback_enabled():
             return _json_response({
@@ -428,21 +448,36 @@ def _get_fallback_recipes():
     to a single page, so never demo against them.
     """
     demos = [
-        {"Diet_type": "keto", "Recipe_name": "Keto Butter Chicken", "Cuisine_type": "indian", "Protein(g)": 42.5, "Carbs(g)": 8.3, "Fat(g)": 28.7},
-        {"Diet_type": "keto", "Recipe_name": "Bacon Cheese Burger Bowl", "Cuisine_type": "american", "Protein(g)": 38.2, "Carbs(g)": 5.1, "Fat(g)": 35.4},
-        {"Diet_type": "keto", "Recipe_name": "Grilled Salmon with Avocado", "Cuisine_type": "american", "Protein(g)": 45.0, "Carbs(g)": 4.2, "Fat(g)": 32.1},
-        {"Diet_type": "paleo", "Recipe_name": "Bone Broth From Nom Nom Paleo", "Cuisine_type": "american", "Protein(g)": 5.22, "Carbs(g)": 1.29, "Fat(g)": 3.2},
-        {"Diet_type": "paleo", "Recipe_name": "Paleo Pumpkin Pie", "Cuisine_type": "american", "Protein(g)": 30.91, "Carbs(g)": 302.59, "Fat(g)": 96.76},
-        {"Diet_type": "paleo", "Recipe_name": "Strawberry Guacamole", "Cuisine_type": "mexican", "Protein(g)": 9.62, "Carbs(g)": 75.78, "Fat(g)": 59.89},
-        {"Diet_type": "vegan", "Recipe_name": "Vegan Black Bean Tacos", "Cuisine_type": "mexican", "Protein(g)": 18.5, "Carbs(g)": 45.2, "Fat(g)": 12.3},
-        {"Diet_type": "vegan", "Recipe_name": "Tofu Stir Fry", "Cuisine_type": "chinese", "Protein(g)": 22.1, "Carbs(g)": 28.5, "Fat(g)": 14.6},
-        {"Diet_type": "vegan", "Recipe_name": "Chickpea Curry", "Cuisine_type": "indian", "Protein(g)": 15.8, "Carbs(g)": 42.3, "Fat(g)": 18.9},
-        {"Diet_type": "dash", "Recipe_name": "Grilled Chicken Salad", "Cuisine_type": "american", "Protein(g)": 35.0, "Carbs(g)": 12.5, "Fat(g)": 8.2},
-        {"Diet_type": "dash", "Recipe_name": "Salmon with Quinoa", "Cuisine_type": "american", "Protein(g)": 40.2, "Carbs(g)": 38.1, "Fat(g)": 15.6},
-        {"Diet_type": "dash", "Recipe_name": "Turkey Meatball Soup", "Cuisine_type": "italian", "Protein(g)": 28.7, "Carbs(g)": 22.4, "Fat(g)": 11.3},
-        {"Diet_type": "mediterranean", "Recipe_name": "Greek Lemon Chicken", "Cuisine_type": "greek", "Protein(g)": 38.5, "Carbs(g)": 15.2, "Fat(g)": 22.1},
-        {"Diet_type": "mediterranean", "Recipe_name": "Falafel Wrap", "Cuisine_type": "middle eastern", "Protein(g)": 18.9, "Carbs(g)": 42.5, "Fat(g)": 16.8},
-        {"Diet_type": "mediterranean", "Recipe_name": "Grilled Sea Bass", "Cuisine_type": "greek", "Protein(g)": 44.2, "Carbs(g)": 5.8, "Fat(g)": 18.5},
+        {"Diet_type": "keto", "Recipe_name": "Keto Butter Chicken", "Cuisine_type": "indian",
+         "Protein(g)": 42.5, "Carbs(g)": 8.3, "Fat(g)": 28.7},
+        {"Diet_type": "keto", "Recipe_name": "Bacon Cheese Burger Bowl", "Cuisine_type": "american",
+         "Protein(g)": 38.2, "Carbs(g)": 5.1, "Fat(g)": 35.4},
+        {"Diet_type": "keto", "Recipe_name": "Grilled Salmon with Avocado", "Cuisine_type": "american",
+         "Protein(g)": 45.0, "Carbs(g)": 4.2, "Fat(g)": 32.1},
+        {"Diet_type": "paleo", "Recipe_name": "Bone Broth From Nom Nom Paleo", "Cuisine_type": "american",
+         "Protein(g)": 5.22, "Carbs(g)": 1.29, "Fat(g)": 3.2},
+        {"Diet_type": "paleo", "Recipe_name": "Paleo Pumpkin Pie", "Cuisine_type": "american",
+         "Protein(g)": 30.91, "Carbs(g)": 302.59, "Fat(g)": 96.76},
+        {"Diet_type": "paleo", "Recipe_name": "Strawberry Guacamole", "Cuisine_type": "mexican",
+         "Protein(g)": 9.62, "Carbs(g)": 75.78, "Fat(g)": 59.89},
+        {"Diet_type": "vegan", "Recipe_name": "Vegan Black Bean Tacos", "Cuisine_type": "mexican",
+         "Protein(g)": 18.5, "Carbs(g)": 45.2, "Fat(g)": 12.3},
+        {"Diet_type": "vegan", "Recipe_name": "Tofu Stir Fry", "Cuisine_type": "chinese",
+         "Protein(g)": 22.1, "Carbs(g)": 28.5, "Fat(g)": 14.6},
+        {"Diet_type": "vegan", "Recipe_name": "Chickpea Curry", "Cuisine_type": "indian",
+         "Protein(g)": 15.8, "Carbs(g)": 42.3, "Fat(g)": 18.9},
+        {"Diet_type": "dash", "Recipe_name": "Grilled Chicken Salad", "Cuisine_type": "american",
+         "Protein(g)": 35.0, "Carbs(g)": 12.5, "Fat(g)": 8.2},
+        {"Diet_type": "dash", "Recipe_name": "Salmon with Quinoa", "Cuisine_type": "american",
+         "Protein(g)": 40.2, "Carbs(g)": 38.1, "Fat(g)": 15.6},
+        {"Diet_type": "dash", "Recipe_name": "Turkey Meatball Soup", "Cuisine_type": "italian",
+         "Protein(g)": 28.7, "Carbs(g)": 22.4, "Fat(g)": 11.3},
+        {"Diet_type": "mediterranean", "Recipe_name": "Greek Lemon Chicken", "Cuisine_type": "greek",
+         "Protein(g)": 38.5, "Carbs(g)": 15.2, "Fat(g)": 22.1},
+        {"Diet_type": "mediterranean", "Recipe_name": "Falafel Wrap", "Cuisine_type": "middle eastern",
+         "Protein(g)": 18.9, "Carbs(g)": 42.5, "Fat(g)": 16.8},
+        {"Diet_type": "mediterranean", "Recipe_name": "Grilled Sea Bass", "Cuisine_type": "greek",
+         "Protein(g)": 44.2, "Carbs(g)": 5.8, "Fat(g)": 18.5},
     ]
     return demos
 
@@ -517,7 +552,11 @@ def register(req: func.HttpRequest) -> func.HttpResponse:
         provider="local",
         last_login=datetime.now(timezone.utc).isoformat(),
     )
-    _save_user(user)
+    if not _save_user(user):
+        return _error(
+            "Your account could not be saved. Please try again in a moment.",
+            503,
+        )
 
     token = create_token(user.id, user.email, user.name)
     return _json_response({
@@ -631,22 +670,26 @@ def oauth_google(req: func.HttpRequest) -> func.HttpResponse:
     )
 
 
-@app.route(route="auth/oauth/google/callback", methods=["GET", "OPTIONS"], auth_level=func.AuthLevel.ANONYMOUS)
+@app.route(
+    route="auth/oauth/google/callback",
+    methods=["GET", "OPTIONS"],
+    auth_level=func.AuthLevel.ANONYMOUS,
+)
 def oauth_google_callback(req: func.HttpRequest) -> func.HttpResponse:
     """Handle Google OAuth callback, create or find user, return JWT."""
     if req.method == "OPTIONS":
         return func.HttpResponse(status_code=204, headers=_cors_headers())
 
     if not verify_state_request(req):
-        return _error("Invalid or expired OAuth state", 400)
+        return _oauth_error("oauth_state")
 
     code = req.params.get("code", "")
     if not code:
-        return _error("Missing authorization code", 400)
+        return _oauth_error("oauth_no_code")
 
     user_info = google_exchange_code(code)
     if not user_info:
-        return _error("Google authentication failed", 401)
+        return _oauth_error("oauth_google_failed")
 
     return _handle_oauth_user(user_info)
 
@@ -672,24 +715,48 @@ def oauth_github(req: func.HttpRequest) -> func.HttpResponse:
     )
 
 
-@app.route(route="auth/oauth/github/callback", methods=["GET", "OPTIONS"], auth_level=func.AuthLevel.ANONYMOUS)
+@app.route(
+    route="auth/oauth/github/callback",
+    methods=["GET", "OPTIONS"],
+    auth_level=func.AuthLevel.ANONYMOUS,
+)
 def oauth_github_callback(req: func.HttpRequest) -> func.HttpResponse:
     """Handle GitHub OAuth callback, create or find user, return JWT."""
     if req.method == "OPTIONS":
         return func.HttpResponse(status_code=204, headers=_cors_headers())
 
     if not verify_state_request(req):
-        return _error("Invalid or expired OAuth state", 400)
+        return _oauth_error("oauth_state")
 
     code = req.params.get("code", "")
     if not code:
-        return _error("Missing authorization code", 400)
+        return _oauth_error("oauth_no_code")
 
     user_info = github_exchange_code(code)
     if not user_info:
-        return _error("GitHub authentication failed", 401)
+        return _oauth_error("oauth_github_failed")
 
     return _handle_oauth_user(user_info)
+
+
+def _oauth_redirect(path: str) -> func.HttpResponse:
+    """302 back to the frontend. Used for both success and failure.
+
+    An OAuth failure used to return bare JSON at the Function App's hostname,
+    which is a dead end: the visitor is off the dashboard's origin with no link
+    back. Sending them to login.html with a reason keeps them in the app.
+    """
+    frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:8080").rstrip("/")
+    return func.HttpResponse(
+        status_code=302,
+        headers={**_cors_headers(), "Location": f"{frontend_url}/{path}"},
+    )
+
+
+def _oauth_error(reason: str) -> func.HttpResponse:
+    """Redirect to the login page with a machine-readable failure reason."""
+    logger.warning("OAuth callback rejected: %s", reason)
+    return _oauth_redirect(f"login.html?error={quote(reason)}")
 
 
 def _handle_oauth_user(info: dict) -> func.HttpResponse:
@@ -731,7 +798,8 @@ def _handle_oauth_user(info: dict) -> func.HttpResponse:
             provider_id=provider_id,
             last_login=datetime.now(timezone.utc).isoformat(),
         )
-        _save_user(user)
+        if not _save_user(user):
+            return _oauth_error("account_not_saved")
 
     token = create_token(user.id, user.email, user.name)
     frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:8080")

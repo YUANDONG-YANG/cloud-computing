@@ -1,0 +1,626 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Phase 2 部署实操手册</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@500;600;700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet" />
+<style>
+/* 布局：单栏运行手册，左侧步骤序号作为垂直脉络，命令块是页面的主角 */
+:root {
+  --bg: #f7f8fa;
+  --surface: #ffffff;
+  --surface-sunk: #eef1f5;
+  --fg: #1b2330;
+  --fg-dim: #5a6676;
+  --rule: #d8dee7;
+  --accent: #0a5c8a;
+  --accent-soft: #e3eef5;
+  --term-bg: #16202c;
+  --term-fg: #dbe5ef;
+  --term-dim: #7e92a6;
+  --ok: #1a6f4a;
+  --ok-soft: #e0f0e8;
+  --warn: #8a5a00;
+  --warn-soft: #faefd8;
+  --danger: #a32b25;
+  --danger-soft: #fae3e1;
+  --font-head: "IBM Plex Sans", "Noto Sans SC", system-ui, sans-serif;
+  --font-body: "Source Sans 3", "Noto Sans SC", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11161d;
+    --surface: #1a212b;
+    --surface-sunk: #141a22;
+    --fg: #e6ecf3;
+    --fg-dim: #97a5b6;
+    --rule: #2c3643;
+    --accent: #5cb3e0;
+    --accent-soft: #1c2c38;
+    --term-bg: #0d141b;
+    --term-fg: #dbe5ef;
+    --term-dim: #76889b;
+    --ok: #5fc595;
+    --ok-soft: #162a22;
+    --warn: #e0b057;
+    --warn-soft: #2b2316;
+    --danger: #ef8e86;
+    --danger-soft: #2e1a19;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11161d;
+  --surface: #1a212b;
+  --surface-sunk: #141a22;
+  --fg: #e6ecf3;
+  --fg-dim: #97a5b6;
+  --rule: #2c3643;
+  --accent: #5cb3e0;
+  --accent-soft: #1c2c38;
+  --term-bg: #0d141b;
+  --term-fg: #dbe5ef;
+  --term-dim: #76889b;
+  --ok: #5fc595;
+  --ok-soft: #162a22;
+  --warn: #e0b057;
+  --warn-soft: #2b2316;
+  --danger: #ef8e86;
+  --danger-soft: #2e1a19;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.65;
+}
+.wrap { max-width: 56rem; margin: 0 auto; padding: 0 16px; padding-block: 2.5rem 5rem; }
+
+/* ---------- 页头 ---------- */
+.masthead { border-bottom: 2px solid var(--fg); padding-bottom: 1.25rem; margin-bottom: 1.75rem; }
+.eyebrow {
+  font-family: var(--font-head); font-size: .75rem; font-weight: 600;
+  letter-spacing: .09em; text-transform: uppercase; color: var(--accent); margin: 0 0 .4rem;
+}
+h1 {
+  font-family: var(--font-head); font-weight: 700; font-size: clamp(1.7rem, 5vw, 2.4rem);
+  line-height: 1.15; margin: 0 0 .6rem; text-wrap: balance;
+}
+.standfirst { margin: 0; color: var(--fg-dim); max-width: 42rem; }
+.meta-row { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1rem; align-items: center; }
+.tag {
+  font-family: var(--font-mono); font-size: .75rem; padding: .25rem .55rem;
+  border: 1px solid var(--rule); border-radius: 3px; color: var(--fg-dim); background: var(--surface);
+}
+.theme-btn {
+  margin-left: auto; font-family: var(--font-body); font-size: .8rem; cursor: pointer;
+  background: var(--surface); color: var(--fg-dim); border: 1px solid var(--rule);
+  border-radius: 3px; padding: .3rem .6rem;
+}
+.theme-btn:hover { color: var(--fg); border-color: var(--fg-dim); }
+
+/* ---------- 进度 ---------- */
+.progress-card {
+  background: var(--surface); border: 1px solid var(--rule); border-radius: 6px;
+  padding: 1rem 1.1rem; margin-bottom: 2rem;
+}
+.progress-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  gap: 1rem; flex-wrap: wrap; margin-bottom: .6rem;
+}
+.progress-head h2 { font-family: var(--font-head); font-size: .95rem; margin: 0; font-weight: 600; }
+.progress-count { font-family: var(--font-mono); font-size: .85rem; color: var(--fg-dim); font-variant-numeric: tabular-nums; }
+.bar { height: 6px; background: var(--surface-sunk); border-radius: 3px; overflow: hidden; }
+.bar > span { display: block; height: 100%; width: 0; background: var(--accent); transition: width .25s ease; }
+.progress-note { font-size: .8rem; color: var(--fg-dim); margin: .6rem 0 0; }
+.reset-btn {
+  font-size: .78rem; background: none; border: none; color: var(--accent);
+  cursor: pointer; padding: 0; text-decoration: underline;
+}
+
+/* ---------- 阶段 ---------- */
+.phase { margin-bottom: 2.75rem; }
+.phase-head { display: flex; gap: .75rem; align-items: baseline; border-bottom: 1px solid var(--rule); padding-bottom: .5rem; margin-bottom: 1.25rem; }
+.phase-num {
+  font-family: var(--font-mono); font-size: .8rem; font-weight: 500; color: var(--accent);
+  background: var(--accent-soft); border-radius: 3px; padding: .15rem .45rem; flex: none;
+}
+.phase-head h2 { font-family: var(--font-head); font-size: 1.2rem; font-weight: 600; margin: 0; }
+.phase-head .dur { margin-left: auto; font-size: .78rem; color: var(--fg-dim); font-family: var(--font-mono); flex: none; }
+
+/* ---------- 步骤 ---------- */
+.step { display: grid; grid-template-columns: 1.6rem 1fr; gap: .75rem; margin-bottom: 1.5rem; }
+.step > input[type=checkbox] { margin: .35rem 0 0; width: 1.05rem; height: 1.05rem; accent-color: var(--accent); cursor: pointer; }
+.step-body { min-width: 0; }
+.step-body > :first-child { margin-top: 0; }
+.step-body > :last-child { margin-bottom: 0; }
+.step-title { font-family: var(--font-head); font-weight: 600; font-size: 1rem; margin: 0 0 .35rem; }
+.step p { margin: .5rem 0; }
+input[type=checkbox]:checked + .step-body .step-title { color: var(--fg-dim); text-decoration: line-through; text-decoration-color: var(--rule); }
+
+/* ---------- 命令块 ---------- */
+.cmd { position: relative; margin: .75rem 0; }
+.cmd pre {
+  background: var(--term-bg); color: var(--term-fg); font-family: var(--font-mono);
+  font-size: .82rem; line-height: 1.6; margin: 0; padding: .85rem 3.4rem .85rem .9rem;
+  border-radius: 5px; overflow-x: auto;
+}
+.cmd .c { color: var(--term-dim); }
+.copy {
+  position: absolute; top: .45rem; right: .45rem; font-family: var(--font-body); font-size: .72rem;
+  background: rgba(255,255,255,.1); color: var(--term-fg); border: 1px solid rgba(255,255,255,.18);
+  border-radius: 3px; padding: .2rem .45rem; cursor: pointer;
+}
+.copy:hover { background: rgba(255,255,255,.2); }
+code.inline {
+  font-family: var(--font-mono); font-size: .86em; background: var(--surface-sunk);
+  padding: .1rem .3rem; border-radius: 3px; word-break: break-word;
+}
+
+/* ---------- 提示框 ---------- */
+.note { border-left: 3px solid; border-radius: 0 4px 4px 0; padding: .7rem .9rem; margin: .8rem 0; font-size: .9rem; }
+.note p { margin: .35rem 0; }
+.note > :first-child { margin-top: 0; }
+.note > :last-child { margin-bottom: 0; }
+.note b { font-family: var(--font-head); }
+.note.expect { border-color: var(--ok); background: var(--ok-soft); }
+.note.warn { border-color: var(--warn); background: var(--warn-soft); }
+.note.stop { border-color: var(--danger); background: var(--danger-soft); }
+
+/* ---------- 表格 ---------- */
+.table-scroll { overflow-x: auto; margin: 1rem 0; }
+table { border-collapse: collapse; width: 100%; font-size: .87rem; min-width: 30rem; }
+th, td { text-align: left; padding: .5rem .65rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--font-head); font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; color: var(--fg-dim); font-weight: 600; }
+td.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.chg { color: var(--accent); font-weight: 600; }
+
+footer { margin-top: 3rem; padding-top: 1.25rem; border-top: 1px solid var(--rule); font-size: .85rem; color: var(--fg-dim); }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+@media (max-width: 30rem) {
+  .phase-head { flex-wrap: wrap; }
+  .phase-head .dur { margin-left: 0; width: 100%; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="masthead">
+  <p class="eyebrow">CPSY 300 · Phase 2</p>
+  <h1>Phase 2 部署实操手册</h1>
+  <p class="standfirst">从「代码写完但什么都没部署」到「公开 URL 能打开、六张截图到手、PDF 导出完成」。代码已经全部就绪并在本地实测通过 —— 剩下的只是跑脚本和取证。照顺序做，每步都写明该看到什么。</p>
+  <div class="meta-row">
+    <span class="tag">约 45–60 分钟</span>
+    <span class="tag">需要 Azure 订阅</span>
+    <span class="tag">分数敞口 50 分</span>
+    <button class="theme-btn" id="themeBtn" type="button">切换深浅色</button>
+  </div>
+</header>
+
+<section class="progress-card">
+  <div class="progress-head">
+    <h2>进度</h2>
+    <span class="progress-count" id="progressCount">0 / 0</span>
+  </div>
+  <div class="bar"><span id="progressBar"></span></div>
+  <p class="progress-note">勾选会记在这台机器的浏览器里，关掉页面再打开还在。<button class="reset-btn" id="resetBtn" type="button">全部清空</button></p>
+</section>
+
+<div class="note expect">
+  <p><b>这 50 分是怎么来的。</b> Deployment 20 分要真实的 Azure 资源和带时间的门户截图；Integration 20 分要前端真的从 Function 取到数据（光有代码不算）；Documentation 10 分要带截图的 PDF。三项全部卡在「跑一次脚本 + 截图」上，代码侧没有任何待办。</p>
+</div>
+
+<!-- ============ 阶段 0 ============ -->
+<section class="phase">
+  <div class="phase-head">
+    <span class="phase-num">阶段 0</span>
+    <h2>装工具、登录</h2>
+    <span class="dur">~15 分钟</span>
+  </div>
+
+  <div class="step">
+    <input type="checkbox" id="s01" />
+    <div class="step-body">
+      <p class="step-title">装三个工具</p>
+      <p>Phase 2 比 Phase 3 多一个依赖：前端走 Azure Static Web Apps，需要 <code class="inline">swa</code> CLI。缺了它脚本不会崩，但会跳过前端上传并打印警告 —— 那样 Integration 的 20 分就拿不到。</p>
+      <div class="cmd"><button class="copy" type="button">复制</button><pre><span class="c"># Azure CLI（Ubuntu / Debian）</span>
+curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+
+<span class="c"># Functions Core Tools v4 和 Static Web Apps CLI（都要 Node.js）</span>
+npm i -g azure-functions-core-tools@4 --unsafe-perm true
+npm i -g @azure/static-web-apps-cli
+
+<span class="c"># 三个都要有输出</span>
+az version --output table
+func --version
+swa --version</pre></div>
+      <div class="note warn"><p><b><code class="inline">swa --version</code> 没输出就别往下走。</b> 先把它装上，否则阶段 2 跑完你会得到一个能用的 API 和一个没上线的前端。</p></div>
+    </div>
+  </div>
+
+  <div class="step">
+    <input type="checkbox" id="s02" />
+    <div class="step-body">
+      <p class="step-title">登录并确认订阅</p>
+      <div class="cmd"><button class="copy" type="button">复制</button><pre>az login
+az account show --query "{订阅:name, 订阅ID:id, 用户:user.name}" -o table</pre></div>
+      <div class="note warn"><p>有多个订阅的话，确认这里显示的是你想计费的那个。切换：<code class="inline">az account set --subscription "订阅名"</code>。</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 阶段 1 ============ -->
+<section class="phase">
+  <div class="phase-head">
+    <span class="phase-num">阶段 1</span>
+    <h2>定名字</h2>
+    <span class="dur">~3 分钟</span>
+  </div>
+
+  <div class="note expect">
+    <p><b>为什么要先定。</b> Function App 和存储账号的名字是 <b>Azure 全局唯一</b>的，默认值大概率已被占用，脚本会在创建时报一个很难看懂的错。先加后缀定下来，顺带你也知道了最终的 URL 长什么样。</p>
+  </div>
+
+  <div class="step">
+    <input type="checkbox" id="s03" />
+    <div class="step-body">
+      <p class="step-title">导出名字，算出最终 URL</p>
+      <div class="cmd"><button class="copy" type="button">复制</button><pre><span class="c"># 把 yy 换成你的缩写，只能小写字母、数字、连字符</span>
+export FUNCTION_APP_NAME=cpsy300-nutrition-api-yy
+export STATIC_WEB_APP_NAME=cpsy300-nutrition-dash-yy
+
+echo "部署完 API 会在："
+echo "  https://${FUNCTION_APP_NAME}.azurewebsites.net/api/health"</pre></div>
+      <div class="note warn"><p><b>这个终端别关。</b> 阶段 2 要用到这两个 <code class="inline">export</code>。关了就重跑这一步。</p></div>
+    </div>
+  </div>
+
+  <div class="step">
+    <input type="checkbox" id="s04" />
+    <div class="step-body">
+      <p class="step-title">先确认名字没被占</p>
+      <div class="cmd"><button class="copy" type="button">复制</button><pre>az functionapp list --query "[?name=='$FUNCTION_APP_NAME'].name" -o tsv
+<span class="c"># 没有任何输出 = 你的订阅里没有同名的，可以继续</span></pre></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 阶段 2 ============ -->
+<section class="phase">
+  <div class="phase-head">
+    <span class="phase-num">阶段 2</span>
+    <h2>部署</h2>
+    <span class="dur">~15 分钟</span>
+  </div>
+
+  <div class="step">
+    <input type="checkbox" id="s05" />
+    <div class="step-body">
+      <p class="step-title">跑 deploy.sh</p>
+      <p>必须<b>先进到 Project2 目录</b>再跑 —— 脚本里的数据集路径和 <code class="inline">backend/</code> 都是相对路径。</p>
+      <div class="cmd"><button class="copy" type="button">复制</button><pre>cd ~/Desktop/claude-computing/Project2
+chmod +x deploy.sh
+./deploy.sh</pre></div>
+      <p>脚本一共 7 步，会自己走完：资源组 → 存储账号并上传 CSV → Function App 和应用设置 → 发布后端 → 创建 Static Web App → 把真实 API 地址注入前端再上传 → 把 CORS 收窄到前端域名并冒烟测试三个端点。</p>
+      <div class="note expect"><p><b>最后应该看到。</b> 三行 <code class="inline">OK</code> 的冒烟测试，以及打印出来的 Function App 和 Dashboard 两个地址。第一次调用要等冷启动，脚本给了 180 秒超时，<b>慢是正常的</b>。</p></div>
+      <div class="note warn"><p><b>Static Web App 在 eastus2，其他资源在 eastus</b> —— 这不是写错了，SWA 在 eastus 不提供服务。脚本已经处理好了。</p></div>
+    </div>
+  </div>
+
+  <div class="step">
+    <input type="checkbox" id="s06" />
+    <div class="step-body">
+      <p class="step-title">把两个真实地址记下来</p>
+      <div class="cmd"><button class="copy" type="button">复制</button><pre>export API_URL="https://${FUNCTION_APP_NAME}.azurewebsites.net"
+export DASH_URL="https://$(az staticwebapp show --name "$STATIC_WEB_APP_NAME" \
+  --resource-group cpsy300-nutritional-insights-rg --query defaultHostname -o tsv)"
+
+echo "API:       $API_URL"
+echo "Dashboard: $DASH_URL"</pre></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 阶段 3 ============ -->
+<section class="phase">
+  <div class="phase-head">
+    <span class="phase-num">阶段 3</span>
+    <h2>验证真的成功了</h2>
+    <span class="dur">~5 分钟</span>
+  </div>
+
+  <div class="note expect">
+    <p><b>这一步别跳。</b> 前端在拿不到 API 时会<b>自动降级成离线模式</b>并显示黄色横幅，用的是 Project 1 的真实批处理结果。页面照样好看、图表照样有数据 —— 但那不是云上来的，Integration 的 20 分会丢。所以必须确认它走的是在线路径。</p>
+  </div>
+
+  <div class="step">
+    <input type="checkbox" id="s07" />
+    <div class="step-body">
+      <p class="step-title">三个端点都要通</p>
+      <div class="cmd"><button class="copy" type="button">复制</button><pre>curl -s "$API_URL/api/health" | python3 -m json.tool
+
+<span class="c"># 真实数字核对：total_recipes 必须是 7806</span>
+curl -s "$API_URL/api/insights" | python3 -c "import sys,json; d=json.load(sys.stdin); print('总数', d['summary']['total_recipes']); print('各 diet', d['summary']['diet_counts']); print('耗时(秒)', d['metadata']['execution_time_seconds'])"
+
+<span class="c"># 分页：应该是 7806 条、157 页、本页 50 条</span>
+curl -s "$API_URL/api/recipes?page=1&limit=50" | python3 -c "import sys,json; d=json.load(sys.stdin); print('total',d['total'],'pages',d['total_pages'],'本页',d['count'])"</pre></div>
+      <div class="note expect"><p><b>各 diet 的正确数字</b>（跟你本地一致才说明云上读的是同一份数据）：mediterranean 1753、dash 1745、vegan 1522、keto 1512、paleo 1274。</p></div>
+    </div>
+  </div>
+
+  <div class="step">
+    <input type="checkbox" id="s08" />
+    <div class="step-body">
+      <p class="step-title">打开仪表盘，确认不是离线模式</p>
+      <div class="cmd"><button class="copy" type="button">复制</button><pre>echo "$DASH_URL"</pre></div>
+      <p>浏览器打开这个地址，检查三件事：</p>
+      <div class="table-scroll"><table>
+        <thead><tr><th>看哪里</th><th>成功</th><th>失败</th></tr></thead>
+        <tbody>
+          <tr><td>右上角徽章</td><td>绿色 <b>API Connected</b></td><td>橙色 <b>Offline - fallback data</b></td></tr>
+          <tr><td>页面顶部</td><td>没有黄色横幅</td><td>黄色「离线模式」横幅</td></tr>
+          <tr><td>控制栏右侧</td><td><b>Source: Azure Blob Storage (live)</b></td><td>Source: offline fallback</td></tr>
+        </tbody>
+      </table></div>
+      <div class="note warn"><p><b>如果是离线模式</b>，99% 是 CORS 或 API 地址注入失败。按 F12 看 Console：报 CORS 就重跑脚本第 7 步；报 404 就检查 <code class="inline">curl $API_URL/api/health</code> 是否真的通。排错清单在页面最后。</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 阶段 4 ============ -->
+<section class="phase">
+  <div class="phase-head">
+    <span class="phase-num">阶段 4</span>
+    <h2>采集六张截图</h2>
+    <span class="dur">~15 分钟</span>
+  </div>
+
+  <div class="note warn">
+    <p><b>两条铁律。</b> ① 每张图都要<b>露出日期和时间</b>（系统时钟在截图范围内，或者截图里带 Azure 门户自己的时间戳）。② <b>绝不能截到连接字符串、账号密钥</b>。门户的「访问密钥」页面不要碰。</p>
+  </div>
+
+  <div class="step">
+    <input type="checkbox" id="s09" />
+    <div class="step-body">
+      <p class="step-title">按这个清单截，对应 PDF 里的九个占位</p>
+      <div class="table-scroll"><table>
+        <thead><tr><th>#</th><th>截什么</th><th>怎么到</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>资源组总览，能看到全部资源</td><td>门户 → 资源组 → <code class="inline">cpsy300-nutritional-insights-rg</code></td></tr>
+          <tr><td>2</td><td>Function App 概览（运行状态、Python 版本、URL）</td><td>点进 Function App → 概览</td></tr>
+          <tr><td>3</td><td>三个函数都列出来</td><td>Function App → 函数</td></tr>
+          <tr><td>4</td><td>存储容器里有 All_Diets.csv</td><td>存储账号 → 容器 → <code class="inline">datasets</code></td></tr>
+          <tr><td>5</td><td>Static Web App 概览</td><td>资源组 → 点进 Static Web App</td></tr>
+          <tr><td>6</td><td>仪表盘全貌，<b>绿色 API Connected 必须在画面里</b></td><td>浏览器打开 <code class="inline">$DASH_URL</code></td></tr>
+          <tr><td>7</td><td>四张图表区域特写</td><td>同上，往下滚</td></tr>
+          <tr><td>8</td><td>浏览器里 <code class="inline">/api/insights</code> 的 JSON</td><td>地址栏直接打开 <code class="inline">$API_URL/api/insights</code></td></tr>
+          <tr><td>9</td><td>分页 / diet 过滤生效的 JSON</td><td><code class="inline">$API_URL/api/recipes?diet_type=keto&page=1&limit=5</code></td></tr>
+        </tbody>
+      </table></div>
+      <p>存到 <code class="inline">Project2/docs/screenshots/</code>，名字就用 <code class="inline">01-resource-group.png</code> 这种顺序命名。</p>
+      <div class="cmd"><button class="copy" type="button">复制</button><pre>mkdir -p ~/Desktop/claude-computing/Project2/docs/screenshots</pre></div>
+    </div>
+  </div>
+
+  <div class="step">
+    <input type="checkbox" id="s10" />
+    <div class="step-body">
+      <p class="step-title">顺手留一份命令行证据</p>
+      <p>截图之外，纯文本的 curl 输出是最干净的证据，PDF 里贴一段很有说服力。</p>
+      <div class="cmd"><button class="copy" type="button">复制</button><pre>cd ~/Desktop/claude-computing/Project2
+{
+  echo "=== 采集时间: $(date -Is) ==="
+  echo; echo "--- GET /api/health ---";   curl -s -i "$API_URL/api/health"   | head -20
+  echo; echo "--- GET /api/insights ---"; curl -s "$API_URL/api/insights"   | python3 -m json.tool | head -40
+  echo; echo "--- GET /api/recipes?diet_type=keto&page=2&limit=5 ---"
+  curl -s "$API_URL/api/recipes?diet_type=keto&page=2&limit=5" | python3 -m json.tool | head -30
+} | tee docs/api-evidence.txt</pre></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 阶段 5 ============ -->
+<section class="phase">
+  <div class="phase-head">
+    <span class="phase-num">阶段 5</span>
+    <h2>回填 URL、导出 PDF</h2>
+    <span class="dur">~10 分钟</span>
+  </div>
+
+  <div class="step">
+    <input type="checkbox" id="s11" />
+    <div class="step-body">
+      <p class="step-title">把占位符换成真实地址</p>
+      <p>仓库里现在是 <code class="inline">&lt;function-app&gt;</code> 这类占位符 —— <b>这是故意的</b>，没部署就写死地址就是造假。现在可以换了。</p>
+      <div class="cmd"><button class="copy" type="button">复制</button><pre>cd ~/Desktop/claude-computing/Project2
+grep -rn "&lt;function-app&gt;\|&lt;static-web-app&gt;" README.md docs/ | head -20
+<span class="c"># 逐处换成 $API_URL / $DASH_URL 的真实值</span></pre></div>
+    </div>
+  </div>
+
+  <div class="step">
+    <input type="checkbox" id="s12" />
+    <div class="step-body">
+      <p class="step-title">填九个截图占位，导出 PDF</p>
+      <div class="cmd"><button class="copy" type="button">复制</button><pre>cd ~/Desktop/claude-computing/Project2
+grep -n "PENDING SCREENSHOT" docs/Phase2-Documentation.md</pre></div>
+      <p>把每处 <code class="inline">[PENDING SCREENSHOT]</code> 换成 Markdown 图片引用，例如：</p>
+      <div class="cmd"><button class="copy" type="button">复制</button><pre>![图 1：资源组总览，2026-10-02 14:32](screenshots/01-resource-group.png)</pre></div>
+      <p>然后导出 PDF（任选一种）：</p>
+      <div class="cmd"><button class="copy" type="button">复制</button><pre><span class="c"># 方式 A：VS Code 装 Markdown PDF 扩展，右键 Export (pdf)</span>
+
+<span class="c"># 方式 B：命令行（需要 pandoc 和 LaTeX）</span>
+sudo apt install -y pandoc texlive-xetex
+pandoc docs/Phase2-Documentation.md -o docs/Phase2-Documentation.pdf \
+  --pdf-engine=xelatex -V CJKmainfont="Noto Sans CJK SC" -V geometry:margin=2cm</pre></div>
+      <div class="note warn"><p>导完<b>翻一遍 PDF</b>：九张图都在、都看得清日期时间、没有任何密钥泄露。</p></div>
+    </div>
+  </div>
+
+  <div class="step">
+    <input type="checkbox" id="s13" />
+    <div class="step-body">
+      <p class="step-title">提交</p>
+      <div class="cmd"><button class="copy" type="button">复制</button><pre>cd ~/Desktop/claude-computing
+git add Project2/docs/screenshots Project2/docs/*.pdf Project2/docs/api-evidence.txt \
+        Project2/README.md Project2/docs/Phase2-Documentation.md
+git commit -m "Add Phase 2 deployment evidence and the documentation PDF"
+git push</pre></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 阶段 6 ============ -->
+<section class="phase">
+  <div class="phase-head">
+    <span class="phase-num">阶段 6</span>
+    <h2>删光资源（省钱）</h2>
+    <span class="dur">~2 分钟</span>
+  </div>
+
+  <div class="note warn">
+    <p><b>Phase 2 没有 teardown.sh</b>（Phase 3 有）。所有资源都在同一个资源组里，删组就够。<b>确认截图和 PDF 都已提交之后再删</b> —— 删了就拿不回来了。</p>
+  </div>
+
+  <div class="step">
+    <input type="checkbox" id="s14" />
+    <div class="step-body">
+      <p class="step-title">先看一眼要删什么，再删</p>
+      <div class="cmd"><button class="copy" type="button">复制</button><pre>az resource list --resource-group cpsy300-nutritional-insights-rg \
+  --query "[].{名称:name, 类型:type}" -o table
+
+az group delete --name cpsy300-nutritional-insights-rg --yes --no-wait
+echo "删除已下发。几分钟后用下面这条确认："
+echo "  az group exists --name cpsy300-nutritional-insights-rg   # 应该返回 false"</pre></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 排错 ============ -->
+<section class="phase">
+  <div class="phase-head">
+    <span class="phase-num">附录</span>
+    <h2>出问题先看这里</h2>
+  </div>
+
+  <div class="table-scroll"><table>
+    <thead><tr><th>症状</th><th>原因</th><th>怎么办</th></tr></thead>
+    <tbody>
+      <tr><td>脚本第 1 步就说数据集找不到</td><td>不在 Project2 目录里跑的</td><td><code class="inline">cd Project2</code> 后重跑</td></tr>
+      <tr><td><code class="inline">name is already taken</code></td><td>Function App 或存储账号名字全局冲突</td><td>回阶段 1 换后缀，重新 export 后重跑</td></tr>
+      <tr><td>脚本打印 <code class="inline">swa CLI was not found</code></td><td>没装 Static Web Apps CLI</td><td><code class="inline">npm i -g @azure/static-web-apps-cli</code> 后重跑脚本</td></tr>
+      <tr><td>仪表盘显示离线横幅，Console 报 CORS</td><td>CORS 没收窄到前端域名，或前端域名变了</td><td><code class="inline">az functionapp cors add --name $FUNCTION_APP_NAME --resource-group cpsy300-nutritional-insights-rg --allowed-origins "$DASH_URL"</code></td></tr>
+      <tr><td>仪表盘离线，Console 报 404</td><td>API 地址没注入进 index.html</td><td>检查 <code class="inline">curl $API_URL/api/health</code>；通的话重跑脚本第 6 步</td></tr>
+      <tr><td>第一次 curl 超时</td><td>消耗计划冷启动</td><td>正常。再调一次，第二次是热的</td></tr>
+      <tr><td><code class="inline">/api/insights</code> 返回 500</td><td>Blob 里没有 CSV，或连接字符串没配好</td><td><code class="inline">az functionapp log tail --name $FUNCTION_APP_NAME --resource-group cpsy300-nutritional-insights-rg</code> 看真实报错</td></tr>
+      <tr><td>数字跟本地不一样</td><td>上传的 CSV 不是同一份</td><td>重跑脚本第 2 步，确认传的是 <code class="inline">../Project1/data/All_Diets.csv</code></td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="note expect">
+    <p><b>Phase 3 的手册在</b> <code class="inline">Project3/docs/deployment-walkthrough.html</code>，流程不一样（要先注册 GitHub OAuth App、用 Cosmos、还要录视频）。两个项目的资源组是分开的，互不影响，先做哪个都行 —— 但 Phase 2 更简单，建议先拿它热手。</p>
+  </div>
+</section>
+
+</div>
+<script>
+(function () {
+  var KEY = "p2-walkthrough-progress";
+  var boxes = Array.prototype.slice.call(document.querySelectorAll('.step > input[type=checkbox]'));
+  var bar = document.getElementById("progressBar");
+  var count = document.getElementById("progressCount");
+
+  function render() {
+    var done = boxes.filter(function (b) { return b.checked; }).length;
+    count.textContent = done + " / " + boxes.length;
+    bar.style.width = boxes.length ? (done / boxes.length * 100) + "%" : "0%";
+  }
+
+  function save() {
+    try {
+      var state = {};
+      boxes.forEach(function (b) { if (b.checked) state[b.id] = 1; });
+      localStorage.setItem(KEY, JSON.stringify(state));
+    } catch (e) { /* 隐私窗口或站点数据被禁用，进度就不记了 */ }
+  }
+
+  function load() {
+    try {
+      var raw = localStorage.getItem(KEY);
+      if (!raw) return;
+      var state = JSON.parse(raw) || {};
+      boxes.forEach(function (b) { b.checked = !!state[b.id]; });
+    } catch (e) { /* 同上 */ }
+  }
+
+  boxes.forEach(function (b) {
+    b.addEventListener("change", function () { save(); render(); });
+  });
+
+  document.getElementById("resetBtn").addEventListener("click", function () {
+    boxes.forEach(function (b) { b.checked = false; });
+    save(); render();
+  });
+
+  load();
+  render();
+
+  // 复制按钮
+  document.querySelectorAll(".cmd .copy").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var pre = btn.parentNode.querySelector("pre");
+      var text = pre.innerText;
+      function ok() {
+        var old = btn.textContent;
+        btn.textContent = "已复制";
+        setTimeout(function () { btn.textContent = old; }, 1400);
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(ok, select);
+      } else {
+        select();
+      }
+      function select() {
+        var r = document.createRange();
+        r.selectNodeContents(pre);
+        var sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(r);
+        btn.textContent = "已选中，按 Ctrl+C";
+        setTimeout(function () { btn.textContent = "复制"; }, 2200);
+      }
+    });
+  });
+
+  // 深浅色切换
+  var themeBtn = document.getElementById("themeBtn");
+  try {
+    var saved = localStorage.getItem("p3-walkthrough-theme");
+    if (saved) document.documentElement.setAttribute("data-theme", saved);
+  } catch (e) {}
+  themeBtn.addEventListener("click", function () {
+    var cur = document.documentElement.getAttribute("data-theme");
+    var isDark = cur === "dark" ||
+      (!cur && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    var next = isDark ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    try { localStorage.setItem("p3-walkthrough-theme", next); } catch (e) {}
+  });
+})();
+</script>
+</body>
+</html>

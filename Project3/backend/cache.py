@@ -306,14 +306,21 @@ def store_recipes(recipes_list: list) -> bool:
     return wrote or bool(r)
 
 
-def get_recipes() -> Optional[list]:
-    """Read the cleaned recipe records, or None when nothing is cached."""
+def get_recipes_with_source() -> tuple:
+    """Read the cleaned recipe records and say which store answered.
+
+    Returns `(records, source)`. `records` is None when nothing is cached, and
+    `source` is one of "redis", "cosmosdb", "memory" or None, mirroring the
+    `cache_source` that `get_insights` reports. The HTTP layer needs this to
+    tell the viewer where the data really came from, instead of asserting a
+    constant.
+    """
     r = _get_redis()
     if r:
         try:
             raw = r.get("recipes_cache")
             if raw:
-                return json.loads(raw)
+                return json.loads(raw), "redis"
         except Exception as exc:
             logger.warning("Redis recipe read failed: %s", exc)
 
@@ -329,13 +336,20 @@ def get_recipes() -> Optional[list]:
                 logger.warning(
                     "Recipe chunk %d is missing; reporting the cache as empty "
                     "rather than serving a copy that may be stale", index)
-                return None
+                return None, None
             records.extend(doc.get("records", []))
         # An empty dataset that was cached on purpose returns []; None is
         # reserved for nothing having been cached at all.
-        return records
+        return records, "cosmosdb"
 
-    return _memory_store.get("recipes_cache")
+    local = _memory_store.get("recipes_cache")
+    return local, ("memory" if local is not None else None)
+
+
+def get_recipes() -> Optional[list]:
+    """Read the cleaned recipe records, or None when nothing is cached."""
+    records, _ = get_recipes_with_source()
+    return records
 
 
 # ---------------------------------------------------------------------------

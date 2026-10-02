@@ -607,8 +607,14 @@ async function updateSecurityStatus() {
 
   const claims = token ? decodeJWT(token) : null;
   if (claims && claims.exp) {
-    const hoursLeft = Math.round((claims.exp * 1000 - Date.now()) / 3600000);
-    setSecurityCard("secJWT", `Valid (${hoursLeft}h remaining)`);
+    const msLeft = claims.exp * 1000 - Date.now();
+    if (msLeft <= 0) {
+      // Rounding a negative remainder used to render "Valid (-3h remaining)".
+      setSecurityCard("secJWT", "Expired");
+    } else {
+      const hoursLeft = Math.max(1, Math.round(msLeft / 3600000));
+      setSecurityCard("secJWT", `Valid (${hoursLeft}h remaining)`);
+    }
   } else {
     setSecurityCard("secJWT", token ? "Active" : "None");
   }

@@ -4,7 +4,6 @@ Provides password hashing (bcrypt, 12 rounds), JWT creation and
 verification, and OAuth helpers for Google and GitHub.
 """
 import os
-import json
 import logging
 import secrets
 from datetime import datetime, timezone, timedelta

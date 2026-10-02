@@ -241,8 +241,9 @@ def test_top_recipes_caps_per_diet():
     rows = 8
     raw = pd.DataFrame({
         "Diet_type": ["vegan"] * rows + ["keto"] * rows,
-        "Recipe_name": [f"v{i}" for i in range(rows)]
-                       + [f"k{i}" for i in range(rows)],
+        "Recipe_name": (
+            [f"v{i}" for i in range(rows)] + [f"k{i}" for i in range(rows)]
+        ),
         "Cuisine_type": ["indian"] * rows + ["american"] * rows,
         "Protein(g)": list(range(rows)) + list(range(rows)),
         "Carbs(g)": [10.0] * (2 * rows),
@@ -351,8 +352,10 @@ def test_df_to_records_columns_and_rounding():
     df = nutrition.clean_data(raw)
     records = nutrition.df_to_records(df)
     assert len(records) == 4
-    assert list(records[0]) == ["Diet_type", "Recipe_name", "Cuisine_type",
-                               "Protein(g)", "Carbs(g)", "Fat(g)"]
+    assert list(records[0]) == [
+        "Diet_type", "Recipe_name", "Cuisine_type",
+        "Protein(g)", "Carbs(g)", "Fat(g)",
+    ]
     assert records[0]["Protein(g)"] == 10.12
     # Ratio columns are deliberately not shipped to the client.
     assert "Protein_to_Carbs_ratio" not in records[0]
