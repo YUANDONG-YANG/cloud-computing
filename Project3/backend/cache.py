@@ -299,15 +299,23 @@ def get_recipes() -> Optional[list]:
 # ---------------------------------------------------------------------------
 
 def get_cache_status() -> dict:
-    """Report cache health for /api/health."""
+    """Report cache health for /api/health.
+
+    Recipe state comes from the metadata document rather than from
+    `get_recipes`, so a health check does not pull the whole dataset back out
+    of Cosmos just to report a count.
+    """
     insights = get_insights()
-    recipes = get_recipes()
+    meta = _cosmos_read(RECIPES_META_KEY) or {}
+    local = _memory_store.get("recipes_cache")
+
     return {
         "redis": "connected" if _get_redis() else "not in use",
         "cosmosdb": "connected" if _get_cosmos() else "not configured",
         "insights_cached": insights is not None,
-        "recipes_cached": recipes is not None,
-        "recipe_count": len(recipes) if recipes else 0,
         "insights_updated_at": (insights or {}).get("updated_at", ""),
+        "recipes_cached": bool(meta) or bool(local),
+        "recipe_count": int(meta.get("record_count", 0)) or len(local or []),
+        "recipes_updated_at": meta.get("updated_at", ""),
         "source": (insights or {}).get("cache_source", "none"),
     }
