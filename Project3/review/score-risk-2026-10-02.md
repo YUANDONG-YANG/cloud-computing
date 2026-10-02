@@ -1,5 +1,11 @@
 # Project 3 (Phase 3) — Mark-Loss Analysis, 2026-10-02
 
+> **Half of this is now fixed.** The analysis below was written against the implementation as it
+> stood at commit `1049cbd`. The code defects it identifies in items 2, 4, 5, 6 and 9, and the
+> `JWT_SECRET` default, were fixed afterwards — see the **Status** section at the end for what
+> changed and what is still outstanding. The findings about deployment, OAuth registration,
+> evidence and the video all still stand, and they are the ones that carry the marks.
+
 Basis: rubric in `Project3/Project Phase 3.docx`, verified line by line against the code in
 `Project3/backend/` and `Project3/frontend/` at commit `1049cbd`.
 
@@ -73,6 +79,50 @@ should ever reach this repository.
 ## Related
 
 - `review/gap-review-2026-10-02.md` predates the implementation and is stale.
-- `docs/reports/Project3-Master-Overview.html` still shows 9 items "Complete", a self-score of
-  80/100 and 8 risks "Mitigated". With the auth bypass open and no Azure resources or screenshots in
-  the repository, those statuses are not supportable. "Code complete / evidence pending" is accurate.
+- `docs/reports/Project3-Master-Overview.html` has since been rewritten: the fabricated Node.js
+  snippets, the unmeasured "231x" figure and the 80/100 self-score are gone, and each rubric row
+  now names the evidence it still needs.
+
+---
+
+# Status after the fixes
+
+Everything in this section is code that exists in the repository and is covered by
+`Project3/tests/` (99 tests, run with `python -m pytest Project3/tests -q`). None of it has run
+against real Azure infrastructure.
+
+## Fixed
+
+| Was | Now |
+|---|---|
+| Recipes lived only in Redis and a process-local dict, so without Redis the API served a 15-row sample list and pagination collapsed to one page (items 3, 4, 5 — 20 marks) | Cosmos DB is the durable store, written in chunks under the 2 MB document limit and readable from any function instance. Redis is optional and skipped unless `REDIS_HOST` is set |
+| `login.html` minted an unsigned token whenever `fetch` rejected, and `isAuthenticated()` never checked a signature, so any password worked with the API down or CORS misconfigured | The forged-token path is deleted. `/api/insights` and `/api/recipes` verify the JWT and answer 401; the page uses `authFetch` and redirects on 401 |
+| Sample data mirrored the real result set, making a broken cache indistinguishable from a working one | Both endpoints answer 503 when nothing is cached. The sample data is behind `ENABLE_DEMO_FALLBACK`, default off, and the dashboard names the store it was served from |
+| `JWT_SECRET` defaulted to a published string | No default. Fatal if unset on Azure, warned locally |
+| OAuth had no CSRF defence, linked accounts on an unverified email, and returned the token in the query string | Signed 10-minute `state`; only a provider-verified email may claim an existing account; the token comes back in the URL fragment |
+| The security cards asserted "AES-256" in markup | They read live configuration from `/api/health`, which says plainly when no database is configured |
+| `deploy.sh` provisioned Redis Basic C0 and two Cosmos containers at default provisioned throughput, roughly $62/month and billing while idle | No Redis; Cosmos is serverless. `teardown.sh` deletes the resource group |
+| `deploy.sh` never set `FRONTEND_URL` or the OAuth client settings, so the callback redirected to localhost and consent went out with an empty `client_id` | Both are set, and the frontend deploys first so its URL is known |
+
+Three further defects surfaced while writing the tests and are fixed: `hash_password` passed
+passwords straight to bcrypt, which accepts 72 bytes — bcrypt 4 truncated silently and bcrypt 5
+raises, so on bcrypt 5 a long password returned a 500 rather than a 400; an empty-but-cached
+dataset read back as a cache miss; and a missing Cosmos chunk fell through to the process-local
+copy, which can hold a different dataset than the metadata describes.
+
+The per-diet counts in the sample data were also invented — it claimed dash 1,546, keto 1,580,
+mediterranean 1,564, paleo 1,543, vegan 1,573, while the dataset holds 1,745, 1,512, 1,753, 1,274
+and 1,522. Corrected, and the same wrong figures were corrected in the overview report.
+
+## Still outstanding — this is where the marks are
+
+| # | What | Marks at stake | Needs |
+|---|---|---|---|
+| 1 | Nothing is deployed | gates everything | An Azure subscription, then `./deploy.sh` |
+| 2 | No OAuth app registered | 10, binary | A GitHub OAuth App (about a minute) and four app settings. GitHub rather than Google: the rubric asks for at least one, and Google additionally requires a Cloud project and a consent screen |
+| 3 | No evidence captured | ~20 across items 1, 2, 8 | Trigger log excerpts, a Cosmos Data Explorer screenshot of the encryption setting and of a stored bcrypt hash, and `curl -i /api/insights` returning 401 |
+| 4 | No video | 20 | Record last, after 1–3. `docs/demo-plan.md` has the run sheet and the measured before/after numbers |
+
+`data/All_Diets_v2.csv` is ready for the "cleaning runs once per change" demo. It must be uploaded
+**as `All_Diets.csv`** with `--overwrite true`, because the trigger is bound to that literal blob
+path; uploading it under its own name fires nothing.
