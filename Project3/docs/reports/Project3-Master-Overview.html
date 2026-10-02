@@ -68,7 +68,8 @@ footer{text-align:center;padding:2rem 1rem;color:var(--mute);font-size:.85rem;bo
   <p class="sub" style="margin-top:.6rem">
     <strong>Document status:</strong>
     <span class="pill warn">Code complete &middot; not deployed</span>
-    <span class="pill bad">No evidence captured</span>
+    <span class="pill bad">No deployment evidence captured</span>
+    <span class="pill ok">143 backend tests passing</span>
     <span class="pill bad">Demo video not recorded</span>
   </p>
 </header>
@@ -80,8 +81,11 @@ footer{text-align:center;padding:2rem 1rem;color:var(--mute);font-size:.85rem;bo
   <h3 style="margin-top:0">What this document does and does not claim</h3>
   <p>This is a <strong>status report on source code</strong>, not a record of a running system. Every feature
   below is implemented in this repository and can be read and reviewed. <strong>None of it has been
-  deployed.</strong> As of 2026-10-02 there are no Azure resources, no screenshots, no logs, no captured
-  <code class="inline-code">curl</code> output, and no demo recording anywhere in the repository.</p>
+  deployed.</strong> As of 2026-10-02 there are no Azure resources, no screenshots, no Azure or
+  Application&nbsp;Insights logs, no captured <code class="inline-code">curl</code> output, and no demo
+  recording anywhere in the repository. The single exception, and the only executed result in this document, is
+  <code class="inline-code">Project3/docs/evidence/tests.log</code>: a captured run of the backend test suite on
+  a developer machine, with Cosmos and Redis stubbed out (&sect;7).</p>
 
   <p>Three things are therefore outside what the code can establish on its own:</p>
   <ul style="font-size:.9rem">
@@ -100,8 +104,10 @@ footer{text-align:center;padding:2rem 1rem;color:var(--mute);font-size:.85rem;bo
   the self-score was assigned to unbuilt work. See
   <code class="inline-code">Project3/review/score-risk-2026-10-02.md</code> for the current mark-risk analysis.
   Earlier revisions of this report also contained illustrative Node.js snippets and performance figures for an
-  implementation that does not exist; the code shown below is now quoted from the actual Python source, with
-  file and line references.</p>
+  implementation that does not exist; the code shown below is now quoted from the actual Python source. It is
+  cited by file and <em>function</em> name rather than by line number: the backend is still being edited, line
+  numbers drift between revisions, and a stale <code class="inline-code">file.py:NN</code> that drops a reader
+  into the wrong function is worse than no citation at all.</p>
 
   <h4>Status legend</h4>
   <p class="sub" style="font-size:.88rem">Each status below means exactly one of three things:</p>
@@ -131,6 +137,7 @@ footer{text-align:center;padding:2rem 1rem;color:var(--mute);font-size:.85rem;bo
     <li><a href="#auth">Authentication &amp; Security</a></li>
     <li><a href="#dashboard">Dashboard UI</a></li>
     <li><a href="#code">Honest Failure Modes</a></li>
+    <li><a href="#testing">Testing &amp; Demo Preparation</a></li>
     <li><a href="#rubric">Rubric / Status &amp; Evidence Gaps</a></li>
     <li><a href="#security">Security Analysis</a></li>
     <li><a href="#team">Team &amp; Contributions</a></li>
@@ -307,7 +314,7 @@ the Function App by absolute URL. <code class="inline-code">frontend/config.js</
   today. Note also that a Consumption-plan blob trigger polls rather than subscribing to events, so the first
   invocation after an upload can lag by minutes &mdash; that needs to be accounted for in the demo.</p>
 
-  <h4>Blob Trigger Function <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; actual source, <code class="inline-code">backend/function_app.py:180-243</code></span></h4>
+  <h4>Blob Trigger Function <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; actual source, <code class="inline-code">backend/function_app.py</code>, <code class="inline-code">blob_trigger_clean()</code></span></h4>
 <pre><code># backend/function_app.py
 @app.blob_trigger(
     arg_name="myblob",
@@ -352,7 +359,7 @@ def blob_trigger_clean(myblob: func.InputStream):
 
     except Exception as exc:
         logger.exception("Blob trigger failed: %s", exc)
-        raise   # re-raise so the host records an invocation failure</code></pre>
+        raise   # the host then records an invocation failure</code></pre>
 
   <h4>How the Blob Trigger Works</h4>
   <svg viewBox="0 0 780 120" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:780px;display:block;margin:.8rem auto">
@@ -386,17 +393,21 @@ def blob_trigger_clean(myblob: func.InputStream):
 <h3>2.2 Result Caching &mdash; Cosmos DB (10 marks) <span class="pill warn">Code complete &middot; unverified</span></h3>
 <div class="section-card">
   <p>After cleaning, the function pre-computes aggregated results (average macros per diet, recipe counts, totals) and stores them in <strong>Cosmos DB</strong>, which is the durable cache. Redis is used only when <code class="inline-code">REDIS_HOST</code> is set and is not provisioned by the deploy script. Dashboard reads never re-process the raw CSV &mdash; they fetch pre-computed results from the cache.</p>
-  <p>The cleaned recipe records are written in <strong>chunks of 2,000</strong> because a Cosmos document may not exceed 2&nbsp;MB and the full dataset serializes to roughly 1.2&nbsp;MB. Chunking also matters for correctness: the blob trigger and the HTTP handlers are not guaranteed to run in the same process on Azure Functions, so a process-local cache would leave the API with nothing to serve. A <code class="inline-code">recipes_meta</code> document records the chunk count, orphan chunks from a larger previous dataset are deleted before the new count is published, and a reader that finds a chunk missing treats the whole cache as incomplete rather than serving a partial dataset.</p>
+  <p>The cleaned recipe records are written in <strong>chunks of 2,000</strong> because a Cosmos document may not exceed 2&nbsp;MB and the full dataset serializes to roughly 1.2&nbsp;MB. Chunking also matters for correctness: the blob trigger and the HTTP handlers are not guaranteed to run in the same process on Azure Functions, so a process-local cache would leave the API with nothing to serve. A <code class="inline-code">recipes_meta</code> document records the chunk count. The write order is deliberate: the old metadata document is deleted <em>before</em> the chunks are replaced and the new one is written <em>last</em>, so a reader arriving mid-rewrite sees an empty cache (which the endpoints turn into a 503) rather than a set spliced together from the old dataset and the new one. Orphan chunks from a larger previous dataset are deleted before the new count is published, and a reader that finds a chunk missing reports the cache as empty rather than serving a partial dataset.</p>
   <p class="sub"><strong>Evidence still needed:</strong> a Cosmos Data Explorer screenshot showing the
   <code class="inline-code">cache</code> container with <code class="inline-code">insights_cache</code>,
   <code class="inline-code">recipes_meta</code> and the <code class="inline-code">recipes_chunk_000&hellip;003</code>
   documents; and a <code class="inline-code">curl</code> response from
-  <code class="inline-code">/api/insights</code> showing <code class="inline-code">"cache_source":&nbsp;"cosmosdb"</code>
-  rather than <code class="inline-code">"memory"</code> or a 503. Neither exists today.</p>
+  <code class="inline-code">/api/insights</code> showing <code class="inline-code">"source":&nbsp;"cosmosdb"</code>
+  rather than <code class="inline-code">"memory"</code> or a 503. (The handler maps the cache layer's
+  <code class="inline-code">cache_source</code> onto the response field <code class="inline-code">source</code>,
+  so <code class="inline-code">source</code> is the key to look for in the JSON.) Neither exists today.</p>
 
-  <h4>Caching Logic <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; actual source, <code class="inline-code">backend/cache.py:229-317</code></span></h4>
+  <h4>Caching Logic <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; actual source, <code class="inline-code">backend/cache.py</code>, <code class="inline-code">store_recipes()</code> and <code class="inline-code">get_recipes()</code></span></h4>
 <pre><code># backend/cache.py
-CHUNK_SIZE = 2000   # a Cosmos document may not exceed 2 MB
+# A Cosmos document may not exceed 2 MB.  The full cleaned dataset serializes
+# to roughly 1.2 MB, so it is split across documents of this many records.
+CHUNK_SIZE = 2000
 
 def store_recipes(recipes_list: list) -> bool:
     """Persist the cleaned recipe records for search, filter and pagination.
@@ -412,6 +423,15 @@ def store_recipes(recipes_list: list) -> bool:
     previous = _cosmos_read(RECIPES_META_KEY) or {}
     previous_count = int(previous.get("chunk_count", 0))
 
+    # Retire the metadata before touching the chunks.  The chunk documents are
+    # replaced one at a time, so mid-rewrite the set is a mixture of the new
+    # dataset and the old one; a reader that still trusted the old metadata
+    # would splice the two and serve the result as if it were valid.  With the
+    # metadata gone the cache reads as empty until the new set is complete,
+    # which is the honest answer and the one the endpoints turn into a 503.
+    if previous:
+        _cosmos_delete(RECIPES_META_KEY)
+
     wrote = True
     for index, chunk in enumerate(chunks):
         if not _cosmos_write({
@@ -424,19 +444,31 @@ def store_recipes(recipes_list: list) -> bool:
 
     if wrote:
         # Drop chunks left over from a larger previous dataset before
-        # publishing the new count, so a reader never sees a mixed set.
+        # publishing the new count.
         for index in range(len(chunks), previous_count):
             _cosmos_delete(f"recipes_chunk_{index:03d}")
 
         wrote = _cosmos_write({
-            "id": RECIPES_META_KEY, "partitionKey": "cache",
-            "chunk_count": len(chunks), "record_count": total,
+            "id": RECIPES_META_KEY,
+            "partitionKey": "cache",
+            "chunk_count": len(chunks),
+            "record_count": total,
             "updated_at": updated_at,
         })
+        #   ... logs the record and document counts ...
 
     r = _get_redis()          # None unless REDIS_HOST is configured
     if r:
-        r.set("recipes_cache", json.dumps(recipes_list))
+        try:
+            r.set("recipes_cache", json.dumps(recipes_list))
+            logger.info("Recipes mirrored to Redis (%d records)", total)
+        except Exception as exc:
+            # Redis is read first and the keys carry no TTL, so a key that
+            # cannot be refreshed must not stay behind: drop it and let reads
+            # fall through to Cosmos.
+            logger.warning("Redis recipe write failed (%s); dropping the "
+                           "stale key", exc)
+            _redis_discard(r, "recipes_cache")
 
     _memory_store["recipes_cache"] = recipes_list
     return wrote or bool(r)
@@ -446,9 +478,12 @@ def get_recipes() -> Optional[list]:
     """Read the cleaned recipe records, or None when nothing is cached."""
     r = _get_redis()
     if r:
-        raw = r.get("recipes_cache")
-        if raw:
-            return json.loads(raw)
+        try:
+            raw = r.get("recipes_cache")
+            if raw:
+                return json.loads(raw)
+        except Exception as exc:
+            logger.warning("Redis recipe read failed: %s", exc)
 
     meta = _cosmos_read(RECIPES_META_KEY)
     if meta:
@@ -456,13 +491,17 @@ def get_recipes() -> Optional[list]:
         for index in range(int(meta.get("chunk_count", 0))):
             doc = _cosmos_read(f"recipes_chunk_{index:03d}")
             if doc is None:
-                logger.warning("Recipe chunk %d missing; cache is incomplete",
-                               index)
-                records = []
-                break
+                # The durable cache disagrees with its own metadata. Report a
+                # miss instead of falling through to the process-local copy,
+                # which may hold an entirely different dataset.
+                logger.warning(
+                    "Recipe chunk %d is missing; reporting the cache as empty "
+                    "rather than serving a copy that may be stale", index)
+                return None
             records.extend(doc.get("records", []))
-        if records:
-            return records
+        # An empty dataset that was cached on purpose returns []; None is
+        # reserved for nothing having been cached at all.
+        return records
 
     return _memory_store.get("recipes_cache")</code></pre>
 
@@ -487,7 +526,8 @@ def get_recipes() -> Optional[list]:
   <p class="sub"><strong>Evidence still needed:</strong> the API already returns its own
   <code class="inline-code">response_time_ms</code> on every <code class="inline-code">/api/recipes</code> and
   <code class="inline-code">/api/insights</code> response
-  (<code class="inline-code">backend/function_app.py:411</code>), so two <code class="inline-code">curl</code>
+  (<code class="inline-code">backend/function_app.py</code>, in <code class="inline-code">get_recipes_api()</code>
+  and <code class="inline-code">get_insights_api()</code>), so two <code class="inline-code">curl</code>
   outputs &mdash; one against the Phase 2 endpoint, one against the Phase 3 cached endpoint &mdash; would
   substitute a measurement for this estimate. Until those are captured, no number belongs here. One caveat worth
   measuring rather than assuming: <code class="inline-code">get_recipes()</code> currently reads <em>all</em>
@@ -496,34 +536,44 @@ def get_recipes() -> Optional[list]:
   <h4>Cached Data Structure <span class="pill warn">Shape is from the code; values are computed locally, not read from a deployed cache</span></h4>
   <p class="sub">The table below shows the shape of the <code class="inline-code">insights_cache</code> document
   and the aggregate values produced by running the cleaning code against the local dataset. They have
-  <strong>not</strong> been read back out of a deployed Cosmos container. Keys are shown in the Redis
-  <code class="inline-code">diet:*</code> hash form the optional mirror uses; in Cosmos the same values live
-  under <code class="inline-code">average_macros</code> and <code class="inline-code">recipe_counts</code>
-  inside a single document.</p>
+  <strong>not</strong> been read back out of a deployed Cosmos container. The field paths are the real ones: a
+  single Cosmos document with id <code class="inline-code">insights_cache</code> holds the whole payload under
+  <code class="inline-code">data</code>, so the values below live at
+  <code class="inline-code">data.average_macros.&lt;diet&gt;</code> and
+  <code class="inline-code">data.recipe_counts.&lt;diet&gt;</code>.</p>
+  <p class="sub">When Redis is in use it mirrors the same payloads rather than re-shaping them.
+  <code class="inline-code">cache.py</code> writes exactly <strong>two Redis string keys</strong> with
+  <code class="inline-code">r.set(...)</code> &mdash; <code class="inline-code">insights_cache</code> (the JSON
+  document above) and <code class="inline-code">recipes_cache</code> (the whole record list as one JSON
+  string) &mdash; and reads them back with <code class="inline-code">r.get(...)</code>. There are no Redis
+  hashes: <code class="inline-code">hset</code> and <code class="inline-code">hgetall</code> appear nowhere in
+  the codebase, and neither does a <code class="inline-code">diet:*</code> key prefix. An earlier revision of
+  this report documented such a per-diet hash scheme; that was residue from a withdrawn Redis-first draft and
+  described code that was never written.</p>
   <div class="scroll">
   <table>
-    <tr><th>Cache Key</th><th>Field</th><th>Value (computed locally)</th></tr>
-    <tr><td rowspan="4"><code class="inline-code">diet:dash</code></td><td>count</td><td>1,745</td></tr>
-    <tr><td>avgProtein</td><td>69.28</td></tr>
-    <tr><td>avgCarbs</td><td>160.54</td></tr>
-    <tr><td>avgFat</td><td>101.15</td></tr>
-    <tr><td rowspan="4"><code class="inline-code">diet:keto</code></td><td>count</td><td>1,512</td></tr>
-    <tr><td>avgProtein</td><td>101.27</td></tr>
-    <tr><td>avgCarbs</td><td>57.97</td></tr>
-    <tr><td>avgFat</td><td>153.12</td></tr>
-    <tr><td rowspan="4"><code class="inline-code">diet:mediterranean</code></td><td>count</td><td>1,753</td></tr>
-    <tr><td>avgProtein</td><td>101.11</td></tr>
-    <tr><td>avgCarbs</td><td>152.91</td></tr>
-    <tr><td>avgFat</td><td>101.42</td></tr>
-    <tr><td rowspan="4"><code class="inline-code">diet:paleo</code></td><td>count</td><td>1,274</td></tr>
-    <tr><td>avgProtein</td><td>88.67</td></tr>
-    <tr><td>avgCarbs</td><td>129.55</td></tr>
-    <tr><td>avgFat</td><td>135.67</td></tr>
-    <tr><td rowspan="4"><code class="inline-code">diet:vegan</code></td><td>count</td><td>1,522</td></tr>
-    <tr><td>avgProtein</td><td>56.16</td></tr>
-    <tr><td>avgCarbs</td><td>254.00</td></tr>
-    <tr><td>avgFat</td><td>103.30</td></tr>
-    <tr><td><code class="inline-code">total_recipes</code></td><td>&mdash;</td><td>7,806</td></tr>
+    <tr><th>Diet</th><th>Field (under <code class="inline-code">data</code>)</th><th>Value (computed locally)</th></tr>
+    <tr><td rowspan="4"><code class="inline-code">dash</code></td><td><code class="inline-code">recipe_counts.dash</code></td><td>1,745</td></tr>
+    <tr><td><code class="inline-code">average_macros.&lt;diet&gt;.Protein</code></td><td>69.28</td></tr>
+    <tr><td><code class="inline-code">average_macros.&lt;diet&gt;.Carbs</code></td><td>160.54</td></tr>
+    <tr><td><code class="inline-code">average_macros.&lt;diet&gt;.Fat</code></td><td>101.15</td></tr>
+    <tr><td rowspan="4"><code class="inline-code">keto</code></td><td><code class="inline-code">recipe_counts.keto</code></td><td>1,512</td></tr>
+    <tr><td><code class="inline-code">average_macros.&lt;diet&gt;.Protein</code></td><td>101.27</td></tr>
+    <tr><td><code class="inline-code">average_macros.&lt;diet&gt;.Carbs</code></td><td>57.97</td></tr>
+    <tr><td><code class="inline-code">average_macros.&lt;diet&gt;.Fat</code></td><td>153.12</td></tr>
+    <tr><td rowspan="4"><code class="inline-code">mediterranean</code></td><td><code class="inline-code">recipe_counts.mediterranean</code></td><td>1,753</td></tr>
+    <tr><td><code class="inline-code">average_macros.&lt;diet&gt;.Protein</code></td><td>101.11</td></tr>
+    <tr><td><code class="inline-code">average_macros.&lt;diet&gt;.Carbs</code></td><td>152.91</td></tr>
+    <tr><td><code class="inline-code">average_macros.&lt;diet&gt;.Fat</code></td><td>101.42</td></tr>
+    <tr><td rowspan="4"><code class="inline-code">paleo</code></td><td><code class="inline-code">recipe_counts.paleo</code></td><td>1,274</td></tr>
+    <tr><td><code class="inline-code">average_macros.&lt;diet&gt;.Protein</code></td><td>88.67</td></tr>
+    <tr><td><code class="inline-code">average_macros.&lt;diet&gt;.Carbs</code></td><td>129.55</td></tr>
+    <tr><td><code class="inline-code">average_macros.&lt;diet&gt;.Fat</code></td><td>135.67</td></tr>
+    <tr><td rowspan="4"><code class="inline-code">vegan</code></td><td><code class="inline-code">recipe_counts.vegan</code></td><td>1,522</td></tr>
+    <tr><td><code class="inline-code">average_macros.&lt;diet&gt;.Protein</code></td><td>56.16</td></tr>
+    <tr><td><code class="inline-code">average_macros.&lt;diet&gt;.Carbs</code></td><td>254.00</td></tr>
+    <tr><td><code class="inline-code">average_macros.&lt;diet&gt;.Fat</code></td><td>103.30</td></tr>
+    <tr><td>&mdash;</td><td><code class="inline-code">total_recipes</code></td><td>7,806</td></tr>
   </table>
   </div>
 </div>
@@ -539,13 +589,13 @@ def get_recipes() -> Optional[list]:
   the Function App</strong>, over the cleaned record list read from the Cosmos cache &mdash; it is not a Cosmos
   SQL query with a partition-key filter. An earlier revision of this report claimed the latter; the code does
   not do that. The dropdown options are populated from the cached dataset rather than hardcoded
-  (<code class="inline-code">frontend/app.js:145-156</code>).</p>
+  (<code class="inline-code">frontend/app.js</code>, <code class="inline-code">populateDietFilter()</code>).</p>
   <p class="sub"><strong>Evidence still needed:</strong> a screenshot of the dashboard with a diet selected and
   the result count updated, plus a <code class="inline-code">curl</code> output for
   <code class="inline-code">/api/recipes?diet=keto</code> showing a <code class="inline-code">total</code> that
   matches the real dataset count for that diet.</p>
 
-  <h4>Filter, Search and Pagination &mdash; one endpoint <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; actual source, <code class="inline-code">backend/function_app.py:376-412</code></span></h4>
+  <h4>Filter, Search and Pagination &mdash; one endpoint <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; actual source, <code class="inline-code">backend/function_app.py</code>, <code class="inline-code">get_recipes_api()</code></span></h4>
 <pre><code># backend/function_app.py - inside get_recipes_api, after the 401 guard
     # Apply diet filter
     diet = req.params.get("diet", "").strip().lower()
@@ -564,24 +614,35 @@ def get_recipes() -> Optional[list]:
 
     # Pagination
     total = len(recipes)
-    page = max(1, int(req.params.get("page", "1")))
-    page_size = min(100, max(1, int(req.params.get("pageSize", "20"))))
+    try:
+        page = max(1, int(req.params.get("page", "1")))
+    except ValueError:
+        page = 1
+    try:
+        page_size = min(100, max(1, int(req.params.get("pageSize", "20"))))
+    except ValueError:
+        page_size = 20
 
     total_pages = max(1, (total + page_size - 1) // page_size)
     page = min(page, total_pages)
     offset = (page - 1) * page_size
     page_results = recipes[offset: offset + page_size]
 
+    elapsed = round((time.time() - start) * 1000, 1)
     return _json_response({
-        "status": "ok", "source": source,
+        "status": "ok",
+        "source": source,
         "response_time_ms": elapsed,
-        "total": total, "page": page, "pageSize": page_size,
+        "total": total,
+        "page": page,
+        "pageSize": page_size,
         "totalPages": total_pages,
-        "hasNext": page &lt; total_pages, "hasPrev": page &gt; 1,
+        "hasNext": page &lt; total_pages,
+        "hasPrev": page &gt; 1,
         "results": page_results,
     })</code></pre>
 
-  <h4>Frontend Filter Component <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; actual source, <code class="inline-code">frontend/app.js:74-80, 161-188</code></span></h4>
+  <h4>Frontend Filter Component <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; actual source, <code class="inline-code">frontend/app.js</code>, <code class="inline-code">initDashboard()</code> and <code class="inline-code">loadRecipes()</code></span></h4>
 <pre><code>// app.js - the filter and search controls share one request path
 if (dietFilter) {
   dietFilter.addEventListener("change", () =&gt; {
@@ -611,7 +672,9 @@ async function loadRecipes() {
       return;
     }
   } catch (err) {
+    console.error("Recipes request failed:", err);
     showTableMessage("Cannot reach the API.");
+    renderPagination({ page: 1, totalPages: 1, total: 0 });
     return;
   }
 
@@ -663,12 +726,18 @@ async function loadRecipes() {
   <code class="inline-code">q</code>, and the frontend debounce is 350&nbsp;ms. See the endpoint source in
   &sect;3.1 above &mdash; filter, search and pagination are one handler.</p>
   <p class="sub"><strong>Evidence still needed:</strong> a <code class="inline-code">curl</code> output for
-  <code class="inline-code">/api/recipes?search=chicken</code> with a real
-  <code class="inline-code">total</code>, and a dashboard screenshot of the same search. The result count for
-  any given keyword is currently unknown, because the search has never run against the real dataset in a
-  deployed environment.</p>
+  <code class="inline-code">/api/recipes?search=chicken</code>, and a dashboard screenshot of the same search.
+  What is <em>not</em> missing is the expected number. The result count is a property of the dataset and the
+  filter code, not of a deployment, so it is already known and tabulated:
+  <code class="inline-code">search=chicken</code> returns <strong>732 results across 37 pages</strong> on
+  version&nbsp;1 of the dataset and <strong>680 across 34 pages</strong> on version&nbsp;2
+  (<code class="inline-code">Project3/docs/demo-plan.md</code>, the &ldquo;totals the presenter can read off
+  the pager&rdquo; table; recomputed independently from both CSVs and exact in both cases). An earlier revision
+  of this report called the count &ldquo;currently unknown&rdquo; &mdash; a screenshot is still needed, but the
+  number is not unknown, and a presenter who sees 732 on camera should recognise it as correct rather than
+  suspect a broken cache.</p>
 
-  <h4>Frontend Search Component <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; actual source, <code class="inline-code">frontend/app.js:82-91</code></span></h4>
+  <h4>Frontend Search Component <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; actual source, <code class="inline-code">frontend/app.js</code>, <code class="inline-code">initDashboard()</code></span></h4>
 <pre><code>// app.js - keyword search, debounced 350 ms
 if (searchInput) {
   searchInput.addEventListener("input", () =&gt; {
@@ -693,7 +762,7 @@ if (searchInput) {
     <circle cx="352" cy="61" r="7" fill="none" stroke="var(--accent)" stroke-width="1.5"/>
     <line x1="357" y1="66" x2="363" y2="72" stroke="var(--accent)" stroke-width="1.5"/>
     <!-- Result count -->
-    <text x="390" y="66" font-size="11" fill="var(--mute)" font-weight="600">Found N recipes for "chicken"</text>
+    <text x="390" y="66" font-size="11" fill="var(--mute)" font-weight="600">Found 732 recipes for "chicken"</text>
     <!-- Mini results -->
     <rect x="20" y="90" width="660" height="18" rx="3" fill="var(--okbg)" stroke="var(--ok)" stroke-width=".5"/>
     <text x="30" y="103" font-size="10" fill="var(--ok)">1. Keto Chicken Bowl (keto) - P: 42.5g | C: 8.2g | F: 28.7g</text>
@@ -715,10 +784,10 @@ if (searchInput) {
   visible. This is the one item where a broken cache is silently fatal: if the cache is empty and the demo
   fallback were switched on, the 15-row sample yields <code class="inline-code">totalPages = 1</code> and
   <code class="inline-code">renderPagination</code> renders <em>no controls at all</em>
-  (<code class="inline-code">frontend/app.js:482-524</code>) &mdash; the feature would be invisible on video.
+  (<code class="inline-code">frontend/app.js</code>, <code class="inline-code">renderPagination()</code>) &mdash; the feature would be invisible on video.
   The fallback is off by default for exactly this reason.</p>
 
-  <h4>Pagination Component <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; actual source, <code class="inline-code">frontend/app.js:482-532</code></span></h4>
+  <h4>Pagination Component <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; actual source, <code class="inline-code">frontend/app.js</code>, <code class="inline-code">renderPagination()</code></span></h4>
 <pre><code>// app.js - renderPagination reads the metadata the API returns
 function renderPagination(result) {
   const container = document.getElementById("pagination");
@@ -775,6 +844,15 @@ function renderPagination(result) {
   <strong>verifiable right now</strong> by reading <code class="inline-code">backend/auth.py</code> &mdash; that
   part needs no deployment to check. What is unverified is everything downstream of it: no user has ever been
   written to a real Cosmos container, because no Cosmos account exists.</p>
+  <p>One boundary worth calling out because it is the difference between a 400 and a 500: bcrypt hashes at
+  most 72 bytes. <code class="inline-code">validate_registration</code> measures the password in
+  <strong>bytes, not characters</strong>, and rejects anything longer with
+  <code class="inline-code">400 &ldquo;Password must be at most 72 bytes.&rdquo;</code>
+  (<code class="inline-code">backend/models.py</code>, <code class="inline-code">validate_registration()</code>);
+  <code class="inline-code">hash_password</code> raises above the same limit as a backstop. Silently truncating
+  &mdash; which older bcrypt releases did &mdash; would make two different passwords interchangeable, and
+  letting the hash call raise would surface a long password as a 500. Both outcomes are covered by tests
+  (&sect;7).</p>
   <p class="sub"><strong>Evidence still needed:</strong> a Cosmos Data Explorer screenshot of one document in
   the <code class="inline-code">users</code> container showing a
   <code class="inline-code">$2b$12$&hellip;</code> hash in the password field and no plaintext password; plus a
@@ -783,12 +861,26 @@ function renderPagination(result) {
   (<code class="inline-code">_memory_users</code>), so register-then-login can fail across instances &mdash;
   which is another reason the database has to actually exist before recording.</p>
 
-  <h4>Password Hashing and Token Issue <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; actual source, <code class="inline-code">backend/auth.py:65-95</code></span></h4>
+  <h4>Password Hashing and Token Issue <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; actual source, <code class="inline-code">backend/auth.py</code>, <code class="inline-code">hash_password()</code>, <code class="inline-code">verify_password()</code>, <code class="inline-code">create_token()</code></span></h4>
 <pre><code># backend/auth.py
+MAX_PASSWORD_BYTES = 72
+
+
 def hash_password(plain: str) -> str:
-    """Hash a plaintext password with bcrypt (12 rounds)."""
-    salt = bcrypt.gensalt(rounds=12)
-    return bcrypt.hashpw(plain.encode("utf-8"), salt).decode("utf-8")
+    """Hash a plaintext password with bcrypt (12 rounds).
+
+    bcrypt itself accepts at most 72 bytes. Version 4 truncated anything
+    longer in silence, version 5 raises, and neither is a good outcome: the
+    first makes two different passwords interchangeable, the second turns a
+    long password into a 500. Callers validate the length first; this is the
+    backstop.
+    """
+    encoded = plain.encode("utf-8")
+    if len(encoded) > MAX_PASSWORD_BYTES:
+        raise ValueError(
+            f"Password exceeds bcrypt's {MAX_PASSWORD_BYTES}-byte limit"
+        )
+    return bcrypt.hashpw(encoded, bcrypt.gensalt(rounds=12)).decode("utf-8")
 
 
 def verify_password(plain: str, hashed: str) -> bool:
@@ -812,10 +904,10 @@ def create_token(user_id: str, email: str, name: str) -> str:
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)</code></pre>
 
-  <h4>No default signing key <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; <code class="inline-code">backend/auth.py:22-36</code></span></h4>
-<pre><code># A known default signing key would let anyone mint a valid token, so an
-# unset secret is a hard failure in a deployment and only a warning locally.
-# WEBSITE_INSTANCE_ID is set by the Functions host on Azure.
+  <h4>No default signing key <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; <code class="inline-code">backend/auth.py</code>, at import</span></h4>
+<pre><code># WEBSITE_INSTANCE_ID is set by the Functions host on Azure and absent under
+# `func start`, so an unset secret is a hard failure in a deployment and only a
+# warning locally.  A known default signing key would let anyone mint a token.
 if not JWT_SECRET:
     if os.environ.get("WEBSITE_INSTANCE_ID"):
         raise RuntimeError(
@@ -827,10 +919,10 @@ if not JWT_SECRET:
 
   <h4>Endpoints</h4>
   <p class="sub"><code class="inline-code">POST /api/auth/register</code>
-  (<code class="inline-code">backend/function_app.py:486</code>) validates the input, rejects a duplicate email
+  (<code class="inline-code">backend/function_app.py</code>, <code class="inline-code">register()</code>) validates the input, rejects a duplicate email
   with 409, hashes with <code class="inline-code">hash_password</code> and stores the user document.
   <code class="inline-code">POST /api/auth/login</code>
-  (<code class="inline-code">backend/function_app.py:536</code>) looks the user up, calls
+  (<code class="inline-code">backend/function_app.py</code>, <code class="inline-code">login()</code>) looks the user up, calls
   <code class="inline-code">verify_password</code>, returns 401 on either a missing user or a bad password, and
   issues a token with <code class="inline-code">create_token</code>. Earlier revisions of this report printed
   Node.js implementations of these two endpoints; no such code exists in this repository, and those snippets
@@ -871,18 +963,24 @@ if not JWT_SECRET:
 <h3>4.2 OAuth Integration &mdash; Google &amp; GitHub (10 marks) <span class="pill warn">Code complete</span> <span class="pill bad">No OAuth app registered</span></h3>
 <div class="section-card">
   <p>Both providers are implemented as a <strong>custom authorization-code flow in the Function App</strong>
-  (<code class="inline-code">backend/auth.py:123-212, 239-346</code>,
-  <code class="inline-code">backend/function_app.py:617-739</code>). There is no Azure Static Web Apps resource
+  (<code class="inline-code">backend/auth.py</code>, <code class="inline-code">create_state()</code> through
+  <code class="inline-code">verify_state_request()</code> and the two
+  <code class="inline-code">*_exchange_code()</code> helpers;
+  <code class="inline-code">backend/function_app.py</code>, the four
+  <code class="inline-code">oauth_*</code> handlers and <code class="inline-code">_handle_oauth_user()</code>).
+  There is no Azure Static Web Apps resource
   and no <code class="inline-code">staticwebapp.config.json</code> in this repository, so the built-in
   platform auth that an earlier revision of this report described is not what the code does. The implementation
   is complete and includes two things worth noting: the <code class="inline-code">state</code> parameter is a
-  short-lived signed JWT that the callback verifies before doing anything, and account linking is gated on the
+  short-lived signed JWT that is <strong>also mirrored in an <code class="inline-code">HttpOnly</code> cookie</strong>,
+  with the callback requiring both to agree before it does anything; and account linking is gated on the
   provider reporting a <strong>verified</strong> email (GitHub requires a second call to
   <code class="inline-code">/user/emails</code> to establish that).</p>
 
   <p><strong>This feature cannot work today, and not because of the code.</strong> No Google Cloud OAuth client
   and no GitHub OAuth app have been registered, so there is no client ID or secret to configure. The credentials
-  are read from app settings (<code class="inline-code">backend/auth.py:38-53</code>) and
+  are read from app settings (<code class="inline-code">backend/auth.py</code>, the configuration block at the
+  top of the module) and
   <code class="inline-code">deploy.sh, the app-settings step</code> passes them through from the caller's environment &mdash;
   but if they are unset it deploys empty strings, the consent redirect goes out with an empty
   <code class="inline-code">client_id</code>, and the provider returns an error page. This item is effectively
@@ -893,10 +991,23 @@ if not JWT_SECRET:
   screenshot of the four app settings present on the Function App; and a recording of one successful consent
   &rarr; callback &rarr; logged-in dashboard round trip for each provider. <strong>No client secret should ever
   be committed to this repository.</strong></p>
-  <p class="sub"><strong>Known limitation to disclose rather than hide:</strong> the signed
-  <code class="inline-code">state</code> is not bound to the browser session (no nonce or cookie pairing), so
-  any third party can request a valid state from <code class="inline-code">/api/auth/oauth/google</code>. It
-  defends against a forged or stale callback, but it is not full login-CSRF protection.</p>
+  <p class="sub"><strong>Login-CSRF protection, as implemented:</strong> an earlier revision of this report
+  disclosed, as a residual gap, that the signed <code class="inline-code">state</code> was &ldquo;not bound to
+  the browser session (no nonce or cookie pairing), so it is not full login-CSRF protection.&rdquo;
+  <strong>That gap has since been closed and the disclosure was out of date.</strong> The state is still a
+  signed, 10-minute, single-use-shaped value with a random <code class="inline-code">jti</code>, but the same
+  value is now also written to a short-lived <code class="inline-code">HttpOnly</code>,
+  <code class="inline-code">SameSite=Lax</code> cookie named <code class="inline-code">p3_oauth_state</code>
+  (<code class="inline-code">Secure</code> too, once <code class="inline-code">WEBSITE_INSTANCE_ID</code> shows
+  the code is running on Azure). <code class="inline-code">verify_state_request()</code> requires all three
+  things before the authorization code is touched: the state must verify against
+  <code class="inline-code">JWT_SECRET</code> and be unexpired, the cookie must be present, and the two must be
+  equal under <code class="inline-code">secrets.compare_digest</code>. Both callbacks call it, and the cookie
+  is expired again as the flow completes (<code class="inline-code">clear_state_cookie()</code>). Because an
+  attacker cannot set a cookie on this origin, a state they fetched from
+  <code class="inline-code">/api/auth/oauth/google</code> is useless in a victim's browser &mdash; which is
+  what the earlier wording said was missing. <em>What remains unverified is the deployment, not the control:
+  this has never executed against a registered OAuth client.</em></p>
 
   <h4>OAuth Flow <span class="pill warn">Design diagram &middot; never executed</span></h4>
   <svg viewBox="0 0 800 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:800px;display:block;margin:.5rem auto">
@@ -932,7 +1043,7 @@ if not JWT_SECRET:
     <text x="400" y="152" text-anchor="middle" font-size="10" fill="var(--bad)" font-weight="600">Blocked at step 2: no OAuth client registered, so client_id is empty</text>
   </svg>
 
-  <h4>OAuth <code>state</code>, signed and bound to the browser <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; actual source, <code class="inline-code">backend/auth.py:123-212</code></span></h4>
+  <h4>OAuth <code>state</code>, signed and bound to the browser <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; actual source, <code class="inline-code">backend/auth.py</code>, <code class="inline-code">create_state()</code>, <code class="inline-code">state_cookie()</code>, <code class="inline-code">verify_state_request()</code></span></h4>
 <p style="margin:.4rem 0 .6rem">
   A signed <code class="inline-code">state</code> on its own proves only that <em>this
   application</em> minted it &mdash; and <code class="inline-code">/api/auth/oauth/&lt;provider&gt;</code>
@@ -947,7 +1058,11 @@ if not JWT_SECRET:
 </p>
 <pre><code># backend/auth.py
 def create_state() -> str:
-    """Mint a short-lived signed OAuth `state` value."""
+    """Mint a short-lived signed OAuth `state` value.
+
+    Signing it keeps the check stateless: the callback can tell its own
+    redirect apart from one a third party initiated, without a session store.
+    """
     now = datetime.now(timezone.utc)
     return jwt.encode(
         # `jti` makes every state unique.  Without it the payload is just
@@ -968,14 +1083,17 @@ def state_cookie(state: str) -> str:
     """Set-Cookie value binding `state` to the browser starting the flow."""
     parts = [
         f"{OAUTH_STATE_COOKIE}={state}",
-        "Path=/", "HttpOnly",
-        # Lax, not Strict: the provider redirects back by top-level
-        # navigation, and Strict would withhold the cookie on that hop.
+        "Path=/",
+        "HttpOnly",
+        # Lax, not Strict: the provider redirects back by top-level navigation,
+        # and Strict would withhold the cookie on that cross-site hop.
         "SameSite=Lax",
         f"Max-Age={OAUTH_STATE_MAX_AGE}",
     ]
     if os.environ.get("WEBSITE_INSTANCE_ID"):
-        parts.append("Secure")   # Azure is HTTPS; `func start` is not
+        # Azure serves HTTPS; `func start` is plain HTTP, where Secure would
+        # stop the cookie being stored at all.
+        parts.append("Secure")
     return "; ".join(parts)
 
 
@@ -988,14 +1106,23 @@ def verify_state_request(req) -> bool:
     if not from_cookie:
         logger.warning("OAuth callback carried no state cookie")
         return False
-</code></pre>
-  <p class="sub">Both callbacks reject a bad or missing state with a 400 before touching the authorization code
-  (<code class="inline-code">backend/function_app.py:640</code>, <code class="inline-code">:681</code>).</p>
+    if not secrets.compare_digest(from_provider, from_cookie):
+        logger.warning("OAuth state did not match the state cookie")
+        return False
+    return True</code></pre>
+  <p class="sub">Both callbacks call <code class="inline-code">verify_state_request(req)</code> as their first
+  action and reject a bad or missing state <em>before</em> the authorization code is read or exchanged
+  (<code class="inline-code">backend/function_app.py</code>,
+  <code class="inline-code">oauth_google_callback()</code> and
+  <code class="inline-code">oauth_github_callback()</code>). A rejection redirects to
+  <code class="inline-code">login.html?error=oauth_state</code> rather than returning bare JSON at the Function
+  App hostname, so the visitor is not stranded off the dashboard's origin with no way back
+  (<code class="inline-code">_oauth_error()</code>).</p>
 
   <h4>Credentials the providers require <span class="pill bad">All four unset</span></h4>
   <p class="sub">The consent URL is built from app settings. Registering the two applications and setting these
   six values is the entire remaining work for this rubric item &mdash; there is no code left to write.</p>
-<pre><code># backend/auth.py:39-55 reads these; deploy.sh, the app-settings step passes them through.
+<pre><code># backend/auth.py reads these at import; deploy.sh, the app-settings step passes them through.
 # Empty values deploy successfully and then fail at the consent screen.
 GOOGLE_CLIENT_ID        = os.environ.get("GOOGLE_CLIENT_ID", "")       # NOT SET
 GOOGLE_CLIENT_SECRET    = os.environ.get("GOOGLE_CLIENT_SECRET", "")   # NOT SET
@@ -1004,7 +1131,7 @@ GITHUB_CLIENT_ID        = os.environ.get("GITHUB_CLIENT_ID", "")       # NOT SET
 GITHUB_CLIENT_SECRET    = os.environ.get("GITHUB_CLIENT_SECRET", "")   # NOT SET
 GITHUB_REDIRECT_URI     # https://&lt;app&gt;.azurewebsites.net/api/auth/oauth/github/callback
 
-# backend/auth.py:239-250 - the consent URL, with the signed state attached
+# backend/auth.py, google_auth_url() - the consent URL, with the signed state attached
 def google_auth_url(state: str = "") -> str:
     """Build the Google OAuth consent URL."""
     params = {
@@ -1024,7 +1151,8 @@ def google_auth_url(state: str = "") -> str:
   what made the earlier version of this report indefensible:</p>
   <ul style="font-size:.9rem">
     <li><strong>Password hashing is verifiable today.</strong> bcrypt at 12 rounds, plaintext never stored
-      &mdash; readable in <code class="inline-code">backend/auth.py:65-95</code>. A reviewer can confirm it
+      &mdash; readable in <code class="inline-code">backend/auth.py</code>,
+      <code class="inline-code">hash_password()</code> and <code class="inline-code">verify_password()</code>. A reviewer can confirm it
       without any infrastructure.</li>
     <li><strong>Encryption at rest is true by construction but unevidenced.</strong> Cosmos DB encrypts data at
       rest with service-managed keys by default; there is no setting to turn on and no way to turn it off. So
@@ -1047,7 +1175,7 @@ def google_auth_url(state: str = "") -> str:
     </div>
     <div class="card">
       <b style="font-size:1rem">Password Hashing</b>
-      <p class="sub" style="font-size:.82rem">bcrypt with 12 salt rounds. Plaintext is never stored. Hash comparison on login. Readable in <code class="inline-code">auth.py:65-95</code>.</p>
+      <p class="sub" style="font-size:.82rem">bcrypt with 12 salt rounds. Plaintext is never stored. Hash comparison on login. Readable in <code class="inline-code">auth.py</code>, <code class="inline-code">hash_password()</code>.</p>
       <span class="pill ok">Verified in repo</span>
     </div>
     <div class="card">
@@ -1057,11 +1185,11 @@ def google_auth_url(state: str = "") -> str:
     </div>
   </div>
 
-  <h4>Password Storage: Hash vs. Plaintext <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; illustrative contrast; see <code class="inline-code">backend/auth.py:65-95</code> for the real implementation</span></h4>
+  <h4>Password Storage: Hash vs. Plaintext <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; illustrative contrast; see <code class="inline-code">backend/auth.py</code>, <code class="inline-code">hash_password()</code>, for the real implementation</span></h4>
 <pre><code># WRONG - never do this
 users.upsert_item({"id": email, "password": "mySecret123"})   # plaintext!
 
-# CORRECT - what this project does (backend/auth.py + function_app.py:503)
+# CORRECT - what this project does (backend/auth.py + function_app.py, register())
 password_hash = hash_password(password)   # bcrypt.gensalt(rounds=12)
 # password_hash == "$2b$12$LJ3m4ys3Lk8nOfVdKj6XkOdHsYq7f..."
 users.upsert_item({"id": email, "password_hash": password_hash})
@@ -1083,21 +1211,26 @@ if not verify_password(password, user["password_hash"]):
   <ul style="font-size:.9rem">
     <li><strong>The server-side guard is the control.</strong> Both data endpoints verify the JWT signature and
       return <code class="inline-code">401</code> without a valid token
-      (<code class="inline-code">backend/function_app.py:166-174</code>, applied at
-      <code class="inline-code">:259-261</code> and <code class="inline-code">:355</code>). The route
+      (<code class="inline-code">backend/function_app.py</code>,
+      <code class="inline-code">_reject_unauthenticated()</code>, applied as the first statement after the
+      <code class="inline-code">OPTIONS</code> pre-flight in both
+      <code class="inline-code">get_insights_api()</code> and
+      <code class="inline-code">get_recipes_api()</code>). The route
       decorators use <code class="inline-code">AuthLevel.ANONYMOUS</code> so the Functions host does not also
       demand a function key; the token check is done in code.</li>
     <li><strong>The browser redirect is a convenience, not a control.</strong>
       <code class="inline-code">isAuthenticated()</code> only base64-decodes the token and checks
       <code class="inline-code">exp</code> &mdash; it does <em>not</em> verify the signature, and
-      <code class="inline-code">frontend/auth.js:61-67</code> documents that openly. A forged token therefore
+      <code class="inline-code">frontend/auth.js</code> documents that openly in the
+      <code class="inline-code">decodeJWT()</code> docstring. A forged token therefore
       still renders the empty dashboard shell. It does not yield any data: the first
       <code class="inline-code">authFetch</code> gets a 401, the token is cleared, and the browser is sent back
       to the login page.</li>
   </ul>
   <p>The authenticated header shows the user's name and a Logout button
   (<code class="inline-code">frontend/dashboard.html:19-20</code>, populated at
-  <code class="inline-code">frontend/app.js:64-69</code>, logout at <code class="inline-code">:606-612</code>).</p>
+  <code class="inline-code">frontend/app.js</code>, <code class="inline-code">initDashboard()</code>; logout
+  at <code class="inline-code">handleLogout()</code>).</p>
   <p class="sub"><strong>Evidence still needed:</strong> the single cleanest artefact for this item is a
   <code class="inline-code">curl</code> transcript showing
   <code class="inline-code">401 {"error":"Authentication required. Please log in."}</code> from
@@ -1105,7 +1238,7 @@ if not verify_password(password, user["password_hash"]):
   next to a <code class="inline-code">200</code> for the same URL with a valid bearer token. Plus a screenshot
   of the dashboard header showing the logged-in name and Logout button. Neither exists today.</p>
 
-  <h4>Server-side Guard <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; actual source, <code class="inline-code">backend/function_app.py:166-174, 251-262, 343-359</code></span></h4>
+  <h4>Server-side Guard <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; actual source, <code class="inline-code">backend/function_app.py</code>, <code class="inline-code">_reject_unauthenticated()</code> and <code class="inline-code">get_insights_api()</code></span></h4>
 <pre><code># backend/function_app.py
 def _reject_unauthenticated(req: func.HttpRequest):
     """Return a 401 response when the request carries no valid JWT, else None.
@@ -1118,9 +1251,12 @@ def _reject_unauthenticated(req: func.HttpRequest):
     return None
 
 
-@app.route(route="insights", methods=["GET", "OPTIONS"],
-           auth_level=func.AuthLevel.ANONYMOUS)
+@app.route(route="insights", methods=["GET", "OPTIONS"], auth_level=func.AuthLevel.ANONYMOUS)
 def get_insights_api(req: func.HttpRequest) -> func.HttpResponse:
+    """Return pre-computed visualization data from cache.
+
+    Served from the cache the blob trigger wrote, NOT re-computed per request.
+    """
     if req.method == "OPTIONS":
         return func.HttpResponse(status_code=204, headers=_cors_headers())
 
@@ -1129,11 +1265,12 @@ def get_insights_api(req: func.HttpRequest) -> func.HttpResponse:
         return denied
     ...
 
-# /api/recipes carries the identical guard at function_app.py:357.
+# /api/recipes carries the identical guard at the top of get_recipes_api().
+# /api/auth/me checks the token directly; /api/health is public by design.
 # get_current_user -> extract_token (Authorization header only, never a query
 # string) -> verify_token (jwt.decode with the HS256 secret).</code></pre>
 
-  <h4>Frontend Gate and 401 Handling <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; actual source, <code class="inline-code">frontend/app.js:57-69, 221-224</code></span></h4>
+  <h4>Frontend Gate and 401 Handling <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; actual source, <code class="inline-code">frontend/app.js</code>, <code class="inline-code">initDashboard()</code> and <code class="inline-code">redirectToLogin()</code></span></h4>
 <pre><code>// app.js
 async function initDashboard() {
   // Convenience redirect only - the signature is NOT checked here.
@@ -1164,15 +1301,46 @@ function redirectToLogin() {
 <!-- ============================================================ -->
 <h2 id="dashboard">5. Dashboard UI <span class="pill warn">Mockup only &middot; no screenshot exists</span></h2>
 <div class="section-card">
-  <p>The dashboard implements the user authentication header, four chart types, filter/search controls and
-  pagination. The image below is a <strong>hand-drawn SVG mock of the intended view, not a screenshot of the
-  running application</strong>. No screenshot of this dashboard exists anywhere in the repository, because the
-  application has never been deployed. The numbers inside the mock are placeholders drawn from the local
-  dataset, not values read from a live system.</p>
+  <p>The dashboard implements the user authentication header, four charts, four security cards, filter and
+  search controls, the recipe table and pagination. The image below is a <strong>hand-drawn SVG mock, not a
+  screenshot of the running application</strong>. No screenshot of this dashboard exists anywhere in the
+  repository, because the application has never been deployed.</p>
+  <p class="sub"><strong>Exactly what the mock is, so it cannot be mistaken for evidence.</strong> An earlier
+  revision of this caption said &ldquo;the numbers inside the mock are placeholders drawn from the local
+  dataset&rdquo;, while the mock in fact showed a <code class="inline-code">Calories</code> column the dataset
+  does not contain, two recipe names that appear nowhere in the CSV, and a 3&times;3 &ldquo;nutrient
+  correlation&rdquo; heatmap that the code does not render. It has been redrawn:</p>
+  <ul class="sub" style="font-size:.88rem">
+    <li>The four chart titles and the recipe-table columns are copied from
+      <code class="inline-code">frontend/dashboard.html</code>. The table columns are
+      <code class="inline-code">#</code>, Recipe&nbsp;Name, Diet&nbsp;Type, Cuisine, Protein&nbsp;(g),
+      Carbs&nbsp;(g), Fat&nbsp;(g) &mdash; there is no calorie column anywhere in the pipeline, because the
+      source CSV carries only <code class="inline-code">Diet_type</code>,
+      <code class="inline-code">Recipe_name</code>, <code class="inline-code">Cuisine_type</code>,
+      <code class="inline-code">Protein(g)</code>, <code class="inline-code">Carbs(g)</code> and
+      <code class="inline-code">Fat(g)</code>.</li>
+    <li>Every number is a <strong>real value computed from <code class="inline-code">All_Diets.csv</code></strong>
+      &mdash; the per-diet averages and counts from &sect;2.2, and three verbatim rows from the file
+      (Vegan&nbsp;Buddha&nbsp;Bowl 57.85&nbsp;/&nbsp;227.15&nbsp;/&nbsp;105.16, Keto&nbsp;Fat&nbsp;Bombs
+      49.19&nbsp;/&nbsp;79.78&nbsp;/&nbsp;264.4, Paleo&nbsp;Pumpkin&nbsp;Pie
+      30.91&nbsp;/&nbsp;302.59&nbsp;/&nbsp;96.76). None of them was read back out of a deployed system.</li>
+    <li>The chart <em>shapes</em> are schematic. The real page draws them with Chart.js: a grouped bar chart, a
+      doughnut, a bubble grid of 5&nbsp;diets &times; 3&nbsp;macros of <strong>average values</strong> (titled
+      &ldquo;Macronutrient Heatmap&rdquo; &mdash; it is not a correlation matrix), and a scatter of the top
+      five protein recipes per diet. The scatter points below are indicative positions only.</li>
+    <li>The grey section labels and the bottom &ldquo;Dataset summary&rdquo; strip are annotations for this
+      diagram. They are not widgets on the page.</li>
+  </ul>
   <p class="sub"><strong>Evidence still needed:</strong> one real screenshot of the authenticated dashboard
-  &mdash; charts populated, name and Logout visible in the header, the cache status pill reading
-  <code class="inline-code">Cache: cosmosdb</code> rather than <code class="inline-code">Demo Mode</code>. That
-  single image would replace this mock and carry most of the visual evidence for items 1, 2, 3, 5 and 9.</p>
+  &mdash; charts populated, name and Logout visible in the header, and the cache status pill reading
+  <code class="inline-code">Served from Cosmos DB</code> rather than
+  <code class="inline-code">Sample data (ENABLE_DEMO_FALLBACK is on)</code>,
+  <code class="inline-code">Cache empty</code> or <code class="inline-code">API unreachable</code>. Those are
+  literal strings from <code class="inline-code">updateStatusBar()</code>, which can emit only six values in
+  total &mdash; all six are listed in &sect;6.1. Earlier revisions of this report told the reader to look for
+  <code class="inline-code">Cache: cosmosdb</code> and <code class="inline-code">Demo Mode</code>, neither of
+  which exists anywhere in the frontend, so the check could never have passed. That single image would replace
+  this mock and carry most of the visual evidence for items 1, 2, 3, 5 and 9.</p>
 
   <!-- Full Dashboard Mock SVG -->
   <svg viewBox="0 0 900 700" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:900px;display:block;margin:1rem auto">
@@ -1187,29 +1355,53 @@ function redirectToLogin() {
     <rect x="820" y="15" width="65" height="24" rx="5" fill="rgba(255,255,255,.2)" stroke="rgba(255,255,255,.4)"/>
     <text x="852" y="31" text-anchor="middle" font-size="10" fill="#fff">Logout</text>
 
-    <!-- Charts Row -->
-    <text x="20" y="75" font-size="13" font-weight="700" fill="var(--brand)">Explore Nutritional Insights</text>
+    <!-- Charts Row (annotation label, not on-screen text) -->
+    <text x="20" y="75" font-size="13" font-weight="700" fill="var(--brand)">Chart grid &mdash; four Chart.js canvases</text>
 
-    <!-- Bar Chart -->
+    <!-- Bar Chart: all five diets, real average macros (see the table in 2.2).
+         Bar heights are value / 254.00 * 45 px, so vegan's carbs set the top of
+         the scale.  An earlier revision drew three diets and inverted
+         mediterranean's real ordering. -->
     <rect x="20" y="85" width="200" height="160" rx="8" fill="var(--card)" stroke="var(--line)"/>
-    <text x="120" y="105" text-anchor="middle" font-size="10" font-weight="600" fill="var(--ink)">Bar Chart - Avg Macros by Diet</text>
-    <!-- Bars -->
-    <rect x="40" y="130" width="12" height="30" fill="var(--brand)" opacity=".8"/>
-    <rect x="54" y="120" width="12" height="40" fill="var(--accent)" opacity=".8"/>
-    <rect x="68" y="125" width="12" height="35" fill="var(--ok)" opacity=".8"/>
-    <text x="55" y="235" text-anchor="middle" font-size="7" fill="var(--mute)">dash</text>
-    <rect x="95" y="115" width="12" height="45" fill="var(--brand)" opacity=".8"/>
-    <rect x="109" y="140" width="12" height="20" fill="var(--accent)" opacity=".8"/>
-    <rect x="123" y="108" width="12" height="52" fill="var(--ok)" opacity=".8"/>
-    <text x="110" y="235" text-anchor="middle" font-size="7" fill="var(--mute)">keto</text>
-    <rect x="150" y="116" width="12" height="44" fill="var(--brand)" opacity=".8"/>
-    <rect x="164" y="118" width="12" height="42" fill="var(--accent)" opacity=".8"/>
-    <rect x="178" y="125" width="12" height="35" fill="var(--ok)" opacity=".8"/>
-    <text x="165" y="235" text-anchor="middle" font-size="7" fill="var(--mute)">med</text>
+    <text x="120" y="102" text-anchor="middle" font-size="9" font-weight="600" fill="var(--ink)">Average Macronutrients by Diet</text>
+    <line x1="28" y1="160" x2="214" y2="160" stroke="var(--line)" stroke-width="1"/>
+    <!-- dash 69.28 / 160.54 / 101.15 -->
+    <rect x="30" y="148" width="8" height="12" fill="var(--accent)" opacity=".8"/>
+    <rect x="40" y="132" width="8" height="28" fill="var(--ok)" opacity=".8"/>
+    <rect x="50" y="142" width="8" height="18" fill="var(--warn)" opacity=".8"/>
+    <text x="44" y="172" text-anchor="middle" font-size="6.5" fill="var(--mute)">dash</text>
+    <!-- keto 101.27 / 57.97 / 153.12 -->
+    <rect x="68" y="142" width="8" height="18" fill="var(--accent)" opacity=".8"/>
+    <rect x="78" y="150" width="8" height="10" fill="var(--ok)" opacity=".8"/>
+    <rect x="88" y="133" width="8" height="27" fill="var(--warn)" opacity=".8"/>
+    <text x="82" y="172" text-anchor="middle" font-size="6.5" fill="var(--mute)">keto</text>
+    <!-- mediterranean 101.11 / 152.91 / 101.42 -->
+    <rect x="106" y="142" width="8" height="18" fill="var(--accent)" opacity=".8"/>
+    <rect x="116" y="133" width="8" height="27" fill="var(--ok)" opacity=".8"/>
+    <rect x="126" y="142" width="8" height="18" fill="var(--warn)" opacity=".8"/>
+    <text x="120" y="172" text-anchor="middle" font-size="6.5" fill="var(--mute)">med</text>
+    <!-- paleo 88.67 / 129.55 / 135.67 -->
+    <rect x="144" y="144" width="8" height="16" fill="var(--accent)" opacity=".8"/>
+    <rect x="154" y="137" width="8" height="23" fill="var(--ok)" opacity=".8"/>
+    <rect x="164" y="136" width="8" height="24" fill="var(--warn)" opacity=".8"/>
+    <text x="158" y="172" text-anchor="middle" font-size="6.5" fill="var(--mute)">paleo</text>
+    <!-- vegan 56.16 / 254.00 / 103.30 -->
+    <rect x="182" y="150" width="8" height="10" fill="var(--accent)" opacity=".8"/>
+    <rect x="192" y="115" width="8" height="45" fill="var(--ok)" opacity=".8"/>
+    <rect x="202" y="142" width="8" height="18" fill="var(--warn)" opacity=".8"/>
+    <text x="196" y="172" text-anchor="middle" font-size="6.5" fill="var(--mute)">vegan</text>
+    <!-- legend -->
+    <rect x="46" y="186" width="7" height="7" rx="1.5" fill="var(--accent)" opacity=".8"/>
+    <text x="57" y="192" font-size="6.5" fill="var(--mute)">Protein (g)</text>
+    <rect x="98" y="186" width="7" height="7" rx="1.5" fill="var(--ok)" opacity=".8"/>
+    <text x="109" y="192" font-size="6.5" fill="var(--mute)">Carbs (g)</text>
+    <rect x="146" y="186" width="7" height="7" rx="1.5" fill="var(--warn)" opacity=".8"/>
+    <text x="157" y="192" font-size="6.5" fill="var(--mute)">Fat (g)</text>
+    <text x="120" y="212" text-anchor="middle" font-size="6.5" fill="var(--mute)">grams per recipe, averaged over 7,806 rows</text>
 
-    <!-- Scatter Plot -->
+    <!-- Scatter Plot: indicative positions, real axes -->
     <rect x="235" y="85" width="200" height="160" rx="8" fill="var(--card)" stroke="var(--line)"/>
-    <text x="335" y="105" text-anchor="middle" font-size="10" font-weight="600" fill="var(--ink)">Scatter - Protein vs Carbs</text>
+    <text x="335" y="102" text-anchor="middle" font-size="9" font-weight="600" fill="var(--ink)">Top Recipes: Protein vs Carbs</text>
     <circle cx="270" cy="180" r="3" fill="var(--brand)" opacity=".6"/>
     <circle cx="290" cy="150" r="3" fill="var(--brand)" opacity=".6"/>
     <circle cx="310" cy="160" r="3" fill="var(--accent)" opacity=".6"/>
@@ -1221,26 +1413,46 @@ function redirectToLogin() {
     <circle cx="305" cy="200" r="3" fill="var(--bad)" opacity=".6"/>
     <circle cx="345" cy="185" r="3" fill="var(--warn)" opacity=".6"/>
     <circle cx="365" cy="155" r="3" fill="var(--brand)" opacity=".6"/>
+    <text x="335" y="228" text-anchor="middle" font-size="6.5" fill="var(--mute)">x: Carbs (g) &nbsp;|&nbsp; y: Protein (g) &nbsp;|&nbsp; top 5 per diet, positions indicative</text>
 
-    <!-- Heatmap -->
+    <!-- Heatmap: what the code actually renders - a bubble grid of
+         5 diets x 3 macros of AVERAGE values, titled "Macronutrient Heatmap"
+         in dashboard.html.  Bubble radius is value / 254.00 * 9 px, floored at
+         3 px, matching the scaling in renderHeatmap().  An earlier revision
+         drew a 3x3 "nutrient correlation" matrix, which the code does not
+         produce; for the record the real pairwise correlations are all
+         positive (Protein-Carbs +0.156, Carbs-Fat +0.269, Protein-Fat +0.478)
+         and are not plotted anywhere in the dashboard. -->
     <rect x="450" y="85" width="200" height="160" rx="8" fill="var(--card)" stroke="var(--line)"/>
-    <text x="550" y="105" text-anchor="middle" font-size="10" font-weight="600" fill="var(--ink)">Heatmap - Nutrient Correlation</text>
-    <rect x="475" y="115" width="35" height="25" fill="var(--brand)" opacity=".9" rx="2"/>
-    <rect x="512" y="115" width="35" height="25" fill="var(--brand)" opacity=".4" rx="2"/>
-    <rect x="549" y="115" width="35" height="25" fill="var(--brand)" opacity=".6" rx="2"/>
-    <rect x="475" y="142" width="35" height="25" fill="var(--brand)" opacity=".4" rx="2"/>
-    <rect x="512" y="142" width="35" height="25" fill="var(--brand)" opacity=".9" rx="2"/>
-    <rect x="549" y="142" width="35" height="25" fill="var(--brand)" opacity=".3" rx="2"/>
-    <rect x="475" y="169" width="35" height="25" fill="var(--brand)" opacity=".6" rx="2"/>
-    <rect x="512" y="169" width="35" height="25" fill="var(--brand)" opacity=".3" rx="2"/>
-    <rect x="549" y="169" width="35" height="25" fill="var(--brand)" opacity=".9" rx="2"/>
-    <text x="492" y="210" text-anchor="middle" font-size="7" fill="var(--mute)">Protein</text>
-    <text x="529" y="210" text-anchor="middle" font-size="7" fill="var(--mute)">Carbs</text>
-    <text x="566" y="210" text-anchor="middle" font-size="7" fill="var(--mute)">Fat</text>
+    <text x="550" y="102" text-anchor="middle" font-size="9" font-weight="600" fill="var(--ink)">Macronutrient Heatmap</text>
+    <text x="508" y="116" text-anchor="middle" font-size="6.5" fill="var(--mute)">Protein</text>
+    <text x="544" y="116" text-anchor="middle" font-size="6.5" fill="var(--mute)">Carbs</text>
+    <text x="580" y="116" text-anchor="middle" font-size="6.5" fill="var(--mute)">Fat</text>
+    <text x="486" y="131" text-anchor="end" font-size="6.5" fill="var(--mute)">dash</text>
+    <circle cx="508" cy="128" r="3.0" fill="var(--accent)" opacity=".75"/>
+    <circle cx="544" cy="128" r="5.7" fill="var(--accent)" opacity=".75"/>
+    <circle cx="580" cy="128" r="3.6" fill="var(--accent)" opacity=".75"/>
+    <text x="486" y="151" text-anchor="end" font-size="6.5" fill="var(--mute)">keto</text>
+    <circle cx="508" cy="148" r="3.6" fill="var(--accent)" opacity=".75"/>
+    <circle cx="544" cy="148" r="3.0" fill="var(--accent)" opacity=".75"/>
+    <circle cx="580" cy="148" r="5.4" fill="var(--accent)" opacity=".75"/>
+    <text x="486" y="171" text-anchor="end" font-size="6.5" fill="var(--mute)">med</text>
+    <circle cx="508" cy="168" r="3.6" fill="var(--accent)" opacity=".75"/>
+    <circle cx="544" cy="168" r="5.4" fill="var(--accent)" opacity=".75"/>
+    <circle cx="580" cy="168" r="3.6" fill="var(--accent)" opacity=".75"/>
+    <text x="486" y="191" text-anchor="end" font-size="6.5" fill="var(--mute)">paleo</text>
+    <circle cx="508" cy="188" r="3.1" fill="var(--accent)" opacity=".75"/>
+    <circle cx="544" cy="188" r="4.6" fill="var(--accent)" opacity=".75"/>
+    <circle cx="580" cy="188" r="4.8" fill="var(--accent)" opacity=".75"/>
+    <text x="486" y="211" text-anchor="end" font-size="6.5" fill="var(--mute)">vegan</text>
+    <circle cx="508" cy="208" r="3.0" fill="var(--accent)" opacity=".75"/>
+    <circle cx="544" cy="208" r="9.0" fill="var(--accent)" opacity=".75"/>
+    <circle cx="580" cy="208" r="3.7" fill="var(--accent)" opacity=".75"/>
+    <text x="550" y="232" text-anchor="middle" font-size="6.5" fill="var(--mute)">average grams per recipe &mdash; largest bubble is vegan carbs, 254.00 g</text>
 
     <!-- Pie Chart -->
     <rect x="665" y="85" width="220" height="160" rx="8" fill="var(--card)" stroke="var(--line)"/>
-    <text x="775" y="105" text-anchor="middle" font-size="10" font-weight="600" fill="var(--ink)">Pie - Recipes by Diet</text>
+    <text x="775" y="102" text-anchor="middle" font-size="9" font-weight="600" fill="var(--ink)">Recipe Distribution by Diet Type</text>
     <circle cx="755" cy="170" r="45" fill="none" stroke="var(--line)" stroke-width="1"/>
     <!-- Pie segments: real shares of the 7,806-row dataset (see the table in 2.2).
          An earlier revision drew five near-equal fifths from the withdrawn
@@ -1277,42 +1489,49 @@ function redirectToLogin() {
     <!-- Search button -->
     <rect x="480" y="305" width="60" height="24" rx="4" fill="var(--accent)"/>
     <text x="510" y="321" text-anchor="middle" font-size="9" fill="#fff">Search</text>
-    <!-- Result count -->
-    <text x="560" y="321" font-size="9" fill="var(--ok)" font-weight="600">7,806 recipes</text>
+    <!-- Result count: the real unfiltered total -->
+    <text x="560" y="321" font-size="9" fill="var(--ok)" font-weight="600">7,806 recipes &mdash; 391 pages at pageSize 20</text>
 
-    <!-- Results Table -->
-    <text x="20" y="370" font-size="13" font-weight="700" fill="var(--brand)">Recipe Results</text>
+    <!-- Results Table: the seven columns of the real table in dashboard.html,
+         and three rows copied verbatim out of All_Diets.csv.  An earlier
+         revision invented a Calories column, dropped Cuisine, and gave Vegan
+         Buddha Bowl macros that are not its own. -->
+    <text x="20" y="370" font-size="13" font-weight="700" fill="var(--brand)">Recipe Explorer</text>
     <rect x="20" y="380" width="860" height="22" rx="3" fill="var(--bg)" stroke="var(--line)"/>
-    <text x="35" y="395" font-size="9" font-weight="600" fill="var(--mute)">Recipe Name</text>
-    <text x="300" y="395" font-size="9" font-weight="600" fill="var(--mute)">Diet Type</text>
-    <text x="450" y="395" font-size="9" font-weight="600" fill="var(--mute)">Protein (g)</text>
-    <text x="570" y="395" font-size="9" font-weight="600" fill="var(--mute)">Carbs (g)</text>
-    <text x="690" y="395" font-size="9" font-weight="600" fill="var(--mute)">Fat (g)</text>
-    <text x="800" y="395" font-size="9" font-weight="600" fill="var(--mute)">Calories</text>
+    <text x="35" y="395" font-size="9" font-weight="600" fill="var(--mute)">#</text>
+    <text x="60" y="395" font-size="9" font-weight="600" fill="var(--mute)">Recipe Name</text>
+    <text x="330" y="395" font-size="9" font-weight="600" fill="var(--mute)">Diet Type</text>
+    <text x="480" y="395" font-size="9" font-weight="600" fill="var(--mute)">Cuisine</text>
+    <text x="600" y="395" font-size="9" font-weight="600" fill="var(--mute)">Protein (g)</text>
+    <text x="700" y="395" font-size="9" font-weight="600" fill="var(--mute)">Carbs (g)</text>
+    <text x="800" y="395" font-size="9" font-weight="600" fill="var(--mute)">Fat (g)</text>
 
     <rect x="20" y="402" width="860" height="20" fill="var(--card)" stroke="var(--line)" stroke-width=".5"/>
-    <text x="35" y="416" font-size="9" fill="var(--ink)">Grilled Mediterranean Salmon</text>
-    <text x="300" y="416" font-size="9" fill="var(--ink)">mediterranean</text>
-    <text x="450" y="416" font-size="9" fill="var(--ink)">42.3</text>
-    <text x="570" y="416" font-size="9" fill="var(--ink)">18.7</text>
-    <text x="690" y="416" font-size="9" fill="var(--ink)">22.1</text>
-    <text x="800" y="416" font-size="9" fill="var(--ink)">440</text>
+    <text x="35" y="416" font-size="9" fill="var(--mute)">1</text>
+    <text x="60" y="416" font-size="9" fill="var(--ink)">Vegan Buddha Bowl</text>
+    <text x="330" y="416" font-size="9" fill="var(--ink)">vegan</text>
+    <text x="480" y="416" font-size="9" fill="var(--ink)">american</text>
+    <text x="600" y="416" font-size="9" fill="var(--ink)">57.85</text>
+    <text x="700" y="416" font-size="9" fill="var(--ink)">227.15</text>
+    <text x="800" y="416" font-size="9" fill="var(--ink)">105.16</text>
 
     <rect x="20" y="422" width="860" height="20" fill="var(--bg)" stroke="var(--line)" stroke-width=".5"/>
-    <text x="35" y="436" font-size="9" fill="var(--ink)">Keto Avocado Chicken Wrap</text>
-    <text x="300" y="436" font-size="9" fill="var(--ink)">keto</text>
-    <text x="450" y="436" font-size="9" fill="var(--ink)">38.9</text>
-    <text x="570" y="436" font-size="9" fill="var(--ink)">6.2</text>
-    <text x="690" y="436" font-size="9" fill="var(--ink)">34.5</text>
-    <text x="800" y="436" font-size="9" fill="var(--ink)">492</text>
+    <text x="35" y="436" font-size="9" fill="var(--mute)">2</text>
+    <text x="60" y="436" font-size="9" fill="var(--ink)">Keto Fat Bombs</text>
+    <text x="330" y="436" font-size="9" fill="var(--ink)">keto</text>
+    <text x="480" y="436" font-size="9" fill="var(--ink)">american</text>
+    <text x="600" y="436" font-size="9" fill="var(--ink)">49.19</text>
+    <text x="700" y="436" font-size="9" fill="var(--ink)">79.78</text>
+    <text x="800" y="436" font-size="9" fill="var(--ink)">264.4</text>
 
     <rect x="20" y="442" width="860" height="20" fill="var(--card)" stroke="var(--line)" stroke-width=".5"/>
-    <text x="35" y="456" font-size="9" fill="var(--ink)">Vegan Buddha Bowl</text>
-    <text x="300" y="456" font-size="9" fill="var(--ink)">vegan</text>
-    <text x="450" y="456" font-size="9" fill="var(--ink)">18.4</text>
-    <text x="570" y="456" font-size="9" fill="var(--ink)">52.3</text>
-    <text x="690" y="456" font-size="9" fill="var(--ink)">15.8</text>
-    <text x="800" y="456" font-size="9" fill="var(--ink)">422</text>
+    <text x="35" y="456" font-size="9" fill="var(--mute)">3</text>
+    <text x="60" y="456" font-size="9" fill="var(--ink)">Paleo Pumpkin Pie</text>
+    <text x="330" y="456" font-size="9" fill="var(--ink)">paleo</text>
+    <text x="480" y="456" font-size="9" fill="var(--ink)">american</text>
+    <text x="600" y="456" font-size="9" fill="var(--ink)">30.91</text>
+    <text x="700" y="456" font-size="9" fill="var(--ink)">302.59</text>
+    <text x="800" y="456" font-size="9" fill="var(--ink)">96.76</text>
 
     <!-- Pagination -->
     <rect x="300" y="475" width="50" height="20" rx="4" fill="var(--bg)" stroke="var(--line)"/>
@@ -1329,27 +1548,32 @@ function redirectToLogin() {
     <rect x="495" y="475" width="50" height="20" rx="4" fill="var(--bg)" stroke="var(--line)"/>
     <text x="520" y="489" text-anchor="middle" font-size="9" fill="var(--ink)">Next</text>
 
-    <!-- Security Section -->
-    <text x="20" y="525" font-size="13" font-weight="700" fill="var(--brand)">Security &amp; Compliance</text>
-    <rect x="20" y="535" width="280" height="65" rx="8" fill="var(--card)" stroke="var(--line)"/>
-    <text x="35" y="555" font-size="10" font-weight="600" fill="var(--ink)">Security Status</text>
-    <text x="35" y="572" font-size="9" fill="var(--mute)">At rest: <tspan fill="var(--warn)" font-weight="600">Cosmos default (unevidenced)</tspan></text>
-    <text x="35" y="588" font-size="9" fill="var(--mute)">Access Control: <tspan fill="var(--ok)" font-weight="600">Bearer JWT, 401 w/o token</tspan></text>
+    <!-- Security cards: the four cards dashboard.html actually renders.  The
+         last two are filled at runtime from GET /api/health, so they report
+         the backend's live configuration instead of a hardcoded claim. -->
+    <text x="20" y="525" font-size="13" font-weight="700" fill="var(--brand)">Security cards &mdash; filled from <tspan font-family="monospace">GET /api/health</tspan></text>
+    <rect x="20" y="535" width="205" height="65" rx="8" fill="var(--card)" stroke="var(--line)"/>
+    <text x="35" y="555" font-size="10" font-weight="600" fill="var(--ink)">Authentication</text>
+    <text x="35" y="572" font-size="9" fill="var(--ok)" font-weight="600">Signed in as Yuandong</text>
+    <text x="35" y="588" font-size="8" fill="var(--mute)">from the decoded token</text>
 
-    <rect x="310" y="535" width="280" height="65" rx="8" fill="var(--card)" stroke="var(--line)"/>
-    <text x="325" y="555" font-size="10" font-weight="600" fill="var(--ink)">OAuth Providers</text>
-    <rect x="325" y="564" width="100" height="22" rx="4" fill="var(--badbg)" stroke="var(--bad)" stroke-dasharray="4,2"/>
-    <text x="375" y="579" text-anchor="middle" font-size="9" fill="var(--bad)">Google (unregistered)</text>
-    <rect x="435" y="564" width="100" height="22" rx="4" fill="var(--badbg)" stroke="var(--bad)" stroke-dasharray="4,2"/>
-    <text x="485" y="579" text-anchor="middle" font-size="9" fill="var(--bad)">GitHub (unregistered)</text>
+    <rect x="238" y="535" width="205" height="65" rx="8" fill="var(--card)" stroke="var(--line)"/>
+    <text x="253" y="555" font-size="10" font-weight="600" fill="var(--ink)">JWT Token</text>
+    <text x="253" y="572" font-size="9" fill="var(--ok)" font-weight="600">Valid (23h remaining)</text>
+    <text x="253" y="588" font-size="8" fill="var(--mute)">&ldquo;Expired&rdquo; once exp has passed</text>
 
-    <rect x="600" y="535" width="280" height="65" rx="8" fill="var(--card)" stroke="var(--line)"/>
-    <text x="615" y="555" font-size="10" font-weight="600" fill="var(--ink)">Password Security</text>
-    <text x="615" y="572" font-size="9" fill="var(--mute)">Hashing: <tspan fill="var(--ok)" font-weight="600">bcrypt (12 rounds)</tspan></text>
-    <text x="615" y="588" font-size="9" fill="var(--mute)">Tokens: <tspan fill="var(--ok)" font-weight="600">JWT (HS256, 24h)</tspan></text>
+    <rect x="456" y="535" width="205" height="65" rx="8" fill="var(--card)" stroke="var(--line)"/>
+    <text x="471" y="555" font-size="10" font-weight="600" fill="var(--ink)">DB Encryption</text>
+    <text x="471" y="572" font-size="9" fill="var(--warn)" font-weight="600">AES-256 (Cosmos DB, service-managed)</text>
+    <text x="471" y="588" font-size="8" fill="var(--mute)">reads &ldquo;not applicable&rdquo; with no Cosmos configured</text>
 
-    <!-- Data Summary -->
-    <text x="20" y="630" font-size="13" font-weight="700" fill="var(--brand)">Dataset Summary</text>
+    <rect x="674" y="535" width="206" height="65" rx="8" fill="var(--card)" stroke="var(--line)"/>
+    <text x="689" y="555" font-size="10" font-weight="600" fill="var(--ink)">Password Hash</text>
+    <text x="689" y="572" font-size="9" fill="var(--ok)" font-weight="600">bcrypt (12 rounds)</text>
+    <text x="689" y="588" font-size="8" fill="var(--mute)">&ldquo;Unknown (API unreachable)&rdquo; on failure</text>
+
+    <!-- Data Summary (annotation for this diagram, not a widget on the page) -->
+    <text x="20" y="630" font-size="13" font-weight="700" fill="var(--brand)">Dataset summary <tspan font-size="9" font-weight="400" fill="var(--mute)">(annotation, not a widget)</tspan></text>
     <rect x="20" y="640" width="170" height="45" rx="8" fill="var(--card)" stroke="var(--line)"/>
     <text x="105" y="655" text-anchor="middle" font-size="9" fill="var(--mute)">Total Recipes</text>
     <text x="105" y="675" text-anchor="middle" font-size="16" font-weight="700" fill="var(--brand)">7,806</text>
@@ -1389,7 +1613,7 @@ references. What is more useful here is the code that governs what happens when 
   one. The sample paths still exist, but they are off unless explicitly enabled, and an empty cache returns a
   <code class="inline-code">503</code> with an explanation instead. <code class="inline-code">deploy.sh, the app-settings step</code>
   sets <code class="inline-code">ENABLE_DEMO_FALLBACK=false</code>.</p>
-<pre><code># backend/function_app.py:155-162
+<pre><code># backend/function_app.py
 def _demo_fallback_enabled() -> bool:
     """Whether to serve hardcoded sample data when the cache is empty.
 
@@ -1400,10 +1624,12 @@ def _demo_fallback_enabled() -> bool:
     return os.environ.get("ENABLE_DEMO_FALLBACK", "false").lower() == "true"
 
 
-# backend/function_app.py:363-374 - what /api/recipes does with a cold cache
+# backend/function_app.py, inside get_recipes_api() - a cold cache
+    # None means nothing is cached; an empty list means the cached dataset is
+    # genuinely empty, which is a valid answer rather than a cache miss.
     recipes = get_recipes()
     source = "cache"
-    if not recipes:
+    if recipes is None:
         if not _demo_fallback_enabled():
             return _json_response({
                 "error": "No cleaned recipes are cached yet. Upload "
@@ -1415,9 +1641,15 @@ def _demo_fallback_enabled() -> bool:
         source = "fallback"</code></pre>
   <p class="sub">The dashboard surfaces this honestly too: the status pill reads
   <code class="inline-code">Sample data (ENABLE_DEMO_FALLBACK is on)</code> when the fallback is active
-  (<code class="inline-code">frontend/app.js:549</code>). <strong>When recording the demo, that pill is the one
-  on-screen signal that distinguishes a working cache from a broken one.</strong> It must read
-  <code class="inline-code">cosmosdb</code>.</p>
+  (<code class="inline-code">frontend/app.js</code>, <code class="inline-code">updateStatusBar()</code>).
+  <strong>When recording the demo, that pill is the one on-screen signal that distinguishes a working cache
+  from a broken one.</strong> It must read <code class="inline-code">Served from Cosmos DB</code>. The six
+  strings it can ever produce are <code class="inline-code">Served from Redis</code>,
+  <code class="inline-code">Served from Cosmos DB</code>,
+  <code class="inline-code">Served from in-process cache</code>,
+  <code class="inline-code">Sample data (ENABLE_DEMO_FALLBACK is on)</code>,
+  <code class="inline-code">Cache empty</code> and <code class="inline-code">API unreachable</code>; anything
+  else in a script or a checklist is a string the frontend cannot emit.</p>
 </div>
 
 <h3>6.2 What is still unproven, stated plainly</h3>
@@ -1449,10 +1681,190 @@ def _demo_fallback_enabled() -> bool:
   </ul>
 </div>
 
+
 <!-- ============================================================ -->
-<!-- 7. RUBRIC / STATUS TABLE                                      -->
+<!-- 7. TESTING AND DEMO PREPARATION                               -->
 <!-- ============================================================ -->
-<h2 id="rubric">7. Rubric / Implementation Status &amp; Evidence Gaps</h2>
+<h2 id="testing">7. Testing and Demo Preparation</h2>
+<p>Everything above this point is either source code a reviewer can read or work that has not been done yet.
+This section is the one part of the project with <strong>executed results</strong>: an automated test suite that
+runs green on a laptop, and a prepared second version of the dataset. Neither needs Azure, and neither was
+mentioned anywhere in an earlier revision of this report &mdash; the word &ldquo;test&rdquo; did not appear in
+it once, which left the deliverables list and the &ldquo;evidence still needed&rdquo; blocks reading as though
+this preparation did not exist.</p>
+
+<h3>7.1 Backend test suite &mdash; 143 tests, passing <span class="pill ok">Executed, not inferred</span></h3>
+<div class="section-card">
+  <p><code class="inline-code">Project3/tests/</code> holds <strong>143 tests</strong>. They were run for this
+  report with <code class="inline-code">python -m pytest -q</code> from
+  <code class="inline-code">Project3/</code> and all 143 passed in <strong>5.9&nbsp;seconds</strong>; the
+  captured output is committed at <code class="inline-code">Project3/docs/evidence/tests.log</code>, which is
+  regenerated from a real run rather than hand-written. This is the <em>only</em> measured runtime number in
+  this document. The count moves as the suite grows &mdash; an earlier run recorded 109 &mdash; so quote
+  <code class="inline-code">tests.log</code> rather than this paragraph if the two ever disagree.</p>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>File</th><th>Tests</th><th>What it covers</th></tr></thead>
+    <tbody>
+      <tr><td><code class="inline-code">tests/test_auth.py</code></td><td>37</td>
+        <td>bcrypt hashing and its 72-byte boundary, JWT issue and verification, OAuth <code class="inline-code">state</code> minting, the state cookie, and <code class="inline-code">verify_state_request</code>.</td></tr>
+      <tr><td><code class="inline-code">tests/test_models.py</code></td><td>36</td>
+        <td>Registration and login validation, including bodies that are not JSON objects and fields that are not text; <code class="inline-code">User</code> serialization and the public view.</td></tr>
+      <tr><td><code class="inline-code">tests/test_nutrition.py</code></td><td>35</td>
+        <td><code class="inline-code">clean_data</code> (stripping, case-folding, imputation, ratio columns, the error paths) and that every <code class="inline-code">precompute_all</code> payload is JSON-serializable with native scalar types.</td></tr>
+      <tr><td><code class="inline-code">tests/test_cache.py</code></td><td>27</td>
+        <td>Chunk boundaries, stale-chunk cleanup, the missing-chunk and failed-write paths, the Redis connection cache, and <code class="inline-code">get_cache_status</code>.</td></tr>
+      <tr><td><code class="inline-code">tests/test_oauth_accounts.py</code></td><td>8</td>
+        <td>Account linking and the verified-email gate: what an unverified provider email may and may not claim.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p><code class="inline-code">tests/conftest.py</code> is what makes the suite safe to run anywhere. It puts
+  <code class="inline-code">backend/</code> on <code class="inline-code">sys.path</code> the way the Functions
+  host loads it, pins a deterministic <code class="inline-code">JWT_SECRET</code> before
+  <code class="inline-code">auth.py</code> is imported (it reads the secret at import time), clears
+  <code class="inline-code">WEBSITE_INSTANCE_ID</code> so the import path under test is the one
+  <code class="inline-code">func start</code> takes, and <strong>scrubs
+  <code class="inline-code">REDIS_HOST</code>, <code class="inline-code">REDIS_PASSWORD</code>,
+  <code class="inline-code">COSMOS_ENDPOINT</code> and <code class="inline-code">COSMOS_KEY</code></strong> so
+  the suite can never reach real infrastructure, whatever is in the developer's environment.</p>
+
+  <h4>The security-relevant cases, named</h4>
+  <p class="sub">These are the cases worth pointing at for the &ldquo;good coding practice&rdquo; objective,
+  because each one pins down a failure mode rather than a happy path.</p>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>What is asserted</th><th>Why it matters</th><th>Test</th></tr></thead>
+    <tbody>
+      <tr><td>A token with <code class="inline-code">alg: none</code> is rejected</td>
+        <td>The classic JWT forgery: strip the signature and claim the algorithm is &ldquo;none&rdquo;. <code class="inline-code">verify_token</code> pins <code class="inline-code">algorithms=[JWT_ALGORITHM]</code>, which closes it.</td>
+        <td><code class="inline-code">test_unsigned_alg_none_token_is_rejected</code></td></tr>
+      <tr><td>A token signed with a foreign secret is rejected</td>
+        <td>Proves the signature, not just the payload shape, is what grants access.</td>
+        <td><code class="inline-code">test_token_signed_with_a_different_secret_is_rejected</code></td></tr>
+      <tr><td>A tampered signature is rejected</td>
+        <td>Flipping a byte of an otherwise valid token must fail closed, not degrade to the decoded claims.</td>
+        <td><code class="inline-code">test_tampered_token_is_rejected</code></td></tr>
+      <tr><td>A session token cannot be replayed as an OAuth <code class="inline-code">state</code></td>
+        <td>Both are HS256 values signed with the same key, so without the <code class="inline-code">purpose</code> claim one would be accepted where the other belongs.</td>
+        <td><code class="inline-code">test_a_session_token_is_not_a_valid_state</code>, <code class="inline-code">test_state_without_the_expected_purpose_is_rejected</code></td></tr>
+      <tr><td>A state with no cookie, or a mismatched cookie, is rejected</td>
+        <td>This is the login-CSRF binding described in &sect;4.2 and &sect;9, asserted rather than asserted <em>about</em>.</td>
+        <td><code class="inline-code">test_state_without_a_cookie_is_rejected</code>, <code class="inline-code">test_state_not_matching_the_cookie_is_rejected</code>, <code class="inline-code">test_unsigned_state_is_rejected_even_when_the_cookie_agrees</code></td></tr>
+      <tr><td>A missing cache chunk never yields a partial or stale dataset</td>
+        <td>A spliced result set would be served as if it were valid. First, middle and last chunk are each tested, including that the reader does not fall through to the process-local copy.</td>
+        <td><code class="inline-code">test_missing_middle_chunk_does_not_yield_a_partial_set</code> and its first/last siblings, <code class="inline-code">test_missing_chunk_does_not_fall_back_to_the_memory_copy</code>, <code class="inline-code">test_failed_chunk_rewrite_never_serves_a_spliced_dataset</code></td></tr>
+      <tr><td>The metadata document is written <strong>last</strong></td>
+        <td>A reader arriving mid-rewrite must see an empty cache, not a half-published set.</td>
+        <td><code class="inline-code">test_meta_is_written_last</code></td></tr>
+      <tr><td>The bcrypt 72-byte limit is measured in bytes and rejected as a 400</td>
+        <td>Silent truncation makes two different passwords interchangeable; letting the hash call raise turns a long password into a 500.</td>
+        <td><code class="inline-code">test_password_limit_counts_bytes_not_characters</code>, <code class="inline-code">test_password_over_the_byte_limit_is_rejected</code>, <code class="inline-code">test_password_at_the_bcrypt_limit_round_trips</code></td></tr>
+      <tr><td>An unverified provider email cannot take over an existing account</td>
+        <td>Users are keyed by email, so reusing an address the provider will not vouch for would overwrite someone else's account and clear its password hash.</td>
+        <td><code class="inline-code">test_an_unverified_email_cannot_take_over_another_persons_account</code>, <code class="inline-code">test_unverified_email_does_not_overwrite_a_password_account</code></td></tr>
+      <tr><td>The public user view never exposes the password hash</td>
+        <td>Every handler returns <code class="inline-code">User.to_public()</code>; this is the test that keeps it that way.</td>
+        <td><code class="inline-code">test_public_view_never_exposes_the_password_hash</code></td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="sub"><strong>What the tests do not establish:</strong> they exercise the backend modules in-process
+  with Cosmos and Redis stubbed out. They say nothing about whether the Function App deploys, whether Cosmos is
+  reachable, or whether an OAuth provider accepts the redirect URI. A green suite is evidence of coding
+  practice, not of a working deployment, and it is listed here as the former.</p>
+</div>
+
+<h3>7.2 Two versions of the dataset, generated deterministically <span class="pill ok">Verified in repo</span></h3>
+<div class="section-card">
+  <p>Rubric items 1 and 2 ask for <em>&ldquo;2 versions of the file&rdquo;</em>, so that the blob trigger can be
+  seen re-running on a change and the dashboard can be seen changing with it.
+  <strong>That second version exists.</strong> <code class="inline-code">Project3/data/make_v2.py</code>
+  generates <code class="inline-code">Project3/data/All_Diets_v2.csv</code> from the original file with three
+  deliberate, narratable edits rather than random noise:</p>
+  <ol style="font-size:.9rem">
+    <li><strong>Triple <code class="inline-code">Protein(g)</code> on every vegan row</strong> &mdash; vegan
+      goes from the lowest-protein diet to the highest, which moves the bar chart and the heatmap visibly.</li>
+    <li><strong>Append one keto recipe</strong>, &ldquo;DEMO V2 Ultra Protein Power Bowl&rdquo;, at
+      1,500&nbsp;g of protein &mdash; a new and obvious #1 in the scatter plot, and a keyword
+      (<code class="inline-code">search=demo v2</code>) that returns 0 results before the upload and 1 after.</li>
+    <li><strong>Drop every paleo row whose cuisine is <code class="inline-code">american</code></strong> (535
+      rows) &mdash; the paleo slice of the doughnut shrinks, its most common cuisine flips from
+      <code class="inline-code">american</code> to <code class="inline-code">italian</code>, and the total falls
+      from 7,806 to 7,272.</li>
+  </ol>
+  <p>The column list, column order, dtypes and line endings are otherwise untouched, so the second upload
+  exercises the same code path. <code class="inline-code">Project3/docs/demo-plan.md</code> tabulates the
+  before/after value for every chart and every pager figure &mdash; all 30 average-macro cells, the per-diet
+  counts, the top-five names and protein values, the cuisine flips, and the result counts for each filter and
+  search the presenter is scripted to type. Those figures were recomputed independently from both CSVs and
+  matched exactly.</p>
+  <p class="sub"><strong>Why this is called out here:</strong> the demo-preparation work is complete and the
+  numbers are known, but it was invisible in the rubric table and the deliverables list, which made 20 marks of
+  finished preparation read as absent. What is still missing is the upload itself &mdash; which needs the
+  deployment &mdash; and the recording.</p>
+</div>
+
+<h3>7.3 Two endpoints the rest of this report does not mention <span class="pill ok">Verified in repo</span></h3>
+<div class="section-card">
+  <p><code class="inline-code">GET /api/health</code> is deliberately public (it has to answer before anyone can
+  log in) and returns three blocks: <code class="inline-code">cache</code> from
+  <code class="inline-code">get_cache_status()</code>, a <code class="inline-code">security</code> block, and a
+  version stamp. The <code class="inline-code">security</code> block is read from <em>live
+  configuration</em>, not asserted:</p>
+<pre><code># backend/function_app.py, health_check()
+    using_cosmos = _get_users() is not None
+    ...
+        "security": {
+            # Reported from live configuration so the dashboard displays what
+            # is actually in effect instead of a hardcoded claim.
+            "password_hashing": "bcrypt (12 rounds)",
+            "user_store": "Cosmos DB" if using_cosmos else "in-memory (dev)",
+            "encryption_at_rest": (
+                "AES-256 (Cosmos DB, service-managed)" if using_cosmos
+                else "not applicable -- no database configured"
+            ),
+            "token": f"JWT HS256, {os.environ.get('JWT_EXPIRY_HOURS', '24')}h",
+        },</code></pre>
+  <p>&sect;4.3 criticises an earlier revision for backing the encryption claim with a hardcoded
+  <code class="inline-code">"AES-256"</code> string in the frontend, but never says what replaced it. This is
+  what replaced it. <code class="inline-code">frontend/app.js</code>
+  (<code class="inline-code">updateSecurityStatus()</code>) fills the dashboard's DB&nbsp;Encryption and
+  Password&nbsp;Hash cards from this response, and on any failure writes
+  <code class="inline-code">Unknown (API unreachable)</code> rather than leaving a confident claim on screen.
+  With no Cosmos configured the card reads <code class="inline-code">not applicable &mdash; no database
+  configured</code>. The card cannot say &ldquo;AES-256&rdquo; unless a Cosmos users container really opened.</p>
+  <p><code class="inline-code">GET /api/auth/me</code> returns the <code class="inline-code">sub</code>,
+  <code class="inline-code">email</code> and <code class="inline-code">name</code> claims of the presented
+  token, or <code class="inline-code">401 {"error":"Not authenticated. Please log in."}</code> without a valid
+  one. It is the smallest possible demonstration that the server, not the browser, decides who is logged in
+  &mdash; and a one-line <code class="inline-code">curl</code> against it is cheaper evidence for rubric item 9
+  than a screenshot.</p>
+  <p>Two more pieces of real engineering that the sections above either omit or understate, collected here so
+  they are claimed somewhere:</p>
+  <ul style="font-size:.9rem">
+    <li><strong>The bcrypt 72-byte boundary is a 400, not a 500.</strong>
+      <code class="inline-code">validate_registration</code> measures the password in bytes and rejects anything
+      longer with <code class="inline-code">"Password must be at most 72 bytes."</code>;
+      <code class="inline-code">hash_password</code> raises above the same limit as a backstop. Tested on both
+      sides of the boundary, including a multi-byte password that is short in characters and long in bytes.</li>
+    <li><strong>The recipe table escapes everything it renders.</strong> Every cell value originates in the
+      uploaded CSV, and <code class="inline-code">clean_data</code> normalises text without sanitising markup, so
+      a crafted <code class="inline-code">Diet_type</code> or <code class="inline-code">Recipe_name</code> would
+      otherwise break out of the row markup and read the session token out of
+      <code class="inline-code">localStorage</code>. <code class="inline-code">renderRecipeTable()</code> passes
+      every interpolated value through <code class="inline-code">escapeHtml()</code>, which assigns the value to
+      a detached element's <code class="inline-code">textContent</code> and reads back its
+      <code class="inline-code">innerHTML</code> &mdash; so the browser does the escaping. The same helper is
+      used for the diet dropdown options and the status pill label. That closes a stored-XSS path through the
+      dataset, which matters more here than usual because the token is script-reachable by design (&sect;9).</li>
+  </ul>
+</div>
+
+<!-- ============================================================ -->
+<!-- 8. RUBRIC / STATUS TABLE                                      -->
+<!-- ============================================================ -->
+<h2 id="rubric">8. Rubric / Implementation Status &amp; Evidence Gaps</h2>
 <p>Statuses use the three-level legend defined at the top of this page. <strong>No item is marked
 &ldquo;Complete&rdquo;</strong>, because completeness for this rubric means a working deployed system that a
 marker can watch, and no part of this project has been deployed. The <em>Status</em> column says what is true of
@@ -1475,7 +1887,7 @@ made of the system.</p>
       <td>1</td>
       <td><strong>Performance: Data Cleaning</strong></td>
       <td>10</td>
-      <td>Azure Function <code class="inline-code">blob_trigger</code> on <code class="inline-code">raw-data/All_Diets.csv</code> cleans and validates the 7,806 recipes and runs only when the file changes. <code class="inline-code">function_app.py:180-243</code>.</td>
+      <td>Azure Function <code class="inline-code">blob_trigger</code> on <code class="inline-code">raw-data/All_Diets.csv</code> cleans and validates the 7,806 recipes and runs only when the file changes. <code class="inline-code">function_app.py</code>, <code class="inline-code">blob_trigger_clean()</code>.</td>
       <td><span class="pill warn">Code complete &middot; unverified</span></td>
       <td>Portal screenshot of the deployed function; log excerpt with <code class="inline-code">Blob trigger fired</code> and <code class="inline-code">completed in &hellip;s</code> for a real upload. Consumption-plan polling delay must be handled in the demo.</td>
     </tr>
@@ -1483,7 +1895,7 @@ made of the system.</p>
       <td>2</td>
       <td><strong>Performance: Result Calculation</strong></td>
       <td>10</td>
-      <td>Pre-computes average macros, recipe counts and totals once per CSV change and writes them to Cosmos (chunked for recipes). Reads come from cache, never a re-parse. <code class="inline-code">cache.py:173-317</code>.</td>
+      <td>Pre-computes average macros, recipe counts and totals once per CSV change and writes them to Cosmos (chunked for recipes). Reads come from cache, never a re-parse. <code class="inline-code">cache.py</code>, <code class="inline-code">store_insights()</code> through <code class="inline-code">get_recipes()</code>.</td>
       <td><span class="pill warn">Code complete &middot; unverified</span></td>
       <td>Cosmos Data Explorer screenshot of <code class="inline-code">insights_cache</code>, <code class="inline-code">recipes_meta</code> and the <code class="inline-code">recipes_chunk_*</code> docs; a <code class="inline-code">curl</code> showing <code class="inline-code">cache_source: cosmosdb</code>. The &ldquo;~8&nbsp;ms vs ~1,850&nbsp;ms&rdquo; figure was never measured and has been withdrawn.</td>
     </tr>
@@ -1491,7 +1903,7 @@ made of the system.</p>
       <td>3</td>
       <td><strong>Data Interaction: Diet Filter</strong></td>
       <td>5</td>
-      <td>Dropdown filter by diet type, applied server-side in Python over the cached records (not a Cosmos SQL query). Options populated from the dataset. <code class="inline-code">function_app.py:376-380</code>.</td>
+      <td>Dropdown filter by diet type, applied server-side in Python over the cached records (not a Cosmos SQL query). Options populated from the dataset. <code class="inline-code">function_app.py</code>, the diet filter in <code class="inline-code">get_recipes_api()</code>.</td>
       <td><span class="pill warn">Code complete &middot; unverified</span></td>
       <td>Dashboard screenshot with a diet selected and the count updated; <code class="inline-code">curl /api/recipes?diet=keto</code> returning <code class="inline-code">total: 1512</code> (v1; 1,513 after the v2 upload) from a real cache.</td>
     </tr>
@@ -1499,15 +1911,15 @@ made of the system.</p>
       <td>4</td>
       <td><strong>Data Interaction: Keyword Search</strong></td>
       <td>10</td>
-      <td>Case-insensitive substring search across recipe name, cuisine and diet, server-side in Python. 350&nbsp;ms debounce on input. <code class="inline-code">function_app.py:381-390</code>.</td>
+      <td>Case-insensitive substring search across recipe name, cuisine and diet, server-side in Python. 350&nbsp;ms debounce on input. <code class="inline-code">function_app.py</code>, the keyword search in <code class="inline-code">get_recipes_api()</code>.</td>
       <td><span class="pill warn">Code complete &middot; unverified</span></td>
-      <td><code class="inline-code">curl /api/recipes?search=chicken</code> with a real <code class="inline-code">total</code>, plus a matching dashboard screenshot. The result count for any keyword is currently unknown.</td>
+      <td><code class="inline-code">curl /api/recipes?search=chicken</code> and a matching dashboard screenshot. The expected figure is already known and verified, so the gap is the capture, not the number: <strong>732 results / 37 pages</strong> on dataset v1 and <strong>680 / 34</strong> on v2 (<code class="inline-code">docs/demo-plan.md</code>, independently recomputed from both CSVs).</td>
     </tr>
     <tr>
       <td>5</td>
       <td><strong>Data Interaction: Pagination</strong></td>
       <td>5</td>
-      <td>Server-side slicing, 20 per page, <code class="inline-code">pageSize</code> clamped 1&ndash;100; response carries <code class="inline-code">total</code>, <code class="inline-code">totalPages</code>, <code class="inline-code">hasNext</code>, <code class="inline-code">hasPrev</code>. <code class="inline-code">function_app.py:391-412</code>.</td>
+      <td>Server-side slicing, 20 per page, <code class="inline-code">pageSize</code> clamped 1&ndash;100; response carries <code class="inline-code">total</code>, <code class="inline-code">totalPages</code>, <code class="inline-code">hasNext</code>, <code class="inline-code">hasPrev</code>. <code class="inline-code">function_app.py</code>, the pagination block in <code class="inline-code">get_recipes_api()</code>.</td>
       <td><span class="pill warn">Code complete &middot; unverified</span></td>
       <td>Screenshot of page 2 or later with controls visible. Note: on an empty cache with the fallback on, 15 rows give <code class="inline-code">totalPages=1</code> and <strong>no controls render at all</strong> &mdash; the feature would be invisible on video.</td>
     </tr>
@@ -1515,7 +1927,8 @@ made of the system.</p>
       <td>6</td>
       <td><strong>Security: Email/Password Auth</strong></td>
       <td>10</td>
-      <td>Registration with validation and duplicate rejection; login via bcrypt hash comparison; HS256 JWT with 24h expiry and no default signing key. Token held in <code class="inline-code">localStorage</code> and sent as a bearer header &mdash; not an HttpOnly cookie. <code class="inline-code">auth.py:22-120</code>.</td>
+      <td>Registration with validation and duplicate rejection; login via bcrypt hash comparison; HS256 JWT with 24h expiry and no default signing key. Token held in <code class="inline-code">localStorage</code> and sent as a bearer header &mdash; not an HttpOnly cookie. <code class="inline-code">auth.py</code>, the configuration block plus
+      <code class="inline-code">hash_password()</code>&ndash;<code class="inline-code">verify_token()</code>.</td>
       <td><span class="pill ok">Hashing verified in repo</span> <span class="pill warn">No database behind it</span></td>
       <td><code class="inline-code">curl</code> transcript of register &rarr; login &rarr; authenticated request against a deployment. Without Cosmos, users live in an in-process dict and register-then-login can fail across instances.</td>
     </tr>
@@ -1523,7 +1936,7 @@ made of the system.</p>
       <td>7</td>
       <td><strong>Security: OAuth Login</strong></td>
       <td>10</td>
-      <td>Custom authorization-code flow for Google and GitHub in the Function App, with a signed short-lived <code class="inline-code">state</code> and verified-email gating. No Azure SWA built-in auth is used. <code class="inline-code">auth.py:123-346</code>, <code class="inline-code">function_app.py:617-739</code>.</td>
+      <td>Custom authorization-code flow for Google and GitHub in the Function App, with a signed short-lived <code class="inline-code">state</code> and verified-email gating. No Azure SWA built-in auth is used. <code class="inline-code">auth.py</code>, <code class="inline-code">create_state()</code> through <code class="inline-code">github_exchange_code()</code>; <code class="inline-code">function_app.py</code>, the four <code class="inline-code">oauth_*</code> handlers.</td>
       <td><span class="pill bad">No OAuth app registered</span></td>
       <td><strong>Blocking and not a code task:</strong> register a Google Cloud OAuth client and a GitHub OAuth app, then set the four client ID/secret app settings and both redirect URIs. Until then the consent redirect carries an empty <code class="inline-code">client_id</code> and the provider errors. Then: provider console screenshots (secrets redacted) and one successful round trip per provider.</td>
     </tr>
@@ -1531,7 +1944,7 @@ made of the system.</p>
       <td>8</td>
       <td><strong>Security: DB Encryption &amp; Password Hash</strong></td>
       <td>10</td>
-      <td>Passwords stored as bcrypt hashes at 12 rounds, never plaintext (<code class="inline-code">auth.py:65-95</code>). Encryption at rest is a Cosmos platform default with service-managed keys &mdash; automatic and not configurable off, so it is true as soon as the account exists.</td>
+      <td>Passwords stored as bcrypt hashes at 12 rounds, never plaintext (<code class="inline-code">auth.py</code>, <code class="inline-code">hash_password()</code>), with the 72-byte bcrypt boundary rejected as a 400 rather than raising a 500 (<code class="inline-code">models.py</code>, <code class="inline-code">validate_registration()</code>). Encryption at rest is a Cosmos platform default with service-managed keys &mdash; automatic and not configurable off, so it is true as soon as the account exists.</td>
       <td><span class="pill ok">Hashing verified in repo</span> <span class="pill bad">Encryption unevidenced</span></td>
       <td>Portal screenshot of the Cosmos account's Data Encryption blade; Data Explorer screenshot of a <code class="inline-code">users</code> document showing a <code class="inline-code">$2b$12$</code> hash and no plaintext field. Neither can be produced before Cosmos is provisioned.</td>
     </tr>
@@ -1539,7 +1952,7 @@ made of the system.</p>
       <td>9</td>
       <td><strong>Dashboard UI: Auth Gate</strong></td>
       <td>10</td>
-      <td>Both data endpoints verify the JWT signature and return <code class="inline-code">401</code> without one (<code class="inline-code">function_app.py:166-174</code>). The browser-side redirect does not verify the signature and is a convenience only, so a forged token renders an empty shell but yields no data. Header shows the user's name and a Logout button (<code class="inline-code">dashboard.html:19-20</code>).</td>
+      <td>Both data endpoints verify the JWT signature and return <code class="inline-code">401</code> without one (<code class="inline-code">function_app.py</code>, <code class="inline-code">_reject_unauthenticated()</code>). The browser-side redirect does not verify the signature and is a convenience only, so a forged token renders an empty shell but yields no data. Header shows the user's name and a Logout button (<code class="inline-code">dashboard.html:19-20</code>).</td>
       <td><span class="pill ok">Guards verified in repo</span> <span class="pill warn">Never exercised live</span></td>
       <td><code class="inline-code">curl</code> showing <code class="inline-code">401</code> from <code class="inline-code">/api/insights</code> with no token, beside a <code class="inline-code">200</code> with a valid one &mdash; the cleanest single artefact for this item. Plus a screenshot of the header with name and Logout.</td>
     </tr>
@@ -1595,17 +2008,20 @@ made of the system.</p>
       two redirect URIs. Worth 10 marks, requires no code, and is currently a hard zero.</li>
     <li><strong>Capture the evidence listed in the table above.</strong> Roughly six screenshots and three
       <code class="inline-code">curl</code> transcripts. Confirm the dashboard status pill reads
-      <code class="inline-code">cosmosdb</code> and not <code class="inline-code">Demo Mode</code> before
-      capturing anything.</li>
+      <code class="inline-code">Served from Cosmos DB</code> &mdash; not
+      <code class="inline-code">Sample data (ENABLE_DEMO_FALLBACK is on)</code>,
+      <code class="inline-code">Served from in-process cache</code> or
+      <code class="inline-code">Cache empty</code> &mdash; before capturing anything. Those are the literal
+      strings the frontend renders.</li>
     <li><strong>Record the demo video last</strong>, against the deployed system rather than local fallback
       data. 20 marks.</li>
   </ol>
 </div>
 
 <!-- ============================================================ -->
-<!-- 8. SECURITY ANALYSIS                                          -->
+<!-- 9. SECURITY ANALYSIS                                          -->
 <!-- ============================================================ -->
-<h2 id="security">8. Security Analysis</h2>
+<h2 id="security">9. Security Analysis</h2>
 <div class="section-card">
   <h3>Threat Model &amp; Controls</h3>
   <p>A control that exists in source code but has never executed against real infrastructure is
@@ -1643,14 +2059,14 @@ made of the system.</p>
       <tr>
         <td>Password theft (stored credentials)</td>
         <td>Application</td>
-        <td>bcrypt at 12 salt rounds; plaintext is never written. Readable at <code class="inline-code">auth.py:65-95</code>.</td>
+        <td>bcrypt at 12 salt rounds; plaintext is never written. Readable at <code class="inline-code">auth.py</code>, <code class="inline-code">hash_password()</code>. <code class="inline-code">User.to_public()</code> omits the hash and both handlers return it.</td>
         <td><span class="pill ok">Verified in repo</span></td>
         <td>Nothing, to confirm the code. To confirm the stored result: one Data Explorer screenshot of a user document.</td>
       </tr>
       <tr>
         <td>Token forgery</td>
         <td>Application</td>
-        <td>HS256 signature verified server-side on every protected request. No default signing key: the app raises at import on Azure if <code class="inline-code">JWT_SECRET</code> is unset (<code class="inline-code">auth.py:22-36</code>), and <code class="inline-code">deploy.sh, the app-settings step</code> generates a random one.</td>
+        <td>HS256 signature verified server-side on every protected request. No default signing key: the app raises at import on Azure if <code class="inline-code">JWT_SECRET</code> is unset (<code class="inline-code">auth.py</code>, the import-time secret check), and <code class="inline-code">deploy.sh, the app-settings step</code> generates a random one.</td>
         <td><span class="pill ok">Verified in repo</span></td>
         <td>A <code class="inline-code">curl</code> showing a tampered token rejected with 401 by the deployed API.</td>
       </tr>
@@ -1662,23 +2078,30 @@ made of the system.</p>
         <td>Either move the session to an HttpOnly, Secure, SameSite cookie, or state this trade-off explicitly in the demo. Pretending it is solved is worse than disclosing it.</td>
       </tr>
       <tr>
-        <td>OAuth callback forgery / stale callback</td>
+        <td>OAuth callback forgery / login CSRF</td>
         <td>Auth</td>
-        <td>Authorization-code flow (not implicit); the code is exchanged server-side and the client never sees provider tokens. <code class="inline-code">state</code> is a signed 10-minute JWT the callback verifies, rejecting a bad one with 400.</td>
-        <td><span class="pill warn">Code complete &middot; unverified</span></td>
-        <td>Cannot be tested until an OAuth app is registered. Note the residual gap: the state is signed but <strong>not bound to the browser session</strong>, so it is not full login-CSRF protection.</td>
+        <td>Authorization-code flow (not implicit); the code is exchanged server-side and the client never sees provider tokens. <code class="inline-code">state</code> is a signed 10-minute JWT carrying a random <code class="inline-code">jti</code>, <strong>and it is bound to the browser that started the flow</strong>: the same value is set as an <code class="inline-code">HttpOnly</code>, <code class="inline-code">SameSite=Lax</code> cookie (<code class="inline-code">p3_oauth_state</code>, <code class="inline-code">Secure</code> on Azure), and <code class="inline-code">verify_state_request()</code> requires the signature to verify, the cookie to be present, and the two to match under <code class="inline-code">secrets.compare_digest</code> before the authorization code is read. Both callbacks call it first and redirect a rejection to <code class="inline-code">login.html?error=oauth_state</code>; the cookie is expired as the flow completes.</td>
+        <td><span class="pill ok">Verified in repo</span> <span class="pill warn">Never executed against a provider</span></td>
+        <td>End-to-end exercise cannot happen until an OAuth app is registered. The control itself is readable now in <code class="inline-code">auth.py</code> (<code class="inline-code">create_state()</code>, <code class="inline-code">state_cookie()</code>, <code class="inline-code">verify_state_request()</code>) and is covered by unit tests &mdash; see &sect;7. An earlier revision of this row disclosed the missing cookie pairing as a residual gap; that gap has since been closed and the disclosure was out of date.</td>
+      </tr>
+      <tr>
+        <td>Stored XSS through dataset content</td>
+        <td>Frontend</td>
+        <td>Every recipe cell originates in the uploaded CSV, and <code class="inline-code">clean_data</code> normalises text without sanitising markup &mdash; so a crafted <code class="inline-code">Recipe_name</code> or <code class="inline-code">Diet_type</code> would otherwise be injected into the table markup and could read the session token out of <code class="inline-code">localStorage</code>. <code class="inline-code">renderRecipeTable()</code> passes every interpolated value through <code class="inline-code">escapeHtml()</code>, which sets a detached element's <code class="inline-code">textContent</code> and reads back its <code class="inline-code">innerHTML</code>, so the browser performs the escaping; the same helper covers the diet dropdown options and the status pill label.</td>
+        <td><span class="pill ok">Verified in repo</span></td>
+        <td>None for the code. Worth narrating in the demo precisely because the token is script-reachable by design, which makes output escaping load-bearing rather than belt-and-braces.</td>
       </tr>
       <tr>
         <td>NoSQL injection</td>
         <td>API</td>
-        <td>User input never reaches a Cosmos query. Documents are read by id, and filtering and search run in Python over the returned records. The earlier claim of &ldquo;parameterized queries exclusively&rdquo; described code that does not exist &mdash; the actual design avoids query construction altogether.</td>
+        <td>User input <em>does</em> reach Cosmos, and only ever as a <strong>bound parameter</strong>. The login and duplicate-email lookup runs <code class="inline-code">SELECT * FROM c WHERE c.email = @email</code> with the submitted address passed through <code class="inline-code">parameters=[{"name": "@email", "value": email}]</code> (<code class="inline-code">function_app.py</code>, <code class="inline-code">_find_user_by_email()</code>), and the OAuth lookup binds <code class="inline-code">@p</code> and <code class="inline-code">@pid</code> the same way (<code class="inline-code">_find_user_by_provider()</code>). Both query strings are fixed literals: nothing is concatenated, f-string-interpolated or <code class="inline-code">%</code>-formatted into them, so a value such as <code class="inline-code">" OR 1=1 --</code> is compared as an email address rather than parsed as SQL. The cached analytics documents add a second layer rather than replacing this one: chunks and the metadata document are fetched by id with <code class="inline-code">read_item()</code> (<code class="inline-code">cache.py</code>, <code class="inline-code">_cosmos_read()</code>), and the diet filter and keyword search then run in Python over the returned records. An earlier revision of this row denied that any query existed at all, which gave away the one piece of genuine injection-safety engineering in the repository.</td>
         <td><span class="pill ok">Verified in repo</span></td>
-        <td>None for the code. Any future move to server-side Cosmos queries must use parameters.</td>
+        <td>None for the code: the two query literals above are the only <code class="inline-code">query=</code> arguments in <code class="inline-code">backend/</code>, and both carry <code class="inline-code">parameters=</code>. Any future server-side Cosmos filter must keep using bound parameters.</td>
       </tr>
       <tr>
         <td>Unauthorized data access</td>
         <td>API</td>
-        <td><code class="inline-code">/api/insights</code> and <code class="inline-code">/api/recipes</code> return 401 without a valid signed token (<code class="inline-code">function_app.py:166-174</code>). The browser-side redirect is <em>not</em> the control and does not verify the signature.</td>
+        <td><code class="inline-code">/api/insights</code> and <code class="inline-code">/api/recipes</code> return 401 without a valid signed token (<code class="inline-code">function_app.py</code>, <code class="inline-code">_reject_unauthenticated()</code>). The browser-side redirect is <em>not</em> the control and does not verify the signature.</td>
         <td><span class="pill ok">Guards verified in repo</span></td>
         <td>The 401-without-token <code class="inline-code">curl</code> transcript against the deployed API.</td>
       </tr>
@@ -1728,9 +2151,9 @@ made of the system.</p>
 </div>
 
 <!-- ============================================================ -->
-<!-- 9. TEAM & CONTRIBUTIONS                                       -->
+<!-- 10. TEAM & CONTRIBUTIONS                                      -->
 <!-- ============================================================ -->
-<h2 id="team">9. Team &amp; Contributions</h2>
+<h2 id="team">10. Team &amp; Contributions</h2>
 <div class="section-card">
   <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(250px,1fr))">
     <div class="card">
@@ -1767,9 +2190,9 @@ made of the system.</p>
 </div>
 
 <!-- ============================================================ -->
-<!-- 10. CHALLENGES & SOLUTIONS                                    -->
+<!-- 11. CHALLENGES & SOLUTIONS                                   -->
 <!-- ============================================================ -->
-<h2 id="challenges">10. Design Decisions &amp; Open Problems</h2>
+<h2 id="challenges">11. Design Decisions &amp; Open Problems</h2>
 <p>This section previously described debugging episodes that never happened &mdash; a Premium-plan cold-start
 fix, Redis connection pooling, a Google <code class="inline-code">redirect_uri_mismatch</code> resolved in the
 Cloud Console, an RU/s throttling fix, and a migration to HttpOnly cookies. None of that work exists in this
@@ -1799,42 +2222,42 @@ follows is traceable to the code, and the last two rows are problems that are st
         <td>2</td>
         <td><strong>A process-local cache is invisible to other instances</strong></td>
         <td>On Azure Functions the blob trigger and the HTTP handlers are not guaranteed to share a process, so an in-memory cache leaves the API with nothing to serve &mdash; and search, filter and pagination then operate on whatever fallback exists.</td>
-        <td>Recipes are persisted to Cosmos, mirroring the insights path, so any instance can read them (<code class="inline-code">cache.py:229-317</code>).</td>
+        <td>Recipes are persisted to Cosmos, mirroring the insights path, so any instance can read them (<code class="inline-code">cache.py</code>, <code class="inline-code">store_recipes()</code> and <code class="inline-code">get_recipes()</code>).</td>
         <td><span class="pill ok">Implemented</span></td>
       </tr>
       <tr>
         <td>3</td>
         <td><strong>The dataset exceeds the Cosmos document limit</strong></td>
         <td>A Cosmos document may not exceed 2&nbsp;MB; the cleaned dataset serializes to roughly 1.2&nbsp;MB and would break on any growth.</td>
-        <td>Records are split into chunks of 2,000 with a <code class="inline-code">recipes_meta</code> document holding the count. Orphan chunks from a larger previous dataset are deleted before the new count is published, and a reader that finds a chunk missing discards the whole set rather than serving a partial one (<code class="inline-code">cache.py:42, 229-281, 282-317</code>).</td>
+        <td>Records are split into chunks of 2,000 with a <code class="inline-code">recipes_meta</code> document holding the count. Orphan chunks from a larger previous dataset are deleted before the new count is published, and a reader that finds a chunk missing discards the whole set rather than serving a partial one (<code class="inline-code">cache.py</code>: <code class="inline-code">CHUNK_SIZE</code>, <code class="inline-code">store_recipes()</code>, <code class="inline-code">get_recipes()</code>).</td>
         <td><span class="pill ok">Implemented</span></td>
       </tr>
       <tr>
         <td>4</td>
         <td><strong>Realistic sample data hid a broken cache</strong></td>
         <td>The fallback returned the real 7,806-row aggregate numbers, so an empty cache looked identical to a working one &mdash; which is precisely what this phase has to prove.</td>
-        <td>Fallbacks are now opt-in via <code class="inline-code">ENABLE_DEMO_FALLBACK</code>, default off, and an empty cache returns 503 with an explanation. The dashboard status pill names the source on screen (<code class="inline-code">function_app.py:155-162</code>, <code class="inline-code">frontend/app.js:549</code>).</td>
+        <td>Fallbacks are now opt-in via <code class="inline-code">ENABLE_DEMO_FALLBACK</code>, default off, and an empty cache returns 503 with an explanation. The dashboard status pill names the source on screen (<code class="inline-code">function_app.py</code>, <code class="inline-code">_demo_fallback_enabled()</code>; <code class="inline-code">frontend/app.js</code>, <code class="inline-code">updateStatusBar()</code>).</td>
         <td><span class="pill ok">Implemented</span></td>
       </tr>
       <tr>
         <td>5</td>
         <td><strong>A client-side redirect is not access control</strong></td>
         <td>The browser gate does not verify the token signature, so on its own it protects nothing.</td>
-        <td>Both data endpoints verify the signature server-side and return 401 without a valid token; the frontend sends a bearer header and honours the 401 by clearing the token and redirecting (<code class="inline-code">function_app.py:166-174</code>, <code class="inline-code">frontend/app.js:111, 171, 221-224</code>).</td>
+        <td>Both data endpoints verify the signature server-side and return 401 without a valid token; the frontend sends a bearer header and honours the 401 by clearing the token and redirecting (<code class="inline-code">function_app.py</code>, <code class="inline-code">_reject_unauthenticated()</code>, <code class="inline-code">frontend/app.js</code>, the <code class="inline-code">resp.status === 401</code> checks in <code class="inline-code">loadInsights()</code> and <code class="inline-code">loadRecipes()</code> plus <code class="inline-code">redirectToLogin()</code>).</td>
         <td><span class="pill ok">Implemented</span></td>
       </tr>
       <tr>
         <td>6</td>
         <td><strong>A known default signing key is a universal forgery</strong></td>
         <td>Any deployment shipping a documented default <code class="inline-code">JWT_SECRET</code> lets anyone mint a valid session token.</td>
-        <td>The app raises at import on Azure when <code class="inline-code">JWT_SECRET</code> is unset and only falls back to a clearly-named local key under <code class="inline-code">func start</code>; <code class="inline-code">deploy.sh, the app-settings step</code> generates a random secret (<code class="inline-code">auth.py:22-36</code>).</td>
+        <td>The app raises at import on Azure when <code class="inline-code">JWT_SECRET</code> is unset and only falls back to a clearly-named local key under <code class="inline-code">func start</code>; <code class="inline-code">deploy.sh, the app-settings step</code> generates a random secret (<code class="inline-code">auth.py</code>, the import-time secret check).</td>
         <td><span class="pill ok">Implemented</span></td>
       </tr>
       <tr>
         <td>7</td>
         <td><strong>Redis has no free tier</strong></td>
         <td>Provisioning Azure Cache for Redis would exceed a student credit, but the rubric accepts either an external cache or a database.</td>
-        <td>Cosmos DB serverless is the cache of record; Redis code remains as an optional read-through layer that activates only when <code class="inline-code">REDIS_HOST</code> is set (<code class="inline-code">deploy.sh, the cost note in its header</code>, <code class="inline-code">cache.py:48-56</code>).</td>
+        <td>Cosmos DB serverless is the cache of record; Redis code remains as an optional read-through layer that activates only when <code class="inline-code">REDIS_HOST</code> is set (<code class="inline-code">deploy.sh, the cost note in its header</code>, <code class="inline-code">cache.py</code>, <code class="inline-code">_get_redis()</code>).</td>
         <td><span class="pill ok">Implemented</span></td>
       </tr>
       <tr>
@@ -1855,7 +2278,7 @@ follows is traceable to the code, and the last two rows are problems that are st
         <td>10</td>
         <td><strong>Indexing the cached payloads cost write RUs for nothing</strong></td>
         <td>Cosmos indexes every path by default. Each chunk document holds a 2,000-element <code class="inline-code">records</code> array, and the insights document holds its aggregates under <code class="inline-code">data</code> &mdash; so every blob-trigger write was paying to index thousands of nested fields. No query reads them: chunks are fetched by id.</td>
-        <td>The <code class="inline-code">cache</code> container ships an indexing policy excluding <code class="inline-code">/records/*</code> and <code class="inline-code">/data/*</code>. <code class="inline-code">deploy.sh</code> applies it at creation and <code class="inline-code">cache.py</code> applies the same policy if it creates the container first, so the two cannot drift (<code class="inline-code">cache.py:33-40</code>, <code class="inline-code">deploy.sh, the Cosmos container step</code>). The saving is in write RUs per CSV change and has not been measured yet.</td>
+        <td>The <code class="inline-code">cache</code> container ships an indexing policy excluding <code class="inline-code">/records/*</code> and <code class="inline-code">/data/*</code>. <code class="inline-code">deploy.sh</code> applies it at creation and <code class="inline-code">cache.py</code> applies the same policy if it creates the container first, so the two cannot drift (<code class="inline-code">cache.py</code>, <code class="inline-code">CACHE_INDEXING_POLICY</code>; <code class="inline-code">deploy.sh, the Cosmos container step</code>). The saving is in write RUs per CSV change and has not been measured yet.</td>
         <td><span class="pill ok">Implemented</span></td>
       </tr>
       <tr>
@@ -1884,6 +2307,14 @@ follows is traceable to the code, and the last two rows are problems that are st
     <span class="sub">Diet Types</span>
   </div>
   <div class="card">
+    <b>143</b>
+    <span class="sub">Backend Tests Passing</span>
+  </div>
+  <div class="card">
+    <b>2</b>
+    <span class="sub">Dataset Versions Prepared</span>
+  </div>
+  <div class="card">
     <b>0</b>
     <span class="sub">Azure Resources Provisioned</span>
   </div>
@@ -1908,11 +2339,15 @@ follows is traceable to the code, and the last two rows are problems that are st
     <li><strong>OAuth Code:</strong> Google and GitHub authorization-code flows with signed <code class="inline-code">state</code> and verified-email gating <span class="pill warn">unverified</span></li>
     <li><strong>Auth Gate:</strong> 401 on the data endpoints without a valid token; name and Logout in the header <span class="pill ok">verified in repo</span></li>
     <li><strong>Deploy Script:</strong> provisions storage, Cosmos serverless, the Function App and the static site <span class="pill bad">never run</span></li>
+    <li><strong>Backend Test Suite:</strong> 143 tests over <code class="inline-code">auth</code>, <code class="inline-code">models</code>, <code class="inline-code">nutrition</code>, <code class="inline-code">cache</code> and OAuth account linking; run with <code class="inline-code">python -m pytest -q</code> from <code class="inline-code">Project3/</code>, output captured in <code class="inline-code">docs/evidence/tests.log</code> <span class="pill ok">executed, passing</span></li>
+    <li><strong>Second Dataset Version:</strong> <code class="inline-code">data/make_v2.py</code> + <code class="inline-code">data/All_Diets_v2.csv</code>, with every before/after chart value tabulated in <code class="inline-code">docs/demo-plan.md</code> <span class="pill ok">verified in repo</span></li>
+    <li><strong>Health and Identity Endpoints:</strong> <code class="inline-code">/api/health</code> reporting live security configuration, and <code class="inline-code">/api/auth/me</code> <span class="pill warn">unverified</span></li>
+    <li><strong>Demo Run Sheet:</strong> <code class="inline-code">docs/demo-plan.md</code> &mdash; ordered beats, the exact figures to expect on screen, and the pre-record checklist <span class="pill ok">written</span></li>
   </ul>
   <h4 style="margin-top:.8rem">Not yet in existence</h4>
   <ul style="font-size:.9rem">
     <li><strong>Any deployed environment.</strong> No resource group, no Cosmos account, no Function App, no live URL. <span class="pill bad">Not done</span></li>
-    <li><strong>Any evidence artefact.</strong> No screenshots, no log excerpts, no <code class="inline-code">curl</code> transcripts, no measured timings. <span class="pill bad">Not done</span></li>
+    <li><strong>Any evidence artefact from a running system.</strong> No screenshots, no Azure log excerpts, no <code class="inline-code">curl</code> transcripts, no measured response times. The one captured artefact in the repository, <code class="inline-code">docs/evidence/tests.log</code>, is a local test run and is evidence of coding practice, not of a deployment. <span class="pill bad">Not done</span></li>
     <li><strong>Registered OAuth applications.</strong> Third-party login cannot succeed until they exist and the credentials are set. <span class="pill bad">Not done</span></li>
     <li><strong>Encryption-at-rest evidence.</strong> True by platform default once Cosmos exists; nothing in the repository shows it. <span class="pill bad">Not done</span></li>
     <li><strong>The demo video.</strong> 20 of 100 marks, not started, and dependent on all of the above. <span class="pill bad">Not done</span></li>
@@ -1920,7 +2355,8 @@ follows is traceable to the code, and the last two rows are problems that are st
 </div>
 
 <footer>
-  <p><strong>Status as of 2026-10-02:</strong> code complete, nothing deployed, no evidence captured, demo not
+  <p><strong>Status as of 2026-10-02:</strong> code complete, backend test suite passing locally, second
+  dataset version and demo run sheet prepared; nothing deployed, no deployment evidence captured, demo not
   recorded. No self-assigned score.</p>
   <p>CPSY 300 &mdash; Cloud Computing &mdash; Project 3: Improve Cloud Dashboard</p>
   <p>Yuandong Yang &middot; Ethan Bayarsaikhan &middot; Justin Norman-Rance &middot; 2026-10-02</p>

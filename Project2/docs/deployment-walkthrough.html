@@ -493,19 +493,28 @@ git push</pre></div>
   </div>
 
   <div class="note warn">
-    <p><b>Phase 2 没有 teardown.sh</b>（Phase 3 有）。所有资源都在同一个资源组里，删组就够。<b>确认截图和 PDF 都已提交之后再删</b> —— 删了就拿不回来了。</p>
+    <p><b>确认截图和 PDF 都已提交之后再删</b> —— 删了就拿不回来了。而且重新部署时 Static Web App 会拿到<b>新的域名</b>，已经写进报告和 PDF 的地址会全部失效，等于截图要重拍一遍。</p>
   </div>
 
   <div class="step">
     <input type="checkbox" id="s14" />
     <div class="step-body">
-      <p class="step-title">先看一眼要删什么，再删</p>
-      <div class="cmd"><button class="copy" type="button">复制</button><pre>az resource list --resource-group cpsy300-nutritional-insights-rg \
-  --query "[].{名称:name, 类型:type}" -o table
+      <p class="step-title">跑 teardown.sh</p>
+      <p>脚本会先列出要删的资源、要你确认，再删整个资源组。</p>
+      <div class="cmd"><button class="copy" type="button">复制</button><pre>cd ~/Desktop/claude-computing/Project2
+./teardown.sh</pre></div>
+    </div>
+  </div>
 
-az group delete --name cpsy300-nutritional-insights-rg --yes --no-wait
-echo "删除已下发。几分钟后用下面这条确认："
-echo "  az group exists --name cpsy300-nutritional-insights-rg   # 应该返回 false"</pre></div>
+  <div class="step">
+    <input type="checkbox" id="s15" />
+    <div class="step-body">
+      <p class="step-title">确认两个资源组都没了</p>
+      <p>Phase 2 和 Phase 3 用的是<b>不同的资源组</b>，只删一个会让另一个继续计费。两个演示都录完后统一确认一次：</p>
+      <div class="cmd"><button class="copy" type="button">复制</button><pre>az group list --query "[].name" -o tsv
+<span class="c"># 下面两个名字都不该出现：</span>
+<span class="c">#   cpsy300-nutritional-insights-rg   ← Phase 2</span>
+<span class="c">#   cpsy300-project3-rg               ← Phase 3（用 Project3/teardown.sh 删）</span></pre></div>
     </div>
   </div>
 </section>
