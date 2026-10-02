@@ -4,11 +4,19 @@
 #
 # Provisions all required Azure resources and deploys the application:
 #   - Resource Group
-#   - Storage Account (Blob containers: raw-data, clean-data)
-#   - Azure Cache for Redis
-#   - Cosmos DB (SQL API, encrypted at rest)
+#   - Storage Account (Blob containers: raw-data, clean-data; static website)
+#   - Cosmos DB (SQL API, serverless, encrypted at rest)
 #   - Azure Functions (Python, Consumption plan)
-#   - Static Web App (frontend)
+#
+# Cost: this stays inside a student credit. Cosmos is provisioned serverless,
+# so it bills per request rather than for reserved throughput, and the
+# Functions Consumption plan and Blob storage are effectively free at this
+# scale. Azure Cache for Redis is NOT provisioned: it has no free tier, and
+# the rubric allows "an external cache (like Redis) or a database (like
+# Cosmos)". The code uses Redis only when REDIS_HOST is set.
+#
+# Billing is per hour and per request, so DELETE THE RESOURCE GROUP once the
+# demo is recorded -- see teardown.sh.
 #
 # Usage:
 #   chmod +x deploy.sh
@@ -26,10 +34,24 @@ RESOURCE_GROUP="cpsy300-project3-rg"
 LOCATION="canadacentral"
 STORAGE_ACCOUNT="cpsy300p3storage"
 FUNCTION_APP="cpsy300-p3-functions"
-REDIS_NAME="cpsy300-p3-redis"
 COSMOS_ACCOUNT="cpsy300-p3-cosmos"
 COSMOS_DATABASE="nutritiondb"
-STATIC_WEB_APP="cpsy300-p3-frontend"
+
+# OAuth: register the apps first, then export these before running.
+#   GitHub -> Settings > Developer settings > OAuth Apps > New OAuth App
+#   Callback URL must match exactly:
+#     https://<FUNCTION_APP>.azurewebsites.net/api/auth/oauth/github/callback
+GITHUB_CLIENT_ID="${GITHUB_CLIENT_ID:-}"
+GITHUB_CLIENT_SECRET="${GITHUB_CLIENT_SECRET:-}"
+GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID:-}"
+GOOGLE_CLIENT_SECRET="${GOOGLE_CLIENT_SECRET:-}"
+
+if [[ -z "$GITHUB_CLIENT_ID" && -z "$GOOGLE_CLIENT_ID" ]]; then
+  echo "WARNING: no OAuth client configured. Third-party login will not work."
+  echo "         Set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET, or configure"
+  echo "         them in the Function App settings afterwards."
+  echo ""
+fi
 
 echo "============================================"
 echo " Project 3 (Phase 3) — Azure Deployment"
@@ -62,33 +84,17 @@ echo "    Creating blob containers..."
 az storage container create --name raw-data --connection-string "$STORAGE_CONN" --output none 2>/dev/null || true
 az storage container create --name clean-data --connection-string "$STORAGE_CONN" --output none 2>/dev/null || true
 
-# ---- 3. Azure Cache for Redis ----
-echo "[3/7] Creating Azure Cache for Redis (may take a few minutes)..."
-az redis create \
-  --name "$REDIS_NAME" \
-  --resource-group "$RESOURCE_GROUP" \
-  --location "$LOCATION" \
-  --sku Basic \
-  --vm-size C0 \
-  --output none
-
-REDIS_HOST=$(az redis show \
-  --name "$REDIS_NAME" \
-  --resource-group "$RESOURCE_GROUP" \
-  --query hostName -o tsv)
-
-REDIS_KEY=$(az redis list-keys \
-  --name "$REDIS_NAME" \
-  --resource-group "$RESOURCE_GROUP" \
-  --query primaryKey -o tsv)
-
-# ---- 4. Cosmos DB ----
-echo "[4/7] Creating Cosmos DB account (encrypted at rest by default)..."
+# ---- 3. Cosmos DB ----
+# Serverless: billed per request unit consumed, with no reserved throughput to
+# pay for while the app sits idle between demo runs. Encrypted at rest with
+# service-managed keys by default, which is what rubric item 8 asks for.
+echo "[3/6] Creating Cosmos DB account, serverless (a few minutes)..."
 az cosmosdb create \
   --name "$COSMOS_ACCOUNT" \
   --resource-group "$RESOURCE_GROUP" \
   --locations regionName="$LOCATION" failoverPriority=0 \
   --default-consistency-level Session \
+  --capabilities EnableServerless \
   --output none
 
 COSMOS_ENDPOINT=$(az cosmosdb show \
@@ -101,32 +107,27 @@ COSMOS_KEY=$(az cosmosdb keys list \
   --resource-group "$RESOURCE_GROUP" \
   --query primaryMasterKey -o tsv)
 
-# Create database and containers
+# Create database and containers. Errors are shown rather than discarded: a
+# silently missing container used to surface much later as an empty dashboard.
 echo "    Creating database and containers..."
 az cosmosdb sql database create \
   --account-name "$COSMOS_ACCOUNT" \
   --resource-group "$RESOURCE_GROUP" \
   --name "$COSMOS_DATABASE" \
-  --output none 2>/dev/null || true
+  --output none || echo "    (database already exists)"
 
-az cosmosdb sql container create \
-  --account-name "$COSMOS_ACCOUNT" \
-  --resource-group "$RESOURCE_GROUP" \
-  --database-name "$COSMOS_DATABASE" \
-  --name users \
-  --partition-key-path "/partitionKey" \
-  --output none 2>/dev/null || true
+for container in users cache; do
+  az cosmosdb sql container create \
+    --account-name "$COSMOS_ACCOUNT" \
+    --resource-group "$RESOURCE_GROUP" \
+    --database-name "$COSMOS_DATABASE" \
+    --name "$container" \
+    --partition-key-path "/partitionKey" \
+    --output none || echo "    (container $container already exists)"
+done
 
-az cosmosdb sql container create \
-  --account-name "$COSMOS_ACCOUNT" \
-  --resource-group "$RESOURCE_GROUP" \
-  --database-name "$COSMOS_DATABASE" \
-  --name cache \
-  --partition-key-path "/partitionKey" \
-  --output none 2>/dev/null || true
-
-# ---- 5. Function App ----
-echo "[5/7] Creating Function App..."
+# ---- 4. Function App ----
+echo "[4/6] Creating Function App..."
 az functionapp create \
   --name "$FUNCTION_APP" \
   --resource-group "$RESOURCE_GROUP" \
@@ -147,10 +148,6 @@ az functionapp config appsettings set \
     "BLOB_CONNECTION_STRING=$STORAGE_CONN" \
     "BLOB_CONTAINER_RAW=raw-data" \
     "BLOB_CONTAINER_CLEAN=clean-data" \
-    "REDIS_HOST=$REDIS_HOST" \
-    "REDIS_PORT=6380" \
-    "REDIS_PASSWORD=$REDIS_KEY" \
-    "REDIS_SSL=true" \
     "COSMOS_ENDPOINT=$COSMOS_ENDPOINT" \
     "COSMOS_KEY=$COSMOS_KEY" \
     "COSMOS_DATABASE=$COSMOS_DATABASE" \
@@ -158,6 +155,13 @@ az functionapp config appsettings set \
     "COSMOS_CACHE_CONTAINER=cache" \
     "JWT_SECRET=$(openssl rand -base64 32)" \
     "JWT_EXPIRY_HOURS=24" \
+    "ENABLE_DEMO_FALLBACK=false" \
+    "GITHUB_CLIENT_ID=$GITHUB_CLIENT_ID" \
+    "GITHUB_CLIENT_SECRET=$GITHUB_CLIENT_SECRET" \
+    "GITHUB_REDIRECT_URI=https://$FUNCTION_APP.azurewebsites.net/api/auth/oauth/github/callback" \
+    "GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID" \
+    "GOOGLE_CLIENT_SECRET=$GOOGLE_CLIENT_SECRET" \
+    "GOOGLE_REDIRECT_URI=https://$FUNCTION_APP.azurewebsites.net/api/auth/oauth/google/callback" \
   --output none
 
 # Deploy function code
@@ -166,18 +170,11 @@ cd backend
 func azure functionapp publish "$FUNCTION_APP" --python
 cd ..
 
-# ---- 6. Upload initial data ----
-echo "[6/7] Uploading initial dataset..."
-az storage blob upload \
-  --container-name raw-data \
-  --file ../Project1/data/All_Diets.csv \
-  --name All_Diets.csv \
-  --connection-string "$STORAGE_CONN" \
-  --overwrite true \
-  --output none 2>/dev/null || true
-
-# ---- 7. Deploy frontend (Static Web App or Storage static site) ----
-echo "[7/7] Deploying frontend to storage static website..."
+# ---- 5. Deploy frontend ----
+# Done before the dataset upload so FRONTEND_URL is known: the OAuth callback
+# redirects there, and without the app setting it would send users to
+# localhost:8080.
+echo "[5/6] Deploying frontend to storage static website..."
 az storage blob service-properties update \
   --account-name "$STORAGE_ACCOUNT" \
   --static-website \
@@ -197,12 +194,29 @@ FRONTEND_URL=$(az storage account show \
   --resource-group "$RESOURCE_GROUP" \
   --query primaryEndpoints.web -o tsv)
 
-# Update CORS and frontend URL
+# CORS must list the exact frontend origin: a rejected pre-flight makes fetch
+# reject, which the login page reports as an unreachable server.
 az functionapp cors add \
   --name "$FUNCTION_APP" \
   --resource-group "$RESOURCE_GROUP" \
   --allowed-origins "${FRONTEND_URL%/}" \
-  --output none 2>/dev/null || true
+  --output none || echo "    (origin already allowed)"
+
+az functionapp config appsettings set \
+  --name "$FUNCTION_APP" \
+  --resource-group "$RESOURCE_GROUP" \
+  --settings "FRONTEND_URL=${FRONTEND_URL%/}" \
+  --output none
+
+# ---- 6. Upload the dataset, which fires the blob trigger ----
+echo "[6/6] Uploading initial dataset..."
+az storage blob upload \
+  --container-name raw-data \
+  --file ../Project1/data/All_Diets.csv \
+  --name All_Diets.csv \
+  --connection-string "$STORAGE_CONN" \
+  --overwrite true \
+  --output none
 
 echo ""
 echo "============================================"
@@ -211,12 +225,21 @@ echo "============================================"
 echo ""
 echo " Frontend URL:  $FRONTEND_URL"
 echo " Function App:  https://$FUNCTION_APP.azurewebsites.net"
-echo " Redis:         $REDIS_HOST:6380"
 echo " Cosmos DB:     $COSMOS_ENDPOINT"
 echo ""
 echo " Next steps:"
-echo "   1. Configure OAuth client IDs in Function App settings"
-echo "   2. Upload All_Diets.csv to the raw-data blob container"
-echo "      (the blob trigger will process it automatically)"
-echo "   3. Open the frontend URL in your browser"
+echo "   1. Wait for the blob trigger to finish, then check:"
+echo "        curl https://$FUNCTION_APP.azurewebsites.net/api/health"
+echo "      'recipes_cached' should be true and 'recipe_count' 7806."
+echo "      On a Consumption plan the trigger polls, so this can take"
+echo "      several minutes after the upload."
+echo "   2. Open the frontend URL, register, and confirm the status pill"
+echo "      reads 'Served from Cosmos DB'."
+echo "   3. Confirm the API rejects anonymous callers:"
+echo "        curl -i https://$FUNCTION_APP.azurewebsites.net/api/insights"
+echo "      This must return 401 -- it is the evidence for rubric item 9."
+echo ""
+echo " WHEN THE DEMO IS RECORDED, DELETE EVERYTHING:"
+echo "        ./teardown.sh"
+echo " Resources bill by the hour whether or not anyone uses them."
 echo "============================================"

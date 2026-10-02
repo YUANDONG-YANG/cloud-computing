@@ -1,3 +1,7 @@
+# Azure Functions app settings: account keys and OAuth client secrets.
+# Commit local.settings.json.example instead.
+local.settings.json
+
 .venv/
 __pycache__/
 .pytest_cache/
@@ -6,8 +10,13 @@ __pycache__/
 .env
 *.pyc
 
-# Azure Functions local settings (may contain storage connection strings)
-local.settings.json
 # deploy.sh build output (frontend with the live API URL injected)
 Project2/build/
 node_modules/
+
+# AI 助手文件，不提交
+CLAUDE.md
+.claude/
+.cursor/
+.github/copilot-instructions.md
+AGENTS.md

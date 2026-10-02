@@ -1,0 +1,43 @@
+{
+  "_comment": [
+    "Copy this file to local.settings.json and fill in real values.",
+    "local.settings.json is gitignored: it holds account keys and OAuth",
+    "secrets, and a secret pushed to GitHub is a secret that must be rotated.",
+    "",
+    "REDIS_* are omitted on purpose. Azure Cache for Redis has no free tier,",
+    "and the app uses Cosmos DB when REDIS_HOST is unset. Add REDIS_HOST only",
+    "if you are running the local Redis container from docker-compose.yml."
+  ],
+  "IsEncrypted": false,
+  "Values": {
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "BLOB_CONNECTION_STRING": "UseDevelopmentStorage=true",
+    "BLOB_CONTAINER_RAW": "raw-data",
+    "BLOB_CONTAINER_CLEAN": "clean-data",
+
+    "COSMOS_ENDPOINT": "https://<cosmos_account>.documents.azure.com:443/",
+    "COSMOS_KEY": "<cosmos_key>",
+    "COSMOS_DATABASE": "nutritiondb",
+    "COSMOS_USERS_CONTAINER": "users",
+    "COSMOS_CACHE_CONTAINER": "cache",
+
+    "JWT_SECRET": "<run: openssl rand -base64 32>",
+    "JWT_EXPIRY_HOURS": "24",
+
+    "ENABLE_DEMO_FALLBACK": "false",
+
+    "GITHUB_CLIENT_ID": "<github_client_id>",
+    "GITHUB_CLIENT_SECRET": "<github_client_secret>",
+    "GITHUB_REDIRECT_URI": "http://localhost:7071/api/auth/oauth/github/callback",
+    "GOOGLE_CLIENT_ID": "<google_client_id>",
+    "GOOGLE_CLIENT_SECRET": "<google_client_secret>",
+    "GOOGLE_REDIRECT_URI": "http://localhost:7071/api/auth/oauth/google/callback",
+
+    "FRONTEND_URL": "http://localhost:8080"
+  },
+  "Host": {
+    "CORS": "http://localhost:8080",
+    "CORSCredentials": false
+  }
+}
