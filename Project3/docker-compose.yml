@@ -51,7 +51,9 @@ services:
   # the whole Phase 3 ingestion path, so this service is not optional.
   # ---------------------------------------------------------------------------
   azurite:
-    image: mcr.microsoft.com/azure-storage/azurite:latest
+    # Pinned, not :latest — a storage emulator that silently changes
+    # behaviour between runs is the worst kind of local/cloud difference.
+    image: mcr.microsoft.com/azure-storage/azurite:3.35.0
     container_name: p3-azurite
     ports:
       - "10000:10000"   # Blob   — raw-data and clean-data containers

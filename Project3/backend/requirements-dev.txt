@@ -1,13 +1,16 @@
-# Test-only dependencies. The runtime ones are in requirements.txt and are the
-# only ones deployed to Azure -- keep pytest out of the deployment package.
+# Test dependencies. Install both files, then run the suite from Project3/:
 #
-#   python -m venv .venv && source .venv/bin/activate
-#   pip install -r backend/requirements.txt -r backend/requirements-dev.txt
-#   python -m pytest -q            # from Project3/, see pytest.ini
+#   pip install -r backend/requirements-dev.txt
+#   python -m pytest -q
 #
-# The suite imports the backend modules directly (tests/conftest.py puts
-# backend/ on sys.path), so the runtime requirements are needed too: the
-# nutrition tests exercise pandas and numpy, and the auth tests bcrypt and PyJWT.
+# The committed run in docs/evidence/tests.log was produced on Python 3.11 to
+# match the Function App runtime. To reproduce it exactly without installing
+# 3.11 locally:
+#
+#   docker run --rm -v "$PWD":/work -w /work python:3.11-slim \
+#     bash -c 'pip install -q -r backend/requirements-dev.txt && \
+#              python -m pytest -q -p no:cacheprovider'
+
 -r requirements.txt
 
-pytest>=8.0
+pytest==8.3.5

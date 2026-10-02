@@ -107,10 +107,18 @@ or not anyone uses the resources.
 
 ### Prerequisites
 
-- Python 3.11+
+- **Python 3.11** — the same version `deploy.sh` gives the Function App, and
+  the version the committed test run used. 3.10 will run the suite but is not
+  what gets deployed; see the Docker one-liner under Tests to match exactly.
 - Azure Functions Core Tools v4 (`npm i -g azure-functions-core-tools@4`)
-- Docker and Docker Compose (for Azurite)
+- Docker and Docker Compose (for Azurite, pinned to `azurite:3.35.0`)
 - Azure CLI (`az`) — used here only to talk to the local Azurite emulator
+
+Every Python dependency is pinned exactly in `backend/requirements.txt`, sharing
+Project 1's versions where the packages overlap. That is deliberate rather than
+tidy: `bcrypt>=4.1.0` used to allow either major version, and bcrypt 4 truncated
+passwords past 72 bytes where bcrypt 5 raises — so the deployed behaviour could
+differ from the tested behaviour.
 
 ### What runs locally, and what that proves
 
@@ -193,6 +201,14 @@ python -m pytest -q
 it is the only install needed. `pytest.ini` sets the test path and makes
 `backend/` importable, which is why the command runs from `Project3/` rather
 than from `backend/`.
+
+To run the suite on the deployed runtime without installing Python 3.11 locally:
+
+```bash
+docker run --rm -v "$PWD":/work -w /work python:3.11-slim \
+  bash -c 'pip install -q -r backend/requirements-dev.txt && \
+           python -m pytest -q -p no:cacheprovider'
+```
 
 The captured output of a real run is committed at `docs/evidence/tests.log`.
 That file is evidence, not decoration: regenerate it with the same command

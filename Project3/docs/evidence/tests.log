@@ -1,10 +1,12 @@
 # Project 3 (Phase 3) backend test run
-# Date:    2026-10-02 23:09 UTC
-# Command: python -m pytest -q   (run from Project3/)
-# Install: pip install -r backend/requirements-dev.txt
-# Python:  Python 3.10.12   pytest 9.1.1
+# Date:    2026-10-02 23:36 UTC
+# Runtime: Python 3.11.16  (matches the Function App: deploy.sh --runtime-version 3.11)
+# pytest:  8.3.5
+# Command: docker run --rm -v "$PWD":/work -w /work python:3.11-slim \
+#            bash -c 'pip install -q -r backend/requirements-dev.txt && \
+#                     python -m pytest -q -p no:cacheprovider'
 #
-# Captured output. Do not hand-edit: regenerate by running the command above.
+# Captured output. Do not hand-edit: regenerate with the command above.
 
 ........................................................................ [ 50%]
 .......................................................................  [100%]
@@ -15,4 +17,4 @@ tests/test_oauth_accounts.py: 8 warnings
 tests/test_auth.py: 14 warnings
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-143 passed, 35 warnings in 5.94s
+143 passed, 35 warnings in 6.12s
