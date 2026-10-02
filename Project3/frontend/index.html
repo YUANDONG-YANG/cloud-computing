@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nutritional Insights Dashboard</title>
+  <script src="auth.js"></script>
+  <script>
+    // Handle OAuth redirect (token in URL query param)
+    handleOAuthRedirect();
+
+    // Route based on auth state
+    if (isAuthenticated()) {
+      window.location.replace("dashboard.html");
+    } else {
+      window.location.replace("login.html");
+    }
+  </script>
+</head>
+<body>
+  <p style="text-align:center;margin-top:4rem;font-family:sans-serif;color:#64748b">
+    Redirecting...
+  </p>
+</body>
+</html>

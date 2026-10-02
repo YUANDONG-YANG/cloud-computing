@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nutritional Insights Dashboard</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <!-- Custom styles -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-slate-100 min-h-screen">
+
+    <!-- Header -->
+    <header class="bg-gradient-to-r from-blue-600 to-blue-800 text-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div>
+                <h1 class="text-2xl sm:text-3xl font-bold tracking-tight">Nutritional Insights Dashboard</h1>
+                <p class="text-blue-200 text-sm mt-1">CPSY 300 -- Phase 2: Cloud Dashboard Development</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <div id="exec-time-display" class="exec-time hidden">
+                    <span class="dot"></span>
+                    <span id="exec-time-value">--</span>
+                </div>
+                <div id="api-status" class="text-xs px-3 py-1.5 rounded-full bg-blue-700 text-blue-200">
+                    Checking API...
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Controls Bar -->
+    <div class="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center gap-3">
+            <label for="diet-filter" class="text-sm font-medium text-slate-600">Filter by Diet:</label>
+            <select id="diet-filter"
+                    class="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white">
+                <option value="all">All Diet Types</option>
+                <option value="dash">Dash</option>
+                <option value="keto">Keto</option>
+                <option value="mediterranean">Mediterranean</option>
+                <option value="paleo">Paleo</option>
+                <option value="vegan">Vegan</option>
+            </select>
+            <button id="refresh-btn"
+                    class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+                Refresh Data
+            </button>
+            <span id="data-source-label" class="ml-auto text-xs text-slate-400"></span>
+        </div>
+    </div>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+
+        <!-- Summary Stats -->
+        <section id="stats-section" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div class="stat-badge">
+                <span id="stat-total" class="stat-value">--</span>
+                <span class="stat-label">Total Recipes</span>
+            </div>
+            <div class="stat-badge">
+                <span id="stat-diets" class="stat-value">--</span>
+                <span class="stat-label">Diet Types</span>
+            </div>
+            <div class="stat-badge">
+                <span id="stat-highest-mean" class="stat-value">--</span>
+                <span class="stat-label">Highest Mean Protein</span>
+            </div>
+            <div class="stat-badge">
+                <span id="stat-highest-mean-val" class="stat-value">--</span>
+                <span class="stat-label">Mean Protein (g)</span>
+            </div>
+            <div class="stat-badge">
+                <span id="stat-highest-total" class="stat-value">--</span>
+                <span class="stat-label">Highest Total Protein</span>
+            </div>
+            <div class="stat-badge">
+                <span id="stat-highest-total-val" class="stat-value">--</span>
+                <span class="stat-label">Total Protein (g)</span>
+            </div>
+        </section>
+
+        <!-- Error Banner (hidden by default) -->
+        <div id="error-banner" class="error-banner hidden">
+            <svg class="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+            </svg>
+            <span id="error-message">An error occurred.</span>
+        </div>
+
+        <!-- Charts Grid -->
+        <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+            <!-- Bar Chart: Average Macros -->
+            <div class="card">
+                <h3 class="text-lg font-semibold text-slate-800 mb-1">Average Macronutrients by Diet</h3>
+                <p class="text-sm text-slate-500 mb-4">Mean protein, carbs, and fat (grams per recipe) for each diet type.</p>
+                <div class="chart-container" id="bar-chart-container">
+                    <canvas id="barChart"></canvas>
+                    <div class="loading-overlay" id="bar-loading">
+                        <div class="spinner"></div>
+                        <span>Loading chart...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pie Chart: Recipe Distribution -->
+            <div class="card">
+                <h3 class="text-lg font-semibold text-slate-800 mb-1">Recipe Distribution by Diet</h3>
+                <p class="text-sm text-slate-500 mb-4">Number of recipes in each diet category.</p>
+                <div class="chart-container" id="pie-chart-container">
+                    <canvas id="pieChart"></canvas>
+                    <div class="loading-overlay" id="pie-loading">
+                        <div class="spinner"></div>
+                        <span>Loading chart...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Heatmap: Macronutrient Values -->
+            <div class="card">
+                <h3 class="text-lg font-semibold text-slate-800 mb-1">Macronutrient Heatmap</h3>
+                <p class="text-sm text-slate-500 mb-4">Color-coded intensity of average macronutrient values across diets.</p>
+                <div class="chart-container" id="heatmap-container">
+                    <div id="heatmap" class="w-full"></div>
+                    <div class="loading-overlay" id="heatmap-loading">
+                        <div class="spinner"></div>
+                        <span>Loading heatmap...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Scatter Plot: Protein vs Carbs -->
+            <div class="card">
+                <h3 class="text-lg font-semibold text-slate-800 mb-1">Protein vs Carbs by Diet</h3>
+                <p class="text-sm text-slate-500 mb-4">Average protein plotted against average carbs for each diet type.</p>
+                <div class="chart-container" id="scatter-chart-container">
+                    <canvas id="scatterChart"></canvas>
+                    <div class="loading-overlay" id="scatter-loading">
+                        <div class="spinner"></div>
+                        <span>Loading chart...</span>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- Top Recipes & Common Cuisines -->
+        <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+            <!-- Top Protein Recipes Table -->
+            <div class="card">
+                <h3 class="text-lg font-semibold text-slate-800 mb-1">Top 5 Highest-Protein Recipes per Diet</h3>
+                <p class="text-sm text-slate-500 mb-4">The five recipes with the most protein in each diet category.</p>
+                <div class="table-scroll" id="top-recipes-container">
+                    <table class="data-table" id="top-recipes-table">
+                        <thead>
+                            <tr>
+                                <th>Diet</th>
+                                <th>Recipe</th>
+                                <th>Cuisine</th>
+                                <th>Protein (g)</th>
+                                <th>Carbs (g)</th>
+                                <th>Fat (g)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="top-recipes-body">
+                            <tr><td colspan="6" class="text-center text-slate-400 py-8">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Common Cuisines Table -->
+            <div class="card">
+                <h3 class="text-lg font-semibold text-slate-800 mb-1">Most Common Cuisines</h3>
+                <p class="text-sm text-slate-500 mb-4">The most frequently appearing cuisine type for each diet.</p>
+                <div class="table-scroll" id="cuisines-container">
+                    <table class="data-table" id="cuisines-table">
+                        <thead>
+                            <tr>
+                                <th>Diet Type</th>
+                                <th>Cuisine</th>
+                                <th>Recipe Count</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cuisines-body">
+                            <tr><td colspan="3" class="text-center text-slate-400 py-8">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- Full Recipe Data Table -->
+        <section class="card">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                <div>
+                    <h3 class="text-lg font-semibold text-slate-800">Recipe Data</h3>
+                    <p class="text-sm text-slate-500">Browse recipes. Use the diet filter above to narrow results.</p>
+                </div>
+                <span id="recipe-count" class="text-sm text-slate-500">-- recipes</span>
+            </div>
+            <div class="table-scroll" style="max-height: 500px;">
+                <table class="data-table" id="recipe-table">
+                    <thead>
+                        <tr>
+                            <th>Diet</th>
+                            <th>Recipe Name</th>
+                            <th>Cuisine</th>
+                            <th>Protein (g)</th>
+                            <th>Carbs (g)</th>
+                            <th>Fat (g)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recipe-body">
+                        <tr><td colspan="6" class="text-center text-slate-400 py-8">Loading recipes...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div id="pagination" class="flex items-center justify-center gap-2 mt-4"></div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-slate-800 text-slate-400 mt-10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 py-6 text-center text-sm">
+            <p>CPSY 300 Cloud Computing -- Project 2: Cloud Dashboard Development</p>
+            <p class="mt-1">Data source: All_Diets.csv (7,806 recipes across 5 diet types) via Azure Blob Storage</p>
+        </div>
+    </footer>
+
+    <!-- App JavaScript -->
+    <script src="app.js"></script>
+</body>
+</html>

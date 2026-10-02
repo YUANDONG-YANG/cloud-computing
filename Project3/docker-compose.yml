@@ -1,0 +1,66 @@
+###############################################################################
+# Project 3 (Phase 3) — Local Development Stack
+#
+# Services:
+#   - azurite:  Azure Storage emulator (Blob, Queue, Table)
+#   - redis:    Redis Cache for pre-computed analytics
+#   - cosmosdb: Cosmos DB emulator (Linux) for users and cache fallback
+#   - backend:  Azure Functions (Python) running locally via func start
+#
+# Usage:
+#   docker-compose up -d          # Start infrastructure
+#   cd backend && func start      # Start the Azure Functions host
+#   # Open frontend/login.html in a browser
+###############################################################################
+
+services:
+  # ---------------------------------------------------------------------------
+  # Azurite — Azure Storage Emulator (Blob / Queue / Table)
+  # ---------------------------------------------------------------------------
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:latest
+    container_name: p3-azurite
+    ports:
+      - "10000:10000"   # Blob
+      - "10001:10001"   # Queue
+      - "10002:10002"   # Table
+    volumes:
+      - azurite-data:/data
+    command: "azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0"
+
+  # ---------------------------------------------------------------------------
+  # Redis — Cache for pre-computed insights and recipe data
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: p3-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: "redis-server --appendonly yes"
+
+  # ---------------------------------------------------------------------------
+  # Cosmos DB Emulator (Linux)
+  # ---------------------------------------------------------------------------
+  cosmosdb:
+    image: mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:latest
+    container_name: p3-cosmosdb
+    ports:
+      - "8081:8081"
+      - "10250:10250"
+      - "10251:10251"
+      - "10252:10252"
+      - "10253:10253"
+      - "10254:10254"
+    environment:
+      - AZURE_COSMOS_EMULATOR_PARTITION_COUNT=10
+      - AZURE_COSMOS_EMULATOR_ENABLE_DATA_PERSISTENCE=true
+      - AZURE_COSMOS_EMULATOR_IP_ADDRESS_OVERRIDE=127.0.0.1
+    volumes:
+      - cosmos-data:/tmp/cosmos/appdata
+
+volumes:
+  azurite-data:
+  redis-data:
+  cosmos-data:
