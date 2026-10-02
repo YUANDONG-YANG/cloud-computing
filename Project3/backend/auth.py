@@ -165,16 +165,23 @@ OAUTH_STATE_COOKIE = "p3_oauth_state"
 OAUTH_STATE_MAX_AGE = 600
 
 
-def state_cookie(state: str) -> str:
-    """Set-Cookie value binding `state` to the browser starting the flow."""
+def _state_cookie(value: str, max_age: int) -> str:
+    """Build the state cookie's Set-Cookie value.
+
+    Setting it and expiring it have to agree on every attribute. A browser
+    replaces a cookie by name, path and domain and ignores the rest, so a
+    mismatch does not break the expiry today -- but it reads as though one of
+    the two were deliberate, and the next person to touch this has to work out
+    which.
+    """
     parts = [
-        f"{OAUTH_STATE_COOKIE}={state}",
+        f"{OAUTH_STATE_COOKIE}={value}",
         "Path=/",
         "HttpOnly",
         # Lax, not Strict: the provider redirects back by top-level navigation,
         # and Strict would withhold the cookie on that cross-site hop.
         "SameSite=Lax",
-        f"Max-Age={OAUTH_STATE_MAX_AGE}",
+        f"Max-Age={max_age}",
     ]
     if os.environ.get("WEBSITE_INSTANCE_ID"):
         # Azure serves HTTPS; `func start` is plain HTTP, where Secure would
@@ -183,9 +190,14 @@ def state_cookie(state: str) -> str:
     return "; ".join(parts)
 
 
+def state_cookie(state: str) -> str:
+    """Set-Cookie value binding `state` to the browser starting the flow."""
+    return _state_cookie(state, OAUTH_STATE_MAX_AGE)
+
+
 def clear_state_cookie() -> str:
     """Set-Cookie value expiring the state cookie once the flow completes."""
-    return f"{OAUTH_STATE_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0"
+    return _state_cookie("", 0)
 
 
 def read_cookie(req, name: str) -> str:
