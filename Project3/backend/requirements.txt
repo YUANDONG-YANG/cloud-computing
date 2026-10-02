@@ -1,9 +1,17 @@
 azure-functions>=1.17.0
 azure-storage-blob>=12.19.0
 azure-cosmos>=4.5.0
-redis>=5.0.0
 pandas>=2.1.0
 numpy>=1.26.0
+
+# bcrypt 4 silently truncated passwords past 72 bytes and bcrypt 5 raises, so
+# auth.py refuses them itself rather than depending on which one resolves.
 bcrypt>=4.1.0
 PyJWT>=2.8.0
 requests>=2.31.0
+
+# Optional: the Redis read-through tier in cache.py. Cosmos DB is the store of
+# record and deploy.sh provisions no Redis, so this is left out of the
+# deployment package. cache.py imports it lazily and skips Redis entirely when
+# REDIS_HOST is unset; install it only if you set REDIS_HOST.
+#   redis>=5.0.0
