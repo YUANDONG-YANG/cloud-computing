@@ -283,13 +283,17 @@ def get_recipes() -> Optional[list]:
         for index in range(int(meta.get("chunk_count", 0))):
             doc = _cosmos_read(f"recipes_chunk_{index:03d}")
             if doc is None:
-                logger.warning("Recipe chunk %d missing; cache is incomplete",
-                               index)
-                records = []
-                break
+                # The durable cache disagrees with its own metadata. Report a
+                # miss instead of falling through to the process-local copy,
+                # which may hold an entirely different dataset.
+                logger.warning(
+                    "Recipe chunk %d is missing; reporting the cache as empty "
+                    "rather than serving a copy that may be stale", index)
+                return None
             records.extend(doc.get("records", []))
-        if records:
-            return records
+        # An empty dataset that was cached on purpose returns []; None is
+        # reserved for nothing having been cached at all.
+        return records
 
     return _memory_store.get("recipes_cache")
 

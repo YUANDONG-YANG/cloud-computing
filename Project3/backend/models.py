@@ -79,6 +79,11 @@ def validate_registration(body: dict) -> tuple[bool, str]:
         return False, "A valid email address is required."
     if len(password) < 8:
         return False, "Password must be at least 8 characters."
+    # bcrypt hashes at most 72 bytes. Rejecting longer passwords here keeps
+    # the register handler from raising out of hash_password, and is honest:
+    # silently truncating would make two different passwords equivalent.
+    if len(password.encode("utf-8")) > 72:
+        return False, "Password must be at most 72 bytes."
     if not name:
         return False, "Name is required."
     return True, ""

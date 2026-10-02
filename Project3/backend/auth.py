@@ -61,10 +61,24 @@ GITHUB_EMAILS_URL = "https://api.github.com/user/emails"
 # Password hashing (bcrypt, 12 rounds)
 # ---------------------------------------------------------------------------
 
+MAX_PASSWORD_BYTES = 72
+
+
 def hash_password(plain: str) -> str:
-    """Hash a plaintext password with bcrypt (12 rounds)."""
-    salt = bcrypt.gensalt(rounds=12)
-    return bcrypt.hashpw(plain.encode("utf-8"), salt).decode("utf-8")
+    """Hash a plaintext password with bcrypt (12 rounds).
+
+    bcrypt itself accepts at most 72 bytes. Version 4 truncated anything
+    longer in silence, version 5 raises, and neither is a good outcome: the
+    first makes two different passwords interchangeable, the second turns a
+    long password into a 500. Callers validate the length first; this is the
+    backstop.
+    """
+    encoded = plain.encode("utf-8")
+    if len(encoded) > MAX_PASSWORD_BYTES:
+        raise ValueError(
+            f"Password exceeds bcrypt's {MAX_PASSWORD_BYTES}-byte limit"
+        )
+    return bcrypt.hashpw(encoded, bcrypt.gensalt(rounds=12)).decode("utf-8")
 
 
 def verify_password(plain: str, hashed: str) -> bool:

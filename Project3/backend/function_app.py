@@ -358,9 +358,11 @@ def get_recipes_api(req: func.HttpRequest) -> func.HttpResponse:
 
     start = time.time()
 
+    # None means nothing is cached; an empty list means the cached dataset is
+    # genuinely empty, which is a valid answer rather than a cache miss.
     recipes = get_recipes()
     source = "cache"
-    if not recipes:
+    if recipes is None:
         if not _demo_fallback_enabled():
             return _json_response({
                 "error": "No cleaned recipes are cached yet. Upload "
