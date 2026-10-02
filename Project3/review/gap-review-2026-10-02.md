@@ -1,5 +1,9 @@
 # Project 3 (Phase 3) Gap Review - 2026-10-02
 
+> **Stale.** This review predates the implementation in commit `1049cbd`, which added the blob
+> trigger, cache layer, auth and OAuth code that the sections below describe as missing. For the
+> current picture see `score-risk-2026-10-02.md`.
+
 Sources: `Project3/Project Phase 3.docx`, `Project3/UI-for-project3.html`.
 
 ## What exists in the repository
