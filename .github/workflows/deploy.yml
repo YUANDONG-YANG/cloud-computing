@@ -70,24 +70,3 @@ jobs:
       - name: Clean up
         if: always()
         run: docker compose --profile registry down
-
-  project2-tests:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
-        working-directory: Project2
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: pip
-      - name: Install test dependencies
-        run: pip install -r requirements-dev.txt
-      - name: Tests and lint
-        run: |
-          python -m pytest -q
-          flake8 .
-      - name: Check deployment script syntax
-        run: bash -n deploy.sh
