@@ -200,3 +200,52 @@ jobs:
           echo "### Published image" >> "$GITHUB_STEP_SUMMARY"
           echo "- Tag: \`${{ steps.tags.outputs.sha_tag }}\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- Digest: \`$digest\`" >> "$GITHUB_STEP_SUMMARY"
+  deploy:
+    name: Deploy (simulated) from the registry
+    needs: publish
+    runs-on: ubuntu-latest
+    environment: simulated-local           # recorded under "Deployments" on the repo page
+    permissions:
+      contents: read
+      packages: read                       # pull only, no pushing
+    defaults:
+      run:
+        working-directory: .
+    env:
+      IMAGE: ${{ needs.publish.outputs.image }}   # the exact tag publish pushed
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull the published image
+        run: docker pull "$IMAGE"
+
+      - name: Run the deployed container
+        run: |
+          mkdir -p output
+          chmod a+w output                    # container user 1000 must be able to write here
+          docker run --rm -v "$PWD/output:/app/output" "$IMAGE"
+
+      - name: Deployment report
+        run: |
+          {
+            echo "### Deployment"
+            echo "- Image: \`$IMAGE\`"
+            echo "- Deployed at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo ""
+            echo "#### Average macronutrients per diet (from the deployed container)"
+            echo "| Diet | Protein (g) | Carbs (g) | Fat (g) |"
+            echo "|---|---|---|---|"
+            tail -n +2 output/average_macros.csv \
+              | awk -F, '{printf "| %s | %.2f | %.2f | %.2f |\n", $1, $2, $3, $4}'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Save deployment output
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-output
+          path: output/
