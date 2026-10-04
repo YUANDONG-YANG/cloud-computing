@@ -111,9 +111,10 @@ been created in Azure yet.</p>
 
 <div class="find warn">
 <h4>What the CI pipeline does and does not do</h4>
-<p><code>.github/workflows/deploy.yml</code> has two jobs. <code>local-simulation</code> is the Phase 1 job: it
-builds the Docker image, runs <code>pytest</code> and <code>flake8</code>, and exercises the Azurite-based local
-simulation. <code>project2-tests</code> is the Phase 2 job: on Python 3.11 it installs
+<p>CI is split into one workflow per phase. <code>.github/workflows/deploy.yml</code> runs the Phase 1
+<code>local-simulation</code> job: it builds the Docker image, runs <code>pytest</code> and <code>flake8</code>,
+and exercises the Azurite-based local simulation. <code>.github/workflows/project2-tests.yml</code> runs the
+Phase 2 <code>project2-tests</code> job: on Python 3.11 it installs
 <code>Project2/requirements-dev.txt</code>, runs <code>python -m pytest -q</code> against
 <code>Project2/tests/</code> (<code>test_function_app.py</code>, <code>test_nutrition.py</code>,
 <code>test_frontend_demo_data.py</code>), runs <code>flake8 .</code>, and syntax-checks the deployment script with
