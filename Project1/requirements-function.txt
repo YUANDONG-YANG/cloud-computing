@@ -1,5 +1,0 @@
-# Only what lambda_function.py imports: no plotting libraries.
-# Versions match requirements.txt so both images run identical code paths.
-numpy==2.2.6
-pandas==2.2.3
-azure-storage-blob==12.25.1
