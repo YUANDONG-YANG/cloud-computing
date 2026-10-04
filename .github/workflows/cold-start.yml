@@ -1,0 +1,41 @@
+name: Cold start benchmark
+
+on:
+  workflow_dispatch:                       # run by hand from the Actions tab
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+    working-directory: Project1
+
+jobs:
+  benchmark:
+    name: Measure cold start
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the current image (baseline)
+        run: docker build -t diet-analysis:project1 .
+
+      - name: Start Azurite and upload All_Diets.csv
+        run: |
+          docker compose up -d --wait azurite
+          docker compose run --rm upload
+
+      - name: Measure baseline
+        run: python3 scripts/cold_start_benchmark.py diet-analysis:project1 baseline
+
+      - name: Save measurements
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cold-start-results
+          path: Project1/evidence/
+
+      - name: Clean up
+        if: always()
+        run: docker compose down -v
