@@ -1,7 +1,15 @@
 name: Cold start benchmark
 
 on:
-  workflow_dispatch:                       # run by hand from the Actions tab
+  push:
+    paths:                                 # rerun whenever something that affects the numbers changes
+      - "Project1/Dockerfile*"
+      - "Project1/requirements*.txt"
+      - "Project1/lambda_function.py"
+      - "Project1/scripts/cold_start_benchmark.py"
+      - "Project1/scripts/warm_invocations.py"
+      - ".github/workflows/cold-start.yml"
+  workflow_dispatch:                       # and the Run button, once this file is on main
 
 permissions:
   contents: read
