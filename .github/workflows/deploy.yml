@@ -158,9 +158,12 @@ jobs:
     # Only publish from main, or when someone clicks "Run workflow"
     if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    defaults:                               # ← add these
+      run:                                  # ← three
+        working-directory: .                # ← lines
     permissions:
       contents: read
-      packages: write                      # this job alone may push images
+      packages: write
     outputs:
       image: ${{ steps.tags.outputs.sha_tag }}   # handed to the deploy job in Lesson 5
     steps:
