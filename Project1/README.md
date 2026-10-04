@@ -32,7 +32,7 @@ or download the file and open it locally.
 | 1 (20) | Pandas analysis, ratios, cleaning, bar chart, heatmap, scatter | Done | [`docs/results/`](docs/results/), [`docs/evidence/task1-analysis.png`](docs/evidence/task1-analysis.png) |
 | 2 (20) | Dockerfile, build and run, registry push, Compose | Done (local registry; Docker Hub not used) | [`docs/evidence/task2-registry.png`](docs/evidence/task2-registry.png) |
 | 3 (20) | Azurite Blob upload, function, simulated NoSQL | Done (CSV uploaded by script, not Storage Explorer) | [`docs/evidence/task3-azurite.png`](docs/evidence/task3-azurite.png) |
-| 4 (20) | GitHub Actions build, test, registry push | Done, run #4 green | [`docs/evidence/github-actions-run-4.png`](docs/evidence/github-actions-run-4.png) |
+| 4 (20) | GitHub Actions build, test, registry push | Done, runs #4 and #44 green | [`docs/evidence/github-actions-run-44.png`](docs/evidence/github-actions-run-44.png) |
 | 5 (5) | Two enhancements, one-page report | Done | [`docs/reports/Enhancement-Report.pdf`](docs/reports/Enhancement-Report.pdf) |
 | Video (10) | Team presentation | Pending | [`docs/reports/Video-Guide.html`](docs/reports/Video-Guide.html) |
 | Contribution (5) | Per-member contributions | Pending | [`docs/reports/Contribution-Report.html`](docs/reports/Contribution-Report.html) |
@@ -42,6 +42,10 @@ or download the file and open it locally.
 GitHub Actions run #4 (workflow "Build test and simulated deployment", status Success, 1m 23s):
 
 ![GitHub Actions run 4](docs/evidence/github-actions-run-4.png)
+
+GitHub Actions run #44 (manually triggered 2026-10-03, status Success, 1m 48s, taskbar date and time visible):
+
+![GitHub Actions run 44](docs/evidence/github-actions-run-44.png)
 
 Task 1 analysis run, Task 3 Azurite and function run (virtual machine, clock visible):
 
@@ -138,7 +142,9 @@ docker compose --profile registry down
 image, runs pytest and flake8, runs the analysis and Azurite flow in Compose, verifies that
 both paths agree, pushes and pulls a local-registry image and runs it, and uploads evidence
 artifacts. Optional Docker Hub publishing uses the repository variable
-`DOCKERHUB_USERNAME` and the secret `DOCKERHUB_TOKEN`.
+`DOCKERHUB_USERNAME` and the secret `DOCKERHUB_TOKEN`. Project 2's tests run in a separate
+workflow (`.github/workflows/project2-tests.yml`), so a Project 1 run contains only the
+`local-simulation` job.
 
 ## References
 
