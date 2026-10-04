@@ -97,3 +97,58 @@ jobs:
           name: docker-image
           path: ${{ runner.temp }}/image.tar
           retention-days: 1                  # temporary handoff, delete after a day
+  integration:
+    name: Integration test (Azurite + function)
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download the image built earlier
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+          path: ${{ runner.temp }}
+
+      - name: Load image
+        run: |
+          docker load --input "${{ runner.temp }}/image.tar"
+          docker tag diet-analysis:ci diet-analysis:project1   # the name docker-compose.yml expects
+
+      - name: Prepare output folders
+        run: |
+          mkdir -p output simulated_nosql evidence
+          chmod a+w output simulated_nosql   # the container runs as user 1000, not the runner's user
+
+      - name: Task 1 - batch analysis in a container
+        run: docker compose run --rm analysis | tee evidence/analysis.log
+
+      - name: Task 3 - start Azurite (Blob Storage emulator)
+        run: docker compose up -d --wait azurite
+
+      - name: Task 3 - upload All_Diets.csv to Azurite
+        run: docker compose run --rm upload | tee evidence/upload.log
+
+      - name: Task 3 - run the serverless function
+        run: docker compose run --rm --no-deps function | tee evidence/function.log
+
+      - name: Check batch and function results match
+        run: docker run --rm -v "$PWD:/check" -w /check diet-analysis:project1 python scripts/verify_outputs.py
+
+      - name: Save container logs
+        if: always()
+        run: docker compose logs --no-color > evidence/compose.log
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-evidence
+          path: |
+            Project1/output/
+            Project1/simulated_nosql/
+            Project1/evidence/
+
+      - name: Clean up
+        if: always()
+        run: docker compose down -v
