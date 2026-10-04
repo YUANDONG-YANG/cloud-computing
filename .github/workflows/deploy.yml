@@ -63,3 +63,37 @@ jobs:
         with:
           name: test-results-py${{ matrix.python-version }}
           path: Project1/test-results.xml
+  build:
+    name: Build Docker image
+    needs: [lint, test]                     # only build code that passed lint + tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3  # modern Docker builder, needed for caching
+
+      - name: Build image (with layer cache)
+        uses: docker/build-push-action@v6
+        with:
+          context: Project1                  # folder that holds the Dockerfile
+          tags: diet-analysis:ci
+          outputs: type=docker,dest=${{ runner.temp }}/image.tar   # save the image as a file
+          cache-from: type=gha               # reuse layers from earlier runs
+          cache-to: type=gha,mode=max        # store layers for the next run
+
+      - name: Load image and smoke test
+        run: |
+          docker load --input "${{ runner.temp }}/image.tar"
+          docker run --rm diet-analysis:ci
+
+      - name: Report image size
+        run: |
+          size=$(docker image inspect diet-analysis:ci --format '{{.Size}}')
+          echo "### Docker image" >> "$GITHUB_STEP_SUMMARY"
+          echo "diet-analysis:ci is $((size / 1024 / 1024)) MB" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Share image with later jobs
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: ${{ runner.temp }}/image.tar
+          retention-days: 1                  # temporary handoff, delete after a day
