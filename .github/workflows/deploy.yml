@@ -152,3 +152,51 @@ jobs:
       - name: Clean up
         if: always()
         run: docker compose down -v
+  publish:
+    name: Publish image to GitHub Container Registry
+    needs: integration
+    # Only publish from main, or when someone clicks "Run workflow"
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write                      # this job alone may push images
+    outputs:
+      image: ${{ steps.tags.outputs.sha_tag }}   # handed to the deploy job in Lesson 5
+    steps:
+      - name: Download the tested image
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+          path: ${{ runner.temp }}
+
+      - name: Work out image name and tags
+        id: tags
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/diet-analysis"   # ,, = lowercase (registry rule)
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+          echo "sha_tag=$image:sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}   # temporary token, created for this run only
+
+      - name: Push the image
+        run: |
+          docker load --input "${{ runner.temp }}/image.tar"
+          docker tag diet-analysis:ci "${{ steps.tags.outputs.sha_tag }}"
+          docker push "${{ steps.tags.outputs.sha_tag }}"
+          if [ "$GITHUB_REF" = "refs/heads/main" ]; then
+            docker tag diet-analysis:ci "${{ steps.tags.outputs.image }}:latest"
+            docker push "${{ steps.tags.outputs.image }}:latest"
+          fi
+
+      - name: Record what was published
+        run: |
+          digest=$(docker inspect --format '{{index .RepoDigests 0}}' "${{ steps.tags.outputs.sha_tag }}")
+          echo "### Published image" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Tag: \`${{ steps.tags.outputs.sha_tag }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Digest: \`$digest\`" >> "$GITHUB_STEP_SUMMARY"
