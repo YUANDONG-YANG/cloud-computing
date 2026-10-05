@@ -32,8 +32,8 @@ or download the file and open it locally.
 | 1 (20) | Pandas analysis, ratios, cleaning, bar chart, heatmap, scatter | Done | [`docs/results/`](docs/results/), [`docs/evidence/task1-analysis.png`](docs/evidence/task1-analysis.png) |
 | 2 (20) | Dockerfile, build and run, registry push, Compose | Done (local registry; Docker Hub not used) | [`docs/evidence/task2-registry.png`](docs/evidence/task2-registry.png) |
 | 3 (20) | Azurite Blob upload, function, simulated NoSQL | Done (CSV uploaded by script, not Storage Explorer) | [`docs/evidence/task3-azurite.png`](docs/evidence/task3-azurite.png) |
-| 4 (20) | GitHub Actions build, test, registry push | Done, runs #4 and #44 green | [`docs/evidence/github-actions-run-44.png`](docs/evidence/github-actions-run-44.png) |
-| 5 (5) | Two enhancements, one-page report | Done | [`docs/reports/Enhancement-Report.pdf`](docs/reports/Enhancement-Report.pdf) |
+| 4 (20) | GitHub Actions build, test, registry push | Done: CI/CD v2, six jobs, GHCR publish and simulated deploy; runs #53 and #54 green | [`docs/evidence/cicd-v2-run-53.png`](docs/evidence/cicd-v2-run-53.png) |
+| 5 (5) | Two enhancements, one-page report | Done (two reports) | [`docs/reports/Enhancement-Report.pdf`](docs/reports/Enhancement-Report.pdf), [`docs/reports/Enhancement-Report-Cold-Start.pdf`](docs/reports/Enhancement-Report-Cold-Start.pdf) |
 | Video (10) | Team presentation | Pending | [`docs/reports/Video-Guide.html`](docs/reports/Video-Guide.html) |
 | Contribution (5) | Per-member contributions | Pending | [`docs/reports/Contribution-Report.html`](docs/reports/Contribution-Report.html) |
 
@@ -46,6 +46,16 @@ GitHub Actions run #4 (workflow "Build test and simulated deployment", status Su
 GitHub Actions run #44 (manually triggered 2026-10-03, status Success, 1m 48s, taskbar date and time visible):
 
 ![GitHub Actions run 44](docs/evidence/github-actions-run-44.png)
+
+CI/CD v2 run #53 (six jobs, all green, taskbar date and time visible) and pull request #2 merged:
+
+![CI/CD v2 run 53](docs/evidence/cicd-v2-run-53.png)
+![CI/CD v2 PR 2](docs/evidence/cicd-v2-pr-2-merged.png)
+
+Task 5 cold start benchmark runs #2 and #3:
+
+![Benchmark before warm path](docs/evidence/task5-benchmark-before.png)
+![Benchmark after warm path](docs/evidence/task5-benchmark-after.png)
 
 Task 1 analysis run, Task 3 Azurite and function run (virtual machine, clock visible):
 
@@ -67,7 +77,10 @@ Charts: ![Average macros](docs/results/average_macros.png)
 | `Dockerfile`, `docker-compose.yml` | Task 2: multi-stage image, Compose services |
 | `Dockerfile.baseline`, `Dockerfile.test`, `scripts/benchmark.py` | Task 5: size and speed comparison, test image |
 | `tests/`, `scripts/verify_outputs.py`, `pytest.ini`, `.flake8` | Task 4: tests, lint, batch-vs-Blob check |
-| `../.github/workflows/deploy.yml` | Task 4: CI pipeline (repository root) |
+| `../.github/workflows/deploy.yml` | Task 4: CI/CD pipeline v2 (repository root) |
+| `Dockerfile.function`, `requirements-function.txt` | Task 5: function-only slim image |
+| `../.github/workflows/cold-start.yml`, `scripts/cold_start_benchmark.py`, `scripts/warm_invocations.py` | Task 5: cold start benchmark |
+| `scripts/embed_screenshot.py` | Embeds evidence screenshots in the Master Overview |
 | `data/` | Course dataset (see `data/README.md`) |
 | `docs/results/` | Sample results and the three charts |
 | `docs/evidence/` | Logs, benchmark data and timestamped screenshots |
@@ -127,6 +140,8 @@ docker compose --profile registry down
 - Highest mean protein: keto, 101.27 g. Highest total protein: mediterranean, 177,249.89 g.
 - Image size 697.66 MB to 568.16 MB (-18.6 %), mostly by excluding the full base image and pip cache.
 - Aggregation 13.72 ms to 1.25 ms (11.0x) on 7,806 rows; 7.6x on a 20x replicated stress workload.
+- Function-only image 405.8 MB to 322.1 MB (-21 %); cold invocation 31-32 % faster than the full image.
+- Warm invocation with an unchanged CSV 36 ms to about 2 ms (ETag check skips download and recompute).
 
 ## Analysis decisions
 
@@ -138,13 +153,20 @@ docker compose --profile registry down
 
 ## CI/CD
 
-`.github/workflows/deploy.yml` (repository root, `working-directory: Project1`) builds the
-image, runs pytest and flake8, runs the analysis and Azurite flow in Compose, verifies that
-both paths agree, pushes and pulls a local-registry image and runs it, and uploads evidence
-artifacts. Optional Docker Hub publishing uses the repository variable
-`DOCKERHUB_USERNAME` and the secret `DOCKERHUB_TOKEN`. Project 2's tests run in a separate
-workflow (`.github/workflows/project2-tests.yml`), so a Project 1 run contains only the
-`local-simulation` job.
+`.github/workflows/deploy.yml` (repository root, CI/CD v2) runs six jobs:
+
+1. **lint** (flake8) and **test** (pytest on Python 3.11 and 3.12) in parallel
+2. **build**: Docker image with layer caching, smoke-tested, handed to later jobs as an artifact
+3. **integration**: the Task 1 and Task 3 flow (Azurite upload, function run) against that image,
+   then `scripts/verify_outputs.py` checks the batch and function results match
+4. **publish** (main or manual runs only): pushes the tested image to
+   `ghcr.io/yuandong-yang/diet-analysis` with the run's `GITHUB_TOKEN`
+5. **deploy**: pulls the published image, runs it and writes a results table to the run summary;
+   GitHub records it under the `simulated-local` environment
+
+`.github/workflows/cold-start.yml` measures container start, import, cold and warm invocation
+times for the full and function-only images. Project 2's tests run in
+`.github/workflows/project2-tests.yml`.
 
 ## References
 

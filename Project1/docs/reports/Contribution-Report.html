@@ -68,20 +68,23 @@
     <td>Ethan Bayarsaikhan (000961411)<br>GitHub: etemujin</td>
     <td>
       <ul>
-        <li>Task 4 CI/CD 
-        <li>Task 4 evidence: manual workflow run and captured the dated screenshot</li>
-        <li>Added <code>scripts/embed_screenshot.py</code> and embedded the run #44 screenshot in the Master Overview; updated the Task 4 status in the overview and README</li>
-        <li>[to add when done: PDF re-export, submission zip, review of Yuandong's PR, video intro and Task 4]</li>
+        <li>Task 4: moved the Project 2 test job into its own workflow so Project 1 runs show only Project 1</li>
+        <li>Task 4: redesigned and rebuilt the CI/CD pipeline (v2), replacing the original single-job workflow: parallel lint and multi-version tests, cached Docker build, integration test against Azurite, publish to GitHub Container Registry, simulated deploy</li>
+        <li>Task 4 evidence: manual runs #44 and #53, dated screenshots, Master Overview and README updated for v2</li>
+        <li>Task 5: function-only slim image and warm-path improvements to <code>lambda_function.py</code> (shared client, ETag check, 3 new tests); cold start benchmark workflow; one-page cold start report</li>
+        <li>Added <code>scripts/embed_screenshot.py</code></li>
+        <li>[to add when done: PDF re-export, submission zip, reviews of teammates' PRs, video intro, Task 4 and Task 5]</li>
       </ul>
     </td>
     <td>5</td>
     <td>
       <ul>
         <li>PR #1 <a href="https://github.com/YUANDONG-YANG/cloud-computing/pull/1">Move the Project 2 test job into its own workflow</a> (merged)</li>
-        <li>Commit <a href="https://github.com/YUANDONG-YANG/cloud-computing/commit/3bec202">3bec202</a></li>
+        <li>PR #2 <a href="https://github.com/YUANDONG-YANG/cloud-computing/pull/2">CI/CD v2</a> (merged); runs <a href="https://github.com/YUANDONG-YANG/cloud-computing/actions/runs/37176217580">#53</a> and <a href="https://github.com/YUANDONG-YANG/cloud-computing/actions/runs/37177986368">#54</a></li>
+        <li>PR #3 <a href="https://github.com/YUANDONG-YANG/cloud-computing/pull/3">Task 5: slim image and warm path</a> (merged); benchmark runs <a href="https://github.com/YUANDONG-YANG/cloud-computing/actions/runs/37247695460">#2</a> and <a href="https://github.com/YUANDONG-YANG/cloud-computing/actions/runs/37248163448">#3</a></li>
         <li>Actions <a href="https://github.com/YUANDONG-YANG/cloud-computing/actions/runs/37161625923">run #44</a> (Success)</li>
-        <li>[PR #2 link: Task 4 evidence]</li>
-        <li>[review link]</li>
+        <li>[PR link: Task 4 evidence and docs]</li>
+        <li>[review links]</li>
       </ul>
     </td>
   </tr>
@@ -115,7 +118,7 @@
 <p>[Actual tools, frequency, issue tracking and review process]</p>
 
 <h2>Assistance and review</h2>
-<p><b>Ethan Bayarsaikhan:</b> used Claude (Anthropic) to draft the workflow split, <code>scripts/embed_screenshot.py</code> and the report text edits. Ethan reviewed each change, ran the workflow on GitHub (run #44) and ran the script himself before committing.</p>
+<p><b>Ethan Bayarsaikhan:</b> used Claude (Anthropic) as a tutor and drafting aid for the workflow split, the CI/CD v2 lessons, <code>scripts/embed_screenshot.py</code>, the Task 5 benchmark and warm-path code, the cold start report draft and these documentation edits. Ethan typed and ran each pipeline stage himself, fixed the CI failures, ran the tests and flake8 locally, collected the benchmark evidence and reviewed every change before committing.</p>
 <p>[Disclose AI/tool assistance as required by your course. Record who checked and understood the generated code, tests and report.]</p>
 
 </body>
