@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Task 5 Enhancement Report: Cold Start</title>
+  <style>
+    @page { size: Letter; margin: 0.45in 0.55in }
+    body { font: 9.8pt/1.32 Arial, sans-serif; color: #17324d; margin: 0 }
+    h1 { font-size: 15pt; color: #0f766e; margin: 0 0 2px }
+    h2 { font-size: 11pt; color: #0f766e; margin: 7px 0 2px }
+    p, ul { margin: 3px 0 }
+    ul { padding-left: 18px }
+    li { margin: 1px 0 }
+    .sub { color: #4b6075; font-size: 9.5pt; margin-bottom: 6px }
+    table { border-collapse: collapse; width: 100%; margin: 3px 0; font-size: 9pt }
+    th, td { border: 1px solid #aab; padding: 2px 6px; text-align: left }
+    th { background: #eef6f5 }
+    td.num { text-align: right }
+    code { font-size: 9pt; background: #eef; padding: 0 3px }
+    .refs { font-size: 8.5pt; color: #4b6075 }
+  </style>
+</head>
+<body>
+
+<h1>Task 5 Enhancement Report: Cold Start and Image Size</h1>
+<p class="sub">Ethan Bayarsaikhan (000961411) · CPSY 300 Project 1 · 2026-10-04 · Applied to Task 3 (serverless function) and Task 2 (container image)</p>
+
+<h2>1. Options chosen</h2>
+<ul>
+  <li><b>Option 1, smaller and more efficient images:</b> a separate, function-only container image.</li>
+  <li><b>Option 2, cold start and execution speed:</b> reuse work across warm invocations of the function.</li>
+</ul>
+
+<h2>2. Research</h2>
+<ul>
+  <li><b>Where cold-start time goes.</b> A cold invocation must fetch the image, start a container, start Python and import libraries, then do the work. A warm instance keeps its process alive, so module-level state survives between calls. I measured each stage before changing anything.</li>
+  <li><b>Smaller images.</b> Docker's build best practices advise against installing packages an image does not need. The function never draws charts, yet it shared an image with matplotlib and seaborn.</li>
+  <li><b>Reusing clients.</b> Microsoft's guidance on managing connections in Azure Functions recommends creating clients once and reusing them across invocations instead of per call.</li>
+  <li><b>ETags.</b> Azure Blob Storage gives every blob an ETag that changes whenever the blob is overwritten, so an unchanged ETag means unchanged content and the previous result is still valid.</li>
+</ul>
+
+<h2>3. Improvements applied</h2>
+<ul>
+  <li><b>A: Function-only image</b> (<code>Dockerfile.function</code>, <code>requirements-function.txt</code>): only numpy, pandas and azure-storage-blob; only the three files the function imports; <code>pip --no-cache-dir</code>; modules precompiled with <code>compileall</code>; non-root user.</li>
+  <li><b>B: Warm path</b> (<code>lambda_function.py</code>): one Blob client per process, and a check of the CSV's ETag before downloading. If it matches the last processed version, the stored result is returned without downloading or recomputing. The ETag saved is the one from the download itself, so a CSV replaced mid-call is still picked up. Three new unit tests cover the cache hit, a changed CSV and a deleted results file.</li>
+  <li><b>Measurement:</b> <code>cold-start.yml</code> workflow with <code>cold_start_benchmark.py</code>. Each measure is the median of 5 runs after one discarded run, on a GitHub Actions runner against Azurite.</li>
+</ul>
+
+<h2>4. Results and impact</h2>
+<table>
+  <tr><th>Median of 5 runs</th><th>Run #2 (before B): baseline → slim</th><th>Run #3 (after B): baseline → slim</th></tr>
+  <tr><td>Image size</td><td class="num">405.8 → 322.1 MB (−21%)</td><td class="num">405.8 → 322.2 MB (−21%)</td></tr>
+  <tr><td>Container start</td><td class="num">0.204 → 0.210 s</td><td class="num">0.216 → 0.160 s</td></tr>
+  <tr><td>Python start and imports</td><td class="num">0.900 → 0.531 s</td><td class="num">0.550 → 0.397 s</td></tr>
+  <tr><td><b>Cold invocation</b></td><td class="num"><b>1.156 → 0.783 s (−32%)</b></td><td class="num"><b>0.806 → 0.554 s (−31%)</b></td></tr>
+  <tr><td><b>Warm invocation</b> (CSV unchanged)</td><td class="num">0.036 → 0.036 s</td><td class="num"><b>0.002 → 0.002 s (−94% vs run #2)</b></td></tr>
+</table>
+<ul>
+  <li><b>A:</b> the image is 21% smaller, so less to download on every cold start and deployment, and cold invocations were 31–32% faster than the baseline image in both runs. Imports were also faster in the slim image; I did not isolate the cause.</li>
+  <li><b>B:</b> warm invocations dropped from 36 ms to about 2 ms in both images, because repeat calls make one metadata request instead of downloading and processing 7,806 rows. Cold invocations are unaffected by design: a new process starts with an empty cache.</li>
+  <li><b>Limits:</b> the same baseline image measured 1.156 s and 0.806 s in two runs, so shared CI runners are noisy; I compare images only within the same run. These are local simulations, not real Azure Functions, where image download time would make A matter more. Related: Docker layer caching in the CI pipeline cut the image build from 61 s to 9 s (runs #47 and #48).</li>
+</ul>
+
+<p class="refs">Sources: Docker, "Building best practices" (docs.docker.com/build/building/best-practices) · Microsoft Learn, "Manage connections in Azure Functions" (learn.microsoft.com/azure/azure-functions/manage-connections) · Microsoft Learn, "Managing concurrency in Blob Storage" (learn.microsoft.com/azure/storage/blobs/concurrency-manage) · Python docs, "compileall" (docs.python.org/3/library/compileall.html) · Evidence: Cold start benchmark runs #2 and #3, <code>docs/evidence/task5-benchmark-before.png</code> and <code>-after.png</code>.</p>
+
+</body>
+</html>
