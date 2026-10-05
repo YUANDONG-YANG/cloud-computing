@@ -37,6 +37,12 @@ jobs:
       - name: Measure baseline
         run: python3 scripts/cold_start_benchmark.py diet-analysis:project1 baseline
 
+      - name: Build the function-only image (enhancement A)
+        run: docker build -f Dockerfile.function -t diet-function:slim .
+
+      - name: Measure slim image
+        run: python3 scripts/cold_start_benchmark.py diet-function:slim slim
+        
       - name: Save measurements
         if: always()
         uses: actions/upload-artifact@v4

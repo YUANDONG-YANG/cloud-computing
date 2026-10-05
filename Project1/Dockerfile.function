@@ -1,0 +1,18 @@
+# Enhancement A: an image for the serverless function only.
+# Same Python base as Dockerfile, but without matplotlib/seaborn and the analysis script.
+FROM python:3.11-slim
+ENV PYTHONUNBUFFERED=1
+WORKDIR /app
+
+COPY requirements-function.txt .
+RUN pip install --no-cache-dir -r requirements-function.txt
+
+# Only the three files the function needs
+COPY nutrition.py storage_config.py lambda_function.py ./
+
+# Precompile our modules so a cold start does not spend time compiling them
+RUN python -m compileall -q /app \
+    && mkdir -p simulated_nosql \
+    && chown -R 1000:1000 /app
+USER 1000:1000
+CMD ["python", "lambda_function.py"]
