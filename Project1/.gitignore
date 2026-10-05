@@ -12,3 +12,6 @@ simulated_nosql/*.json
 # Local secrets and archives
 .env
 *.zip
+
+# Intermediate output of scripts/build_report.py (the PDF is the deliverable)
+/docs/reports/Project1-Report.html
