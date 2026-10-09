@@ -1,0 +1,15 @@
+# Subtask 4.1 - local Redis integration (API + Redis on one Docker network)
+services:
+  redis:
+    image: redis
+    ports:
+      - "6379:6379"
+  app:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+    depends_on:
+      - redis
