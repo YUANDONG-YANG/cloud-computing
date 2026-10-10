@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Azure CLI verification evidence</title>
+<style>body{margin:0;background:#202124;color:#e8eaed;font:18px/1.42 ui-monospace,SFMono-Regular,Consolas,monospace}.top{padding:22px 32px;background:#303134;color:#f1f3f4}.top b{color:#7ee787}.term{padding:24px 36px}.cmd{color:#55e6cf}.muted{color:#b8c0cc}.ok{color:#a6e22e}pre{margin:4px 0 18px;white-space:pre-wrap}</style></head>
+<body><div class="top"><b>CPSY 300 Lab 03 — Azure CLI verification transcript</b><br><span class="muted">Captured 2026-10-10 UTC · read-only commands and public HTTP request</span></div><div class="term">
+<pre class="cmd">$ date -u</pre><pre>Sat Oct 10 00:26:16 UTC 2026</pre>
+<pre class="cmd">$ az vm show -d -g dealerops-student-demo -n cpsy300-lab03-vm2 --query ... -o json</pre><pre>{
+  "location": "eastus",
+  "name": "cpsy300-lab03-vm2",
+  "powerState": "VM running",
+  "privateIps": "172.16.0.4",
+  "publicIps": "20.84.66.238"
+}</pre>
+<pre class="cmd">$ curl -sS http://20.84.66.238:5000/</pre><pre>{
+  "cache": "disabled", "rows": 354, "service": "uber-traffic-api", "status": "ok",
+  "served_at_utc": "2026-10-10T00:25:47.233664+00:00"
+}</pre>
+<pre class="cmd">$ az redis show -g dealerops-student-demo -n cpsy300-redis --query ... -o json</pre><pre>{
+  "hostName": "cpsy300-redis.redis.cache.windows.net", "name": "cpsy300-redis",
+  "provisioningState": <span class="ok">"Succeeded"</span>, "sslPort": 6380, "enableNonSslPort": false,
+  "sku": {"name": "Basic", "capacity": 0}
+}</pre>
+<pre class="cmd">$ az monitor autoscale show -g dealerops-student-demo -n cpsy300-vmss3-autoscale --query ... -o json</pre><pre>{
+  "enabled": <span class="ok">true</span>,
+  "rules": ["Percentage CPU > 70 → Increase by 1", "Percentage CPU < 30 → Decrease by 1"]
+}</pre>
+</div></body></html>

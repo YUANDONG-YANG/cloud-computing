@@ -1,14 +1,267 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CPSY 300 Lab 03 Report</title><style>:root{--ink:#172033;--muted:#657184;--blue:#1e5eff;--line:#dbe2ec;--bg:#f5f7fb}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 system-ui,-apple-system,"Segoe UI",Arial,sans-serif}main{max-width:1100px;margin:auto;background:#fff;min-height:100vh;padding:48px 62px 70px}h1{font-size:35px;line-height:1.15;margin:0 0 10px}h2{font-size:22px;margin:40px 0 12px;padding-bottom:7px;border-bottom:2px solid var(--line)}h3{font-size:17px;color:#234b91;margin:24px 0 7px}.sub{font-size:17px;color:var(--muted)}.meta{display:flex;gap:10px;flex-wrap:wrap;margin:24px 0 32px}.meta span{background:#eef3ff;border-radius:99px;padding:4px 10px;color:#31518c;font-size:12px}.lead{font-size:17px;max-width:880px}.kpis,.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.grid{grid-template-columns:1fr 1fr}.kpi,.card{border:1px solid var(--line);border-radius:12px;padding:15px;background:linear-gradient(135deg,#fff,#f7faff)}.kpi b{display:block;color:var(--blue);font-size:24px}.kpi small{color:var(--muted)}table{border-collapse:collapse;width:100%;margin:13px 0 20px;font-size:14px}th,td{border:1px solid #d9dfe8;padding:8px 10px;text-align:left;vertical-align:top}th{background:#193b73;color:#fff}tr:nth-child(even){background:#f5f8fc}.code{background:#111827;color:#e6edf3;border-radius:9px;padding:14px;overflow:auto;white-space:pre-wrap;font:12px/1.55 ui-monospace,Menlo,monospace}.evidence{border:2px dashed #b9c6da;border-radius:10px;padding:13px 15px;margin:12px 0;background:#fbfcff}.evidence b{color:#244b92}.bar{display:flex;align-items:center;gap:8px;margin:7px 0}.bar label{width:55px;font-size:12px}.bar i{height:15px;background:linear-gradient(90deg,var(--blue),#09a6b8);width:var(--w);border-radius:4px}.bar em{font-size:12px;color:var(--muted);font-style:normal}.check{padding-left:0;list-style:none}.check li{padding:7px 0;border-bottom:1px solid var(--line)}.check li:before{content:'☐';color:var(--blue);font-size:18px;margin-right:8px}.foot{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}@media(max-width:760px){main{padding:28px 20px}.kpis,.grid{grid-template-columns:1fr 1fr}}@media print{body{background:#fff}main{padding:25px 35px}}</style></head><body><main>
-<h1>CPSY 300 Lab 03</h1><div class="sub">Performance Testing and Optimization with Microsoft Azure</div><div class="meta"><span>Prepared: <span id="now"></span></span><span>Dataset: Uber-Jan-Feb-FOIL.csv</span><span>Rubric: 11 × 5 = 55</span></div>
-<p class="lead">This report provides the application code, data preprocessing, Docker configuration, JMeter test plan, and Redis caching implementation required by the lab. The official CSV is aggregated by date and dispatching base, so <code>trips</code> is used as the weight instead of treating each row as one trip.</p>
-<h2>Executive summary</h2><div class="kpis"><div class="kpi"><b>4,130,230</b><small>cleaned weighted trips</small></div><div class="kpi"><b>59</b><small>calendar days</small></div><div class="kpi"><b>Feb 20</b><small>busiest day · 100,915</small></div><div class="kpi"><b>B02764</b><small>largest base · 1,914,449</small></div></div><p>The application runs on <code>0.0.0.0:5000</code> and provides health, prediction, and analysis endpoints. It runs without Redis and returns <code>"source":"cache"</code> for repeated timestamps when Redis is available. Docker uses gunicorn, while JMeter is configured for 500 users, a 60-second ramp-up, and five loops per user.</p>
-<h2>1. Data preprocessing and traffic analysis · 10 marks</h2><h3>1.1 Cleaning and feature extraction · 5 marks</h3><p>The input contains 354 rows and four raw fields: <code>dispatching_base_number</code>, <code>date</code>, <code>active_vehicles</code>, and <code>trips</code>. The application removes missing and duplicate records, supports either the handout's <code>Date/Time</code> field or the actual file's <code>date</code> field, and creates <code>Hour</code>, <code>Day</code>, <code>DayOfWeek</code>, <code>IsWeekend</code>, and <code>TripWeight</code>.</p><div class="code">df.dropna(inplace=True)&#10;df.drop_duplicates(inplace=True)&#10;date_col = "Date/Time" if "Date/Time" in df.columns else "date"&#10;df[date_col] = pd.to_datetime(df[date_col])&#10;df["Hour"] = df[date_col].dt.hour&#10;df["Day"] = df[date_col].dt.date.astype(str)&#10;df["DayOfWeek"] = df[date_col].dt.day_name()&#10;df["TripWeight"] = pd.to_numeric(df.get("trips", 1))</div><div class="evidence"><b>Evidence A1:</b> Verified from the actual terminal output: 354 cleaned rows, engineered features, and total weighted trips of 4,130,230.</div>
-<h3>1.2 Aggregation and visualization · 5 marks</h3><table><tr><th>Metric</th><th>Result</th><th>Interpretation</th></tr><tr><td>Rows after cleaning</td><td>354</td><td>No missing or duplicate rows in the official aggregate file</td></tr><tr><td>Total weighted trips</td><td>4,130,230</td><td>Sum of the trips field, not row count</td></tr><tr><td>Busiest day</td><td>2015-02-20 · 100,915</td><td>All dispatching bases aggregated by day</td></tr><tr><td>Largest base</td><td>B02764 · 1,914,449</td><td>All dates aggregated by base</td></tr></table><div class="card"><b>Top daily totals</b><div class="bar"><label>Feb 20</label><i style="--w:100%"></i><em>100,915</em></div><div class="bar"><label>Feb 14</label><i style="--w:99%"></i><em>100,345</em></div><div class="bar"><label>Feb 21</label><i style="--w:97%"></i><em>98,380</em></div><div class="bar"><label>Feb 13</label><i style="--w:97%"></i><em>98,024</em></div><div class="bar"><label>Jan 31</label><i style="--w:91%"></i><em>92,257</em></div></div><div class="evidence"><b>Evidence A2:</b> Open <code>http://localhost:5000/analysis</code> and insert the daily/hourly bar chart and day-of-week × hour heatmap. The official file has day-level granularity only; label the hourly view “day-level source / hour feature unavailable,” or rerun with the event-level CSV supplied by the course.</div>
-<h2>2. JMeter traffic simulation · 5 marks</h2><p><code>jmeter_test_plan.jmx</code> includes a Thread Group, CSV Data Set, HTTP GET sampler, Summary Report, and View Results Tree. It uses 500 users (change to 1000 if required), a 60-second ramp-up, and five loops. Because the actual CSV uses <code>date</code>, the variables are <code>base,timestamp,active_vehicles,trips</code>; the request is <code>/predict_traffic?timestamp=${timestamp}</code>.</p><div class="code">jmeter -n -t jmeter_test_plan.jmx -l results.jtl -e -o jmeter-report</div><div class="evidence"><b>Evidence B1/B2:</b> The valid source screenshot is <code>screenshots/jmeter-summary.png</code>. The real run completed 2,500 samples with 0 errors, 2.04 ms average response time, and 42.15 transactions/s. The test-plan tree remains a source-file item, not a fabricated screenshot.</div>
-<h2>3. Dockerization · 10 marks</h2><div class="grid"><div class="card"><h3>3.1 Dockerfile · 5 marks</h3><p>Uses a Python slim image, pinned dependencies, gunicorn, port 5000, and a reproducible start command.</p><div class="code">docker build -t uber-app .&#10;docker run --rm -p 5000:5000 uber-app&#10;curl http://localhost:5000/</div></div><div class="card"><h3>3.2 Local verification · 5 marks</h3><p>The health endpoint returns <code>status: ok</code>; the prediction endpoint returns timestamp, predicted trips, observed daily trips, and source.</p><div class="code">curl "http://localhost:5000/predict_traffic?timestamp=2015-02-20T00:00:00"&#10;curl http://localhost:5000/analysis</div></div></div><div class="evidence"><b>Evidence C1–C4:</b> Insert screenshots of the Dockerfile, requirements.txt, docker build output, docker run status, and a successful curl response.</div>
-<h2>4. Azure VM and VMSS · 10 marks</h2><h3>4.1 Azure VM deployment · 5 marks</h3><p>Create an Ubuntu VM in the Azure Sandbox and allow TCP 5000 in the NSG. After pushing the image, run:</p><div class="code">docker pull &lt;dockerhub-user&gt;/uber-app:latest&#10;docker run -d --restart unless-stopped -p 5000:5000 &lt;dockerhub-user&gt;/uber-app:latest&#10;curl http://&lt;public-ip&gt;:5000/</div><div class="evidence"><b>Evidence D1/D2:</b> Insert VM docker ps/logs and a successful browser or Postman response from the public IP.</div><h3>4.2 VMSS autoscaling · 5 marks</h3><p>Configure a VMSS startup script to pull the same image and expose port 5000. Configure CPU above 70% to scale out and CPU below 30% to scale in, with an Azure Load Balancer. Use the JMeter plan to generate load and record instance-count changes.</p><div class="evidence"><b>Evidence D3/D4:</b> VMSS <code>cpsy300-vmss3</code> is provisioned successfully with 1 instance, load balancer, minimum 1, maximum 3, CPU scale-out above 70%, and scale-in below 30%.</div>
-<h2>5. Redis caching · 10 marks</h2><h3>5.1 Local Redis · 5 marks</h3><p><code>docker-compose.yml</code> starts Redis and the API together. The API uses a SHA-256 timestamp key with a default TTL of 3600 seconds; the first request computes a result and the second returns the cached result.</p><div class="code">docker compose up --build -d&#10;curl "http://localhost:5000/predict_traffic?timestamp=2015-02-20T00:00:00"&#10;curl "http://localhost:5000/predict_traffic?timestamp=2015-02-20T00:00:00"&#10;docker compose exec redis redis-cli keys 'uber:prediction:*'</div><div class="evidence"><b>Evidence E1/E2:</b> The first request returned <code>compute</code>, the second returned <code>cache</code>, and a Redis key was present in the actual terminal output. No composite screenshot is claimed for this item.</div><h3>5.2 Azure Cache for Redis · 5 marks</h3><p>Copy the Azure Redis hostname, SSL port 6380, and primary key into an environment variable. Never commit the real key to this report or Docker image.</p><div class="code">export REDIS_URL='rediss://:&lt;primary-key&gt;@&lt;name&gt;.redis.cache.windows.net:6380/0'&#10;# restart the VM container and repeat the two identical calls</div><div class="evidence"><b>Evidence E3/E4:</b> Insert the Azure Redis overview showing name/status and the VM API cache-hit response.</div>
-<h2>6. Monitoring and cleanup · 10 marks</h2><h3>6.1 Before/after comparison · 5 marks</h3><p>Use the same time window in Azure Monitor to compare average response time, CPU usage, and autoscale actions before and after caching. Use JMeter throughput and error percentage as supporting evidence.</p><table><tr><th>Metric</th><th>Before caching</th><th>After caching</th><th>Expected direction</th></tr><tr><td>Response time</td><td>Insert Azure value</td><td>Insert Azure value</td><td>Lower</td></tr><tr><td>CPU usage</td><td>Insert Azure value</td><td>Insert Azure value</td><td>Lower</td></tr><tr><td>Scale-out actions</td><td>Insert Azure value</td><td>Insert Azure value</td><td>Fewer</td></tr></table><div class="evidence"><b>Evidence F1:</b> Insert one Azure Monitor screenshot containing all three charts, clearly labelled before and after caching. Do not invent values.</div><h3>6.2 Cleanup · 5 marks</h3><div class="code">docker compose down --remove-orphans&#10;docker rm -f $(docker ps -aq) 2&gt;/dev/null || true&#10;redis-cli FLUSHDB&#10;az vm delete --resource-group &lt;rg&gt; --name &lt;vm&gt; --yes&#10;az vmss delete --resource-group &lt;rg&gt; --name &lt;vmss&gt;&#10;az redis delete --resource-group &lt;rg&gt; --name &lt;redis-name&gt; --yes</div><div class="evidence"><b>Evidence F2:</b> Insert local Docker/Redis cleanup and Azure Portal resource-deletion or deallocation screenshots.</div>
-<h2>Submission checklist</h2><ul class="check"><li>report.html</li><li>app.py, Dockerfile, requirements.txt, and docker-compose.yml</li><li>jmeter_test_plan.jmx</li><li>Uber-Jan-Feb-FOIL.csv</li><li>All rubric screenshots with a visible date and time</li><li>Place everything and the screenshots folder into one ZIP; print this HTML to PDF if required</li></ul>
-<div class="foot">Data source: FiveThirtyEight / Uber TLC FOIL response (official GitHub repository). Local statistics are reproducible. Azure Portal screenshots, JMeter measurements, and cleanup status must be produced by the actual lab environment and inserted in the evidence sections.<br>Generated for CPSY 300 Lab 03 · <span id="now2"></span></div><script>const s=new Date().toLocaleString('en-CA',{dateStyle:'medium',timeStyle:'short'});document.querySelector('#now').textContent=s;document.querySelector('#now2').textContent=s;</script><h2>Evidence screenshots</h2><div class="grid"></div><div class="card"><h3>Live analysis endpoint</h3><img src="screenshots/analysis-live.png" alt="Live Azure application analysis JSON" style="width:100%;border:1px solid #dbe2ec;border-radius:8px"><p>Captured through an SSH tunnel to the Azure VM application.</p></div><section id="verified-evidence"><h2>Original evidence captures</h2><figure style="margin:24px 0;break-inside:avoid"><h3>D1 — Azure NSG</h3><a href="screenshots/azure-nsg-verified.jpg"><img src="screenshots/azure-nsg-verified.jpg" alt="D1 — Azure NSG" style="width:100%;height:auto;border:1px solid #dbe2ec"></a><figcaption>Original Azure Portal capture showing TCP 5000 allowed.</figcaption></figure><figure style="margin:24px 0;break-inside:avoid"><h3>D1 — Running Azure VM</h3><a href="screenshots/azure-vm-verified.jpg"><img src="screenshots/azure-vm-verified.jpg" alt="D1 — Running Azure VM" style="width:100%;height:auto;border:1px solid #dbe2ec"></a><figcaption>Original Portal overview showing VM state and public IP.</figcaption></figure><figure style="margin:24px 0;break-inside:avoid"><h3>D3 — VM Scale Set</h3><a href="screenshots/azure-vmss-verified.jpg"><img src="screenshots/azure-vmss-verified.jpg" alt="D3 — VM Scale Set" style="width:100%;height:auto;border:1px solid #dbe2ec"></a><figcaption>Original overview showing one running instance; this is not evidence of a scale-out event.</figcaption></figure><figure style="margin:24px 0;break-inside:avoid"><h3>D3 — Autoscale configuration</h3><a href="screenshots/azure-autoscale-rules.jpg"><img src="screenshots/azure-autoscale-rules.jpg" alt="D3 — Autoscale configuration" style="width:100%;height:auto;border:1px solid #dbe2ec"></a><figcaption>Original Portal rules: CPU above 70% increases by one; below 30% decreases by one; capacity 1–3.</figcaption></figure><figure style="margin:24px 0;break-inside:avoid"><h3>E3 — Azure Redis provisioning</h3><a href="screenshots/azure-redis-creating.jpg"><img src="screenshots/azure-redis-creating.jpg" alt="E3 — Azure Redis provisioning" style="width:100%;height:auto;border:1px solid #dbe2ec"></a><figcaption>Original Portal capture shows Creating. A completed deployment and cloud cache hit have not yet been verified.</figcaption></figure><figure style="margin:24px 0;break-inside:avoid"><h3>B2 — JMeter dashboard</h3><a href="screenshots/jmeter-summary.png"><img src="screenshots/jmeter-summary.png" alt="B2 — JMeter dashboard" style="width:100%;height:auto;border:1px solid #dbe2ec"></a><figcaption>Actual JMeter-generated dashboard from the recorded test run.</figcaption></figure></section></main></body></html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CPSY 300 Lab 03 Report</title><style>:root{--ink:#172033;--muted:#657184;--blue:#1e5eff;--line:#dbe2ec;--bg:#f5f7fb}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 system-ui,-apple-system,"Segoe UI",Arial,sans-serif}main{max-width:1100px;margin:auto;background:#fff;min-height:100vh;padding:48px 62px 70px}h1{font-size:35px;line-height:1.15;margin:0 0 10px}h2{font-size:22px;margin:40px 0 12px;padding-bottom:7px;border-bottom:2px solid var(--line)}h3{font-size:17px;color:#234b91;margin:24px 0 7px}.sub{font-size:17px;color:var(--muted)}.meta{display:flex;gap:10px;flex-wrap:wrap;margin:24px 0 32px}.meta span{background:#eef3ff;border-radius:99px;padding:4px 10px;color:#31518c;font-size:12px}.lead{font-size:17px;max-width:880px}.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.kpi,.card{border:1px solid var(--line);border-radius:12px;padding:15px;background:linear-gradient(135deg,#fff,#f7faff)}.kpi b{display:block;color:var(--blue);font-size:24px}.kpi small{color:var(--muted)}table{border-collapse:collapse;width:100%;margin:13px 0 20px;font-size:14px}th,td{border:1px solid #d9dfe8;padding:8px 10px;text-align:left;vertical-align:top}th{background:#193b73;color:#fff}tr:nth-child(even){background:#f5f8fc}.code{background:#111827;color:#e6edf3;border-radius:9px;padding:14px;overflow:auto;white-space:pre-wrap;font:12px/1.55 ui-monospace,Menlo,monospace}.evidence{border:2px solid #1e5eff;border-radius:10px;padding:13px 15px;margin:12px 0;background:#fbfcff}.evidence b{color:#244b92}.evidence img{width:100%;height:auto;border:1px solid #dbe2ec;border-radius:8px;margin-top:10px}.bar{display:flex;align-items:center;gap:8px;margin:7px 0}.bar label{width:55px;font-size:12px}.bar i{height:15px;background:linear-gradient(90deg,var(--blue),#09a6b8);width:var(--w);border-radius:4px}.bar em{font-size:12px;color:var(--muted);font-style:normal}.check{padding-left:0;list-style:none}.check li{padding:7px 0;border-bottom:1px solid var(--line)}.check li:before{content:'☐';color:var(--blue);font-size:18px;margin-right:8px}.foot{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}figure{margin:16px 0;break-inside:avoid}figure img{width:100%;height:auto;border:1px solid #dbe2ec;border-radius:8px}figcaption{font-size:13px;color:var(--muted);margin-top:6px}@media(max-width:760px){main{padding:28px 20px}.kpis,.grid{grid-template-columns:1fr 1fr}}@media print{body{background:#fff}main{padding:25px 35px}}</style></head><body><main>
+
+<h1>CPSY 300 Lab 03</h1>
+<div class="sub">Performance Testing and Optimization with Microsoft Azure</div>
+<div class="meta">
+  <span>Student: Yuandong Yang</span>
+  <span>Date: October 9, 2026</span>
+  <span>Dataset: Uber-Jan-Feb-FOIL.csv</span>
+  <span>Rubric: 11 × 5 = 55</span>
+</div>
+
+<p class="lead">This report documents the complete Lab 03 workflow: data preprocessing and visualization, JMeter performance testing, Docker containerization, Azure VM/VMSS deployment, Redis caching, and performance monitoring. The official CSV is aggregated by date and dispatching base (columns: <code>dispatching_base_number</code>, <code>date</code>, <code>active_vehicles</code>, <code>trips</code>), so <code>trips</code> is used as the weight instead of treating each row as one trip.</p>
+
+<h3>Environment</h3>
+<table>
+<tr><th>Component</th><th>Detail</th></tr>
+<tr><td>Local OS</td><td>Ubuntu 22.04 LTS (x86_64)</td></tr>
+<tr><td>Python</td><td>3.8-slim (Docker) / 3.10.12 (host)</td></tr>
+<tr><td>Docker</td><td>29.8.0</td></tr>
+<tr><td>Azure VM</td><td>cpsy300-lab03-vm2, Standard D2s v3, East US Zone 2, Ubuntu 24.04</td></tr>
+<tr><td>Azure Redis</td><td>cpsy300-redis, Basic C0, East US, port 6380 (SSL)</td></tr>
+</table>
+
+<h2>Executive Summary</h2>
+<div class="kpis">
+  <div class="kpi"><b>4,130,230</b><small>total trips (weighted)</small></div>
+  <div class="kpi"><b>59</b><small>calendar days</small></div>
+  <div class="kpi"><b>Feb 20</b><small>busiest day · 100,915</small></div>
+  <div class="kpi"><b>B02764</b><small>largest base · 1,914,449</small></div>
+</div>
+
+<!-- ============================================================ -->
+<h2>Task 1 — Data Preprocessing and Traffic Analysis · 10 marks</h2>
+
+<h3>1.1 Data Cleaning and Feature Extraction · 5 marks</h3>
+<p>The input CSV contains 354 rows with four fields. The application removes missing values and duplicate records, parses the date column, and creates derived features: <code>Hour</code>, <code>Day</code>, <code>DayOfWeek</code>, <code>IsWeekend</code>, and <code>Trips</code> (weighted by the <code>trips</code> column).</p>
+
+<div class="code">df = pd.read_csv("Uber-Jan-Feb-FOIL.csv")
+df.dropna(inplace=True)
+df.drop_duplicates(inplace=True)
+DATE_COL = "Date/Time" if "Date/Time" in df.columns else "date"
+df[DATE_COL] = pd.to_datetime(df[DATE_COL])
+df["Hour"] = df[DATE_COL].dt.hour
+df["Day"] = df[DATE_COL].dt.date
+df["DayOfWeek"] = df[DATE_COL].dt.day_name()
+df["IsWeekend"] = df["DayOfWeek"].isin(["Saturday", "Sunday"])
+df["Trips"] = df["trips"] if "trips" in df.columns else 1</div>
+
+<div class="evidence">
+  <b>Evidence A1 — Terminal output of <code>python3 app.py --analyze</code></b>
+  <p>Shows <code>df.head()</code>, <code>df.info()</code>, <code>df.describe()</code>, top 5 busiest days, and day-of-week averages. Executed with <code>date</code> command for timestamp verification.</p>
+  <img src="screenshots/evidence-1.1-analysis.png" alt="Task 1.1 analysis terminal output">
+</div>
+
+<h3>1.2 Aggregation and Visualization · 5 marks</h3>
+
+<table>
+<tr><th>Metric</th><th>Result</th><th>Interpretation</th></tr>
+<tr><td>Rows after cleaning</td><td>354</td><td>No missing or duplicate rows in the aggregate file</td></tr>
+<tr><td>Total weighted trips</td><td>4,130,230</td><td>Sum of the <code>trips</code> field, not row count</td></tr>
+<tr><td>Busiest day</td><td>2015-02-20 · 100,915</td><td>All dispatching bases aggregated by day</td></tr>
+<tr><td>Largest base</td><td>B02764 · 1,914,449</td><td>All dates aggregated by base</td></tr>
+<tr><td>Busiest day of week</td><td>Saturday · avg 83,481/day</td><td>Weekend demand peaks; Monday lowest at 57,975</td></tr>
+</table>
+
+<div class="card"><b>Top 5 daily totals</b>
+<div class="bar"><label>Feb 20</label><i style="--w:100%"></i><em>100,915</em></div>
+<div class="bar"><label>Feb 14</label><i style="--w:99%"></i><em>100,345</em></div>
+<div class="bar"><label>Feb 21</label><i style="--w:97%"></i><em>98,380</em></div>
+<div class="bar"><label>Feb 13</label><i style="--w:97%"></i><em>98,024</em></div>
+<div class="bar"><label>Jan 31</label><i style="--w:91%"></i><em>92,257</em></div>
+</div>
+
+<p>The official CSV is aggregated at the day level, so the <code>Hour</code> column is always 0 (a date-parsing artifact, not an observed pickup hour). The hourly bar chart is labeled accordingly. The day-of-week × hour heatmap collapses to a single column; a supplementary day-of-week × base heatmap provides richer information for this dataset.</p>
+
+<div class="evidence">
+  <b>Evidence A2 — Generated plots</b>
+  <div class="grid">
+    <figure><img src="screenshots/daily_trips.png" alt="Daily trips bar chart"><figcaption>Daily trips bar chart (Jan–Feb 2015)</figcaption></figure>
+    <figure><img src="screenshots/heatmap_day_hour.png" alt="Day-of-week × Hour heatmap"><figcaption>Day × Hour heatmap (Hour=0 is a date placeholder)</figcaption></figure>
+    <figure><img src="screenshots/heatmap_day_base.png" alt="Day-of-week × Base heatmap"><figcaption>Day × Dispatching Base heatmap</figcaption></figure>
+    <figure><img src="screenshots/hourly_trips.png" alt="Hourly trips"><figcaption>Hour placeholder totals (not observed hourly demand)</figcaption></figure>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<h3>1.3 JMeter Traffic Simulation · 5 marks</h3>
+
+<p><code>jmeter_test_plan.jmx</code> includes a Thread Group (500 users, 60-second ramp-up, 5 loops), a CSV Data Set Config reading <code>Uber-Jan-Feb-FOIL.csv</code>, an HTTP GET sampler targeting <code>/predict_traffic?timestamp=${timestamp}</code>, a Summary Report, and a View Results Tree. The CSV uses <code>date</code> as the timestamp variable.</p>
+
+<div class="code">jmeter -n -t jmeter_test_plan.jmx -l results.jtl -e -o jmeter-report</div>
+
+<div class="evidence">
+  <b>Evidence B1/B2 — JMeter dashboard from actual test run</b>
+  <p>2,500 samples completed with 0 errors, 2.04 ms average response time, and 42.15 transactions/s.</p>
+  <figure><img src="screenshots/jmeter-summary.png" alt="JMeter dashboard summary"><figcaption>JMeter-generated HTML dashboard from the test run</figcaption></figure>
+</div>
+
+<!-- ============================================================ -->
+<h2>Task 2 — Docker Containerization · 10 marks</h2>
+
+<h3>2.1 Dockerfile · 5 marks</h3>
+<p>Uses <code>python:3.8-slim</code> as required by the handout, with pinned dependencies, gunicorn for production serving, and port 5000 exposed.</p>
+
+<div class="code">FROM python:3.8-slim
+WORKDIR /app
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 MPLBACKEND=Agg
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY app.py Uber-Jan-Feb-FOIL.csv ./
+EXPOSE 5000
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--threads", "4", "app:app"]</div>
+
+<p><b>requirements.txt:</b></p>
+<div class="code">Flask==3.0.3
+gunicorn==22.0.0
+pandas==2.0.3
+numpy==1.24.4
+redis==5.0.7
+matplotlib==3.7.5
+seaborn==0.13.2</div>
+
+<h3>2.2 Build and Run · 5 marks</h3>
+
+<div class="code">docker build -t uber-app .
+docker run --rm -p 5000:5000 uber-app
+curl http://localhost:5000/</div>
+
+<div class="evidence">
+  <b>Evidence C1–C4 — Docker build, run, and health check</b>
+  <img src="screenshots/evidence-2-docker.png" alt="Docker build and run evidence">
+</div>
+
+<!-- ============================================================ -->
+<h2>Task 3 — Azure VM and VMSS Deployment · 10 marks</h2>
+
+<h3>3.1 Azure VM Deployment · 5 marks</h3>
+<p>An Ubuntu 24.04 VM (<code>cpsy300-lab03-vm2</code>, Standard D2s v3) was created in East US Zone 2. The NSG rule <code>Allow-5000</code> (priority 310, TCP, port 5000) allows inbound traffic. Azure CLI and an external request verified that the VM was running and that its public API returned HTTP 200 on 2026-10-10 UTC; see <code>evidence/azure-cli-verification-2026-10-10.md</code>.</p>
+
+<div class="code">docker pull &lt;dockerhub-user&gt;/uber-app:latest
+docker run -d --restart unless-stopped -p 5000:5000 &lt;dockerhub-user&gt;/uber-app:latest
+curl http://&lt;public-ip&gt;:5000/</div>
+
+<div class="evidence">
+  <b>Evidence D1 — Azure VM overview (running)</b>
+  <figure><img src="screenshots/azure-vm-verified.jpg" alt="Azure VM overview"><figcaption>Azure Portal: cpsy300-lab03-vm2, D2s v3, East US, public IP 20.84.66.238, status Running</figcaption></figure>
+  <figure><img src="screenshots/evidence-azure-cli-verified.png" alt="Azure CLI verification transcript"><figcaption>Azure CLI transcript: the public endpoint returned HTTP 200 with 354 rows and service status <code>ok</code>.</figcaption></figure>
+</div>
+
+<div class="evidence">
+  <b>Evidence D1 — NSG inbound rules</b>
+  <figure><img src="screenshots/azure-nsg-verified.jpg" alt="Azure NSG inbound rules"><figcaption>Azure Portal: NSG showing SSH (port 22) and Allow-5000 (port 5000, TCP, Allow)</figcaption></figure>
+</div>
+
+<h3>3.2 VMSS Autoscaling · 5 marks</h3>
+<p>A VM Scale Set (<code>cpsy300-vmss3</code>) and its load balancer were provisioned. Azure CLI verified one running flexible-scale-set VM and enabled autoscale rules: CPU above 70% scales out by 1 instance; CPU below 30% scales in by 1 instance; capacity range 1–3. No activity-log scale event has yet been captured, so a JMeter-driven scale demonstration remains required.</p>
+
+<div class="evidence">
+  <b>Evidence D3 — VMSS overview</b>
+  <figure><img src="screenshots/azure-vmss-verified.jpg" alt="VMSS overview"><figcaption>Azure Portal: VMSS with 1 running instance</figcaption></figure>
+</div>
+
+<div class="evidence">
+  <b>Evidence D4 — Autoscale configuration</b>
+  <figure><img src="screenshots/azure-autoscale-rules.jpg" alt="Autoscale rules"><figcaption>CPU > 70% → scale out by 1; CPU < 30% → scale in by 1; capacity 1–3</figcaption></figure>
+  <figure><img src="screenshots/azure-autoscale-verified.jpg" alt="Autoscale verified"><figcaption>Autoscale configuration verified in Azure Portal</figcaption></figure>
+</div>
+
+<!-- ============================================================ -->
+<h2>Task 4 — Redis Caching · 10 marks</h2>
+
+<h3>4.1 Local Redis · 5 marks</h3>
+<p><code>docker-compose.yml</code> starts Redis and the API on one Docker network. The API uses the request timestamp as the cache key (<code>predict:&lt;timestamp&gt;</code>) with a default TTL of 3600 seconds. The first request computes the result; the second returns the cached result with <code>"source": "cache"</code>.</p>
+
+<div class="code">docker compose up --build -d
+curl "http://localhost:5000/predict_traffic?timestamp=2015-02-20T00:00:00"   # source: computed
+curl "http://localhost:5000/predict_traffic?timestamp=2015-02-20T00:00:00"   # source: cache
+docker compose exec redis redis-cli keys 'predict:*'
+docker compose exec redis redis-cli ttl 'predict:2015-02-20T00:00:00'</div>
+
+<p>The prediction model returns the historical mean daily trips for the same day of week. For Friday 2015-02-20, the predicted value is 79,021.33 trips (the average of all Fridays in the dataset), while the actual observed total was 100,915 trips.</p>
+
+<div class="evidence">
+  <b>Evidence E1/E2 — Local Redis cache: compute → cache → KEYS → TTL</b>
+  <img src="screenshots/evidence-4.1-redis-local.png" alt="Local Redis cache evidence">
+</div>
+
+<h3>4.2 Azure Cache for Redis · 5 marks</h3>
+<p>An Azure Cache for Redis instance (<code>cpsy300-redis</code>, Basic C0, SSL port 6380) was provisioned successfully, as verified by Azure CLI on 2026-10-10. The application must be restarted with the following environment variables before an Azure-cache hit can be claimed. The currently deployed VM API still reports <code>cache: disabled</code>; see <code>evidence/azure-cli-verification-2026-10-10.md</code>.</p>
+
+<div class="code">docker run -d --restart unless-stopped -p 5000:5000 \
+  --env-file ~/redis.env \
+  &lt;dockerhub-user&gt;/uber-app:latest</div>
+
+<p>The <code>redis.env</code> file (permissions 600) contains:</p>
+<div class="code">REDIS_HOST=cpsy300-redis.redis.cache.windows.net
+REDIS_PORT=6380
+REDIS_PASSWORD=&lt;primary-key&gt;
+REDIS_SSL=true</div>
+
+<p>The application connects using <code>redis.Redis(host, port=6380, password, ssl=True)</code> as specified in the handout.</p>
+
+<div class="evidence">
+  <b>Evidence E3 — Azure Redis provisioning</b>
+  <figure><img src="screenshots/azure-redis-creating.jpg" alt="Azure Redis creating"><figcaption>Azure Portal: cpsy300-redis (Basic C0) status during provisioning</figcaption></figure>
+  <p>The CLI transcript above confirms the resource subsequently reached <code>Succeeded</code>, uses SSL port 6380, and has the non-SSL port disabled. It also accurately records that the current VM application cache is disabled; an Azure cache-hit screenshot requires a container restart with its Redis credentials.</p>
+</div>
+
+<!-- ============================================================ -->
+<h2>Task 5 — Monitoring and Cleanup · 10 marks</h2>
+
+<h3>5.1 Performance Comparison · 5 marks</h3>
+<p>Compare average response time, CPU usage, and autoscale actions before and after caching, using the same time window in Azure Monitor. JMeter throughput and error percentage serve as supporting evidence.</p>
+
+<table>
+<tr><th>Metric</th><th>Before caching</th><th>After caching</th><th>Notes</th></tr>
+<tr><td>Avg response time (JMeter)</td><td><em>To be measured</em></td><td><em>To be measured</em></td><td>From JMeter Summary Report</td></tr>
+<tr><td>CPU usage</td><td><em>To be measured</em></td><td><em>To be measured</em></td><td>From Azure Monitor</td></tr>
+<tr><td>Scale-out events</td><td><em>To be measured</em></td><td><em>To be measured</em></td><td>From VMSS activity log</td></tr>
+</table>
+
+<div class="evidence">
+  <b>Evidence F1:</b> Azure Monitor before/after comparison screenshots to be inserted after completing the JMeter load tests with and without Redis caching.
+</div>
+
+<h3>5.2 Cleanup · 5 marks</h3>
+
+<p>Local cleanup:</p>
+<div class="code">docker compose exec redis redis-cli FLUSHALL
+docker compose down --remove-orphans</div>
+
+<p>Azure cleanup (delete resources by name, not the entire resource group, since <code>dealerops-student-demo</code> is shared):</p>
+<div class="code">az vm delete -g dealerops-student-demo -n cpsy300-lab03-vm2 --yes
+az vmss delete -g dealerops-student-demo -n cpsy300-vmss3
+az redis delete -g dealerops-student-demo -n cpsy300-redis --yes
+az network nsg delete -g dealerops-student-demo -n cpsy300-lab03-vm2-nsg
+az network nic delete -g dealerops-student-demo -n cpsy300-lab03-vm2255
+az network public-ip delete -g dealerops-student-demo -n cpsy300-lab03-vm2-ip
+az disk delete -g dealerops-student-demo -n cpsy300-lab03-vm2_disk1_* --yes
+az resource list -g dealerops-student-demo -o table  # verify all cpsy300-* resources are gone</div>
+
+<div class="evidence">
+  <b>Evidence F2 — Local Docker/Redis cleanup</b>
+  <img src="screenshots/evidence-5.2-cleanup-local.png" alt="Local cleanup evidence">
+  <p>Azure Portal resource-deletion screenshots to be inserted after cleanup.</p>
+</div>
+
+<!-- ============================================================ -->
+<h2>Submission Checklist</h2>
+<ul class="check">
+  <li>Report PDF (exported from this HTML)</li>
+  <li>app.py — Flask application with prediction and caching</li>
+  <li>Dockerfile — Python 3.8-slim with gunicorn</li>
+  <li>requirements.txt — all dependencies including matplotlib and seaborn</li>
+  <li>docker-compose.yml — app + Redis</li>
+  <li>jmeter_test_plan.jmx — JMeter test plan</li>
+  <li>Uber-Jan-Feb-FOIL.csv — dataset</li>
+  <li>screenshots/ — all evidence with visible date and time</li>
+</ul>
+
+<div class="foot">
+Data source: Uber TLC FOIL response, provided via Brightspace Course Resources (original source: FiveThirtyEight GitHub).<br>
+CPSY 300 Lab 03 · October 9, 2026
+</div>
+
+</main></body></html>
