@@ -61,11 +61,12 @@ Phase 2 builds on Phase 1 (local development). The goal is to **move the solutio
 - [x] GitHub Repository with frontend and backend code
 - [ ] Documentation PDF explaining architecture, services, and screenshots
 
-**Status (2026-10-02):** the backend, frontend, deployment script and test suite are
-complete and committed, but **no Azure resources have been provisioned**, so the two
-URL deliverables are outstanding and there are no screenshots. The source document for
-the Documentation PDF is `docs/Phase2-Documentation.md`; it is written and marks each
-required screenshot as a pending placeholder for a human to capture after deployment.
+**Status (2026-10-20):** the backend, frontend, deployment script and test suite are
+complete and committed, and the system is **deployed to Azure**. The Function App is
+https://cpsy300-nutrition-api.azurewebsites.net and the dashboard is
+https://salmon-ocean-0ce94150f.4.azurestaticapps.net. Dated screenshots are in
+`docs/reports/Project2-Master-Overview.html` (Deployment Evidence) and
+`docs/Phase2-Documentation.md` (section 9).
 
 ---
 
