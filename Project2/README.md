@@ -5,15 +5,15 @@
 
 ## Status
 
-**The Azure resources have not been provisioned yet.** There are therefore **no live
-URLs and no portal screenshots** in this repository, and nothing here should be read
-as deployment evidence.
+**Deployed to Azure on 2026-10-20** (resource group `cpsy300-nutritional-insights-rg`,
+region canadacentral, Static Web App in eastus2) with `./deploy.sh`.
 
-What *is* done: the backend Function app, the dashboard frontend, the deployment
-script and the test suite are complete and consistent with each other. Deployment is
-a single `./deploy.sh` run away for anyone with an Azure subscription (see
-[Deploy to Azure](#deploy-to-azure)). The screenshots required by the course are
-listed as pending placeholders in `docs/Phase2-Documentation.md`.
+- Function App: https://cpsy300-nutrition-api.azurewebsites.net/api/health
+- Dashboard: https://salmon-ocean-0ce94150f.4.azurestaticapps.net
+
+Date-stamped screenshots of the live dashboard, API responses, resources and CORS
+settings are in `docs/reports/Project2-Master-Overview.html` (section 7, Deployment
+Evidence; image files in `docs/reports/screenshots/`).
 
 ## Overview
 

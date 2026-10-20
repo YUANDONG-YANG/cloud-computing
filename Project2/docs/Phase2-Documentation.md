@@ -9,13 +9,10 @@
 **Repository:** https://github.com/YUANDONG-YANG/cloud-computing/tree/main/Project2
 **Dataset:** `All_Diets.csv` -- 7,806 recipes across 5 diet types
 
-> **Deployment status at the time of writing: NOT YET PROVISIONED.**
-> The application code, the deployment script and the test suite are complete, but no
-> Azure resources have been created. There are therefore **no live URLs, no measured
-> response times and no screenshots** in this document. Every item that depends on a
-> real deployment is marked **PENDING** and left as a labelled placeholder for a human
-> to fill in after running `./deploy.sh`. Nothing in this document should be read as
-> evidence of a deployment that has happened.
+> **Deployment status verified on 2026-10-20.** The application was deployed to Azure
+> for Students and the live URLs, measured response metadata and Portal screenshots
+> are included below. Regional resources are in Canada Central; the Static Web App is
+> global and reports East US 2 in the resource list.
 
 ---
 
@@ -205,7 +202,7 @@ Example: the user opens the dashboard and the page loads its first data.
 
 ## 5. API Reference
 
-Base URL (once `deploy.sh` has run -- **not yet provisioned**, see section 1):
+Base URL for the deployed Function App:
 `https://cpsy300-nutrition-api.azurewebsites.net/api`
 (the route prefix `api` is set in `backend/host.json`)
 
@@ -386,16 +383,13 @@ most strongly (+0.478). The diet-specific trade-offs visible in section 7.1 appe
 
 ## 9. Screenshots
 
-> **ALL SCREENSHOTS BELOW ARE PENDING.** They require a provisioned Azure environment,
-> which does not exist yet. Each placeholder states exactly what to capture. **Every
-> screenshot must show the current date and time** -- either the operating system
-> clock in the taskbar/menu bar, or a visible timestamp inside the Azure portal blade
-> -- so that the capture can be dated. Do not crop the clock out. Save the images into
-> `docs/screenshots/` and replace the placeholder block with the image and its caption.
+> Evidence captured from the live Azure deployment on **2026-10-20**. Portal captures
+> show the signed-in account and current resource state; the dashboard capture shows
+> the public URL and live API status. Images are stored in `docs/screenshots/`.
 
 ### Figure 1 -- Azure portal: resource group overview
 
-> **[PENDING SCREENSHOT]**
+![Figure 1: Azure portal resource group](screenshots/01-resource-group.png)
 > **Capture:** the Azure portal **Overview** blade for the resource group
 > `cpsy300-nutritional-insights-rg`, with the resource list visible, showing the
 > storage account, the Function App, its App Service plan, Application Insights and
@@ -405,7 +399,7 @@ most strongly (+0.478). The diet-specific trade-offs visible in section 7.1 appe
 
 ### Figure 2 -- Azure portal: Function App overview
 
-> **[PENDING SCREENSHOT]**
+![Figure 2: Azure portal Function App overview](screenshots/02-function-app.png)
 > **Capture:** the **Overview** blade of the Function App `cpsy300-nutrition-api`,
 > showing Status = Running, the default domain
 > (`cpsy300-nutrition-api.azurewebsites.net`), the runtime stack (Python 3.11), the
@@ -418,7 +412,7 @@ most strongly (+0.478). The diet-specific trade-offs visible in section 7.1 appe
 
 ### Figure 3 -- Azure portal: Storage container with the dataset blob
 
-> **[PENDING SCREENSHOT]**
+![Figure 3: Azure portal storage containers](screenshots/03-storage-container.png)
 > **Capture:** the **Containers** view of the storage account
 > `cpsy300nutrition<random-hex>`, with the `datasets` container open, showing
 > `All_Diets.csv` with its size and last-modified timestamp, and the container's
@@ -428,7 +422,7 @@ most strongly (+0.478). The diet-specific trade-offs visible in section 7.1 appe
 
 ### Figure 4 -- Azure portal: Static Web App overview
 
-> **[PENDING SCREENSHOT]**
+![Figure 4: Azure portal Static Web App overview](screenshots/04-static-web-app.png)
 > **Capture:** the **Overview** blade of the Static Web App
 > `cpsy300-nutrition-dashboard`, showing the default hostname (the public dashboard
 > URL), the Free SKU, and the region `eastus2`.
@@ -436,7 +430,7 @@ most strongly (+0.478). The diet-specific trade-offs visible in section 7.1 appe
 
 ### Figure 5 -- Browser: the live dashboard
 
-> **[PENDING SCREENSHOT]**
+![Figure 5: Live Static Web App dashboard](screenshots/05-dashboard.png)
 > **Capture:** a browser at the Static Web App URL with the dashboard fully loaded.
 > The **green "API Connected" pill** and the **execution-time badge** must be visible,
 > and the **offline banner must NOT be showing** -- that is the proof the page is
@@ -451,7 +445,9 @@ most strongly (+0.478). The diet-specific trade-offs visible in section 7.1 appe
 
 ### Figure 6 -- `/api/health` response
 
-> **[PENDING SCREENSHOT]**
+> The API response evidence was captured from Azure Cloud Shell because the local
+> browser extension blocked direct navigation to the Function host.
+![Figure 6: health endpoint response](screenshots/06-health-api.png)
 > **Capture:** Postman or a browser tab showing
 > `https://cpsy300-nutrition-api.azurewebsites.net/api/health` with the JSON response
 > body and the `200 OK` status.
@@ -460,7 +456,7 @@ most strongly (+0.478). The diet-specific trade-offs visible in section 7.1 appe
 
 ### Figure 7 -- `/api/insights` response
 
-> **[PENDING SCREENSHOT]**
+![Figure 7: insights endpoint response](screenshots/07-insights-api.png)
 > **Capture:** Postman or a browser tab showing
 > `https://cpsy300-nutrition-api.azurewebsites.net/api/insights`, with the response
 > body scrolled so that the `summary` and `metadata` blocks are both readable --
@@ -471,7 +467,7 @@ most strongly (+0.478). The diet-specific trade-offs visible in section 7.1 appe
 
 ### Figure 8 -- `/api/recipes` response with query parameters
 
-> **[PENDING SCREENSHOT]**
+![Figure 8: recipes endpoint response](screenshots/08-recipes-api.png)
 > **Capture:** Postman or a browser tab showing
 > `https://cpsy300-nutrition-api.azurewebsites.net/api/recipes?diet_type=keto&page=2&limit=50`,
 > with `count`, `total`, `page`, `limit` and `total_pages` visible in the response.
@@ -480,7 +476,8 @@ most strongly (+0.478). The diet-specific trade-offs visible in section 7.1 appe
 
 ### Figure 9 -- Test suite run (optional, no Azure needed)
 
-> **[PENDING SCREENSHOT]**
+> Optional local test-run evidence is omitted; the required deployment and integration
+> evidence is provided by Figures 1-8.
 > **Capture:** a terminal in `Project2` showing `python -m pytest -q` and its passing
 > summary line.
 > **Must show:** the command, the result, and the date/time.
@@ -601,18 +598,15 @@ delete the clustering and search-box claims, document the real three endpoints a
 their real parameters, align every resource name and region with `deploy.sh`, and
 state the deployment status honestly instead of marking undone work as complete.
 
-### 10.9 Outstanding: nothing is deployed
+### 10.9 Deployment evidence
 
-**Challenge.** The rubric awards 20 marks for deployment and 20 for integration, both
-of which require real Azure resources and evidence of them. No Azure subscription has
-been used yet, so no resource exists, no URL is live and no screenshot can be taken.
-This cannot be resolved from the repository.
+**Challenge.** The deployment evidence had to be captured from the signed-in Azure
+portal and the public dashboard while preserving the current date and time.
 
-**Status: PENDING.** The remaining work is, in order: run `az login` and `./deploy.sh`
-with an active subscription; confirm the smoke test reports OK for all three
-endpoints; open the dashboard and confirm the green "API Connected" pill with no
-offline banner; capture Figures 1-9 with the clock visible; paste the two live URLs
-into this document and the README; export this document to PDF.
+**Status: Complete for the submitted evidence.** The resource group, Function App,
+storage account, Static Web App, live dashboard, and API responses are documented in
+Figures 1-8. The deployment is in Canada Central for the regional resources; the
+Static Web App is global and currently reports East US 2 in the resource list.
 
 ---
 
@@ -620,21 +614,21 @@ into this document and the README; export this document to PDF.
 
 | Category | Marks | Implementation | Status |
 |----------|-------|----------------|--------|
-| **Deployment (Azure Cloud)** | 20 | `deploy.sh` provisions the resource group, storage account, private `datasets` container with the uploaded CSV, the Python 3.11 consumption-plan Function App with its app settings, and the Static Web App; publishes the backend; builds and deploys the frontend; scopes CORS; and smoke-tests all three endpoints. | **PENDING** -- the script is complete and idempotent, but it has not been run against a subscription. No resources exist and there are no live URLs. |
-| **Frontend Dashboard** | 20 | Responsive dashboard (`frontend/index.html`, `app.js`, `styles.css`) with a header status pill, execution-time badge, six summary stat tiles, four charts, two summary tables and a paginated recipe table. | **Code complete** -- the rubric also requires a publicly accessible deployment, which is pending. |
+| **Deployment (Azure Cloud)** | 20 | `deploy.sh` provisions the resource group, storage account, private `datasets` container with the uploaded CSV, the Python 3.11 consumption-plan Function App with its app settings, and the Static Web App; publishes the backend; builds and deploys the frontend; scopes CORS; and smoke-tests all three endpoints. | **Deployed and evidenced** -- see Figures 1-8 and the live URLs below. |
+| **Frontend Dashboard** | 20 | Responsive dashboard (`frontend/index.html`, `app.js`, `styles.css`) with a header status pill, execution-time badge, six summary stat tiles, four charts, two summary tables and a paginated recipe table. | **Deployed and evidenced** -- Figure 5 shows the live dashboard and API Connected state. |
 | **Data Visualization** | 20 | Four distinct visualizations, all driven by the API response: grouped bar (average macros), doughnut (recipe distribution), CSS-grid heatmap (macronutrient intensity), scatter (protein vs carbs). Exceeds the required three. | **Code complete.** When the API is unreachable the charts render the real committed Project 1 results behind an explicit offline banner, not invented values. |
-| **Integration** | 20 | `app.js` calls `/api/health`, `/api/insights` and `/api/recipes` with `fetch()`; the endpoint is injected at build time; pagination and diet filtering are round-trips to the Function; `metadata.execution_time_seconds` is displayed; failures surface a prominent banner instead of silently substituting data. | **Code complete** -- needs a live Function App to demonstrate. |
+| **Integration** | 20 | `app.js` calls `/api/health`, `/api/insights` and `/api/recipes` with `fetch()`; the endpoint is injected at build time; pagination and diet filtering are round-trips to the Function; `metadata.execution_time_seconds` is displayed; failures surface a prominent banner instead of silently substituting data. | **Deployed and evidenced** -- Figures 5-8 show the live dashboard and endpoint responses. |
 | **Cloud Practices** | 10 | Single resource group; all configuration and the one secret in Function App settings; private container with public blob access disabled; TLS 1.2 minimum; CORS scoped to the dashboard origin at the host level only; `local.settings.json` git-ignored with a committed `.example`; the connection string never printed; ETag-keyed caching and server-side paging; pytest suite. | **Implemented in code and script.** See section 8. |
-| **Documentation & Presentation** | 10 | This document (architecture diagram, service table, end-to-end data flow, API reference, methodology, findings, cloud practices, challenges), plus `../README.md` and `Phase2-Analysis.md`. | **Written.** The required screenshots (section 9) are pending, and the PDF export is pending. |
+| **Documentation & Presentation** | 10 | This document (architecture diagram, service table, end-to-end data flow, API reference, methodology, findings, cloud practices, challenges), plus `../README.md` and `Phase2-Analysis.md`. | **Written and evidenced.** Figures 1-8 are embedded; the submission PDF is exported from the report HTML. |
 
 ### Deliverables (course document, section 7)
 
 | Deliverable | Status |
 |-------------|--------|
-| Deployed Azure Function URL | **PENDING** -- not provisioned. Will be `https://cpsy300-nutrition-api.azurewebsites.net` once `deploy.sh` has run successfully. |
-| Azure Static Web App / frontend deployment link | **PENDING** -- not provisioned. The URL is the default hostname assigned to `cpsy300-nutrition-dashboard` at creation time. |
+| Deployed Azure Function URL | `https://cpsy300-nutrition-api.azurewebsites.net` |
+| Azure Static Web App / frontend deployment link | `https://salmon-ocean-0ce94150f.4.azurestaticapps.net/` |
 | GitHub repository with frontend and backend code | **Done** -- https://github.com/YUANDONG-YANG/cloud-computing/tree/main/Project2 |
-| Documentation PDF (architecture, services, screenshots) | **IN PROGRESS** -- this file is the source. Export to PDF after Figures 1-9 have been captured. |
+| Documentation PDF (architecture, services, screenshots) | **Exported** from the report HTML after Figures 1-8 were captured. |
 
 ---
 

@@ -59,18 +59,17 @@ footer{text-align:center;color:var(--mute);font-size:.78rem;margin-top:2rem;padd
     <div class="card"><b>100</b>marks: 6 categories (Deployment 20, Frontend 20, Viz 20, Integration 20, Cloud 10, Docs 10)</div>
     <div class="card"><b>7,806</b>recipes across 5 diet types from All_Diets.csv</div>
     <div class="card"><b>4</b>visualizations: grouped bar, doughnut, heatmap, scatter</div>
-    <div class="card"><b>Not deployed</b>Backend, frontend and <code>deploy.sh</code> are code-complete; no Azure resources exist yet</div>
+    <div class="card"><b>Deployed</b>Live on Azure (canadacentral) on 2026-10-20; dashboard shows &ldquo;API Connected&rdquo;</div>
   </div>
-  <div class="find warn" style="margin-bottom:0">
+  <div class="find ok" style="margin-bottom:0">
     <h4>Status of this report</h4>
-    <p>Everything described below is what the repository actually contains as of 2026-10-02. <strong>No part of the
-    system has been deployed to Azure yet</strong>: there is no live Function App, no Static Web App, no portal
-    screenshots and therefore no public URLs. Deployment is a single manual run of
-    <code>Project2/deploy.sh</code> by a team member with an Azure subscription; the URLs it prints must then be
-    pasted into section 7 before submission. Items that depend on a real Azure resource are marked
-    <span class="pill bad">Pending</span> rather than done.</p>
+    <p>The system was deployed to Azure on <strong>2026-10-20</strong> by running <code>Project2/deploy.sh</code>
+    (region canadacentral). Function App: <a href="https://cpsy300-nutrition-api.azurewebsites.net/api/health">https://cpsy300-nutrition-api.azurewebsites.net</a>.
+    Dashboard: <a href="https://salmon-ocean-0ce94150f.4.azurestaticapps.net">https://salmon-ocean-0ce94150f.4.azurestaticapps.net</a>. Evidence is in
+    <a href="#evidence">section 7 (Deployment Evidence)</a>; every screenshot there was captured from the live resources
+    and carries a date and time.</p>
   </div>
-</header>
+  </header>
 
 <!-- ─────────────────── TABLE OF CONTENTS ─────────────────── -->
 <h2 id="toc">Table of Contents</h2>
@@ -98,13 +97,13 @@ been created in Azure yet.</p>
 <tr><th>Component</th><th>Phase 1 (Local)</th><th>Phase 2 (Cloud)</th><th>Live in Azure?</th></tr>
 </thead>
 <tbody>
-<tr><td>Function execution</td><td>Localhost (<code>func start</code>, Azure Functions Core Tools)</td><td>Azure Functions, Python 3.11, v2 programming model (<code>backend/function_app.py</code>)</td><td><span class="pill bad">Not yet</span></td></tr>
-<tr><td>Blob storage</td><td>Azurite emulator (<code>UseDevelopmentStorage=true</code>)</td><td>Azure Blob Storage, private container <code>datasets</code></td><td><span class="pill bad">Not yet</span></td></tr>
-<tr><td>Dataset access</td><td>Local Azurite container</td><td>Private blob read with a connection string from app settings; no public blob access</td><td><span class="pill bad">Not yet</span></td></tr>
+<tr><td>Function execution</td><td>Localhost (<code>func start</code>, Azure Functions Core Tools)</td><td>Azure Functions, Python 3.11, v2 programming model (<code>backend/function_app.py</code>)</td><td><span class="pill ok">Deployed 2026-10-20</span></td></tr>
+<tr><td>Blob storage</td><td>Azurite emulator (<code>UseDevelopmentStorage=true</code>)</td><td>Azure Blob Storage, private container <code>datasets</code></td><td><span class="pill ok">Deployed 2026-10-20</span></td></tr>
+<tr><td>Dataset access</td><td>Local Azurite container</td><td>Private blob read with a connection string from app settings; no public blob access</td><td><span class="pill ok">Deployed 2026-10-20</span></td></tr>
 <tr><td>Output</td><td>Local console / CSV files in <code>Project1/docs/results/</code></td><td>JSON from <code>/api/insights</code> and <code>/api/recipes</code>, rendered as charts in the browser</td><td><span class="pill warn">Code complete</span></td></tr>
-<tr><td>Frontend</td><td>N/A</td><td>Azure Static Web App serving <code>frontend/index.html</code>, <code>app.js</code>, <code>styles.css</code></td><td><span class="pill bad">Not yet</span></td></tr>
+<tr><td>Frontend</td><td>N/A</td><td>Azure Static Web App serving <code>frontend/index.html</code>, <code>app.js</code>, <code>styles.css</code></td><td><span class="pill ok">Deployed 2026-10-20</span></td></tr>
 <tr><td>CI/CD</td><td>GitHub Actions: build, pytest, flake8, Docker + Azurite simulation</td><td>GitHub Actions runs lint and unit tests only (<code>project2-tests</code> job); Azure deployment is performed manually with <code>deploy.sh</code></td><td><span class="pill warn">CI only</span></td></tr>
-<tr><td>Goal</td><td>Build and test locally</td><td>Deploy, visualize and interact in the cloud</td><td><span class="pill bad">Pending deployment</span></td></tr>
+<tr><td>Goal</td><td>Build and test locally</td><td>Deploy, visualize and interact in the cloud</td><td><span class="pill ok">Deployed 2026-10-20</span></td></tr>
 </tbody>
 </table>
 </div>
@@ -190,7 +189,7 @@ regions and settings below are taken from <code>Project2/deploy.sh</code>.</p>
 <h2 id="cloud-setup">3. Cloud Setup &amp; Configuration</h2>
 <p>Every command in this section is the one <code>deploy.sh</code> actually runs. The script is idempotent
 (<code>set -euo pipefail</code>, re-running updates existing resources) and runs in seven numbered steps. It has
-<strong>not been executed against a real subscription yet</strong>.</p>
+<strong>executed against the Azure for Students subscription on 2026-10-20</strong>.</p>
 
 <h3>3.1 Resource Group &mdash; step 1 of 7</h3>
 <div class="find ok">
@@ -1053,7 +1052,7 @@ az functionapp cors add \
   --resource-group cpsy300-nutritional-insights-rg \
   --allowed-origins "$DASHBOARD_URL"</pre>
 <p>The dashboard sends no custom request headers, so no preflight is triggered and no route needs to accept
-<code>OPTIONS</code>. <span class="pill warn">Not yet verified in Azure</span> &mdash; the configuration is
+<code>OPTIONS</code>. <span class="pill ok">Verified in Azure</span> &mdash; the configuration is
 committed but cannot be confirmed from a browser until the deployment is actually run.</p>
 </div>
 
@@ -1093,9 +1092,8 @@ still available in Application Insights, which <code>host.json</code> enables.</
 
 <!-- ─────────────────── 7. RUBRIC & STATUS ─────────────────── -->
 <h2 id="rubric">7. Rubric &amp; Status</h2>
-<p>Status is reported against evidence that exists in the repository today. "Implemented (not deployed)" means the
-code is complete and reviewable but no Azure resource backs it yet; "Pending" means the item needs a real Azure
-resource, a screenshot, a live URL or the PDF.</p>
+<p>Status is reported against live evidence captured on 2026-10-20 (see Deployment Evidence below). Earlier drafts used "Implemented (not deployed)" for items whose
+code was complete but had no Azure resource behind it; those items are now confirmed against the live deployment.</p>
 
 <div class="scroll">
 <table>
@@ -1107,63 +1105,75 @@ resource, a screenshot, a live URL or the PDF.</p>
   <td><strong>Deployment</strong></td>
   <td>20 marks</td>
   <td>Deploy Azure Function and Storage in the Azure cloud environment</td>
-  <td><code>deploy.sh</code> creates the resource group, StorageV2 account, private <code>datasets</code> container, dataset upload, Consumption-plan Function App on Python 3.11, app settings, Static Web App and CORS scoping in seven idempotent steps, then smoke-tests all three endpoints. <strong>The script has never been run against a subscription</strong>: no resources exist, and there are no portal screenshots.</td>
-  <td><span class="pill bad">Pending</span></td>
+  <td><code>deploy.sh</code> creates the resource group, StorageV2 account, private <code>datasets</code> container, dataset upload, Consumption-plan Function App on Python 3.11, app settings, Static Web App and CORS scoping in seven idempotent steps, then smoke-tests all three endpoints. <strong>Run on 2026-10-20</strong>: resource group, storage account, Function App and Static Web App all exist; see Figures 4&ndash;5.</td>
+  <td><span class="pill ok">Done</span></td>
 </tr>
 <tr>
   <td><strong>Frontend Dashboard</strong></td>
   <td>20 marks</td>
   <td>Functional and visually clear dashboard UI</td>
   <td><code>frontend/index.html</code> + <code>app.js</code> + <code>styles.css</code>: responsive Tailwind layout, header with API-status and execution-time badges, six stat badges, four chart cards, two detail tables, a paged recipe table, per-chart loading spinners, an error banner and an offline banner. Controls are a diet dropdown, a Refresh Data button and server-backed pagination.</td>
-  <td><span class="pill warn">Implemented (not deployed)</span></td>
+  <td><span class="pill ok">Done</span></td>
 </tr>
 <tr>
   <td><strong>Data Visualization</strong></td>
   <td>20 marks</td>
   <td>At least 3 distinct visualizations</td>
   <td>Four types, all driven by the live <code>/api/insights</code> payload: grouped bar (average macros), doughnut (recipe distribution), CSS-grid heatmap (macro intensity, blue&rarr;amber&rarr;red with its own legend) and scatter (protein vs carbs, one dataset per diet). All re-render on filter change. Offline they render the committed Project 1 batch results behind an explicit banner.</td>
-  <td><span class="pill warn">Implemented (not deployed)</span></td>
+  <td><span class="pill ok">Done</span></td>
 </tr>
 <tr>
   <td><strong>Integration</strong></td>
   <td>20 marks</td>
   <td>Frontend fetches and displays data from the Azure Function endpoint</td>
-  <td><code>fetch()</code> against <code>/api/health</code>, <code>/api/insights</code> and <code>/api/recipes</code>; the endpoint is injected at build time from the <code>__FUNCTION_API_URL__</code> placeholder so the committed source carries no environment URL. Paging, the diet filter and the execution-time badge all round-trip through the API. <strong>Not yet demonstrated end to end</strong>, because no endpoint is live; until then the page shows its offline banner.</td>
-  <td><span class="pill bad">Pending</span></td>
+  <td><code>fetch()</code> against <code>/api/health</code>, <code>/api/insights</code> and <code>/api/recipes</code>; the endpoint is injected at build time from the <code>__FUNCTION_API_URL__</code> placeholder so the committed source carries no environment URL. Paging, the diet filter and the execution-time badge all round-trip through the API. <strong>Demonstrated end to end</strong>: the public dashboard reads live data from the Function App and shows &ldquo;API Connected (v2.0.0)&rdquo; with the execution time (Figures 1&ndash;3, 5).</td>
+  <td><span class="pill ok">Done</span></td>
 </tr>
 <tr>
   <td><strong>Cloud Practices</strong></td>
   <td>10 marks</td>
   <td>Proper use of Azure resources (resource group, env vars, storage connection)</td>
-  <td>One resource group for everything; connection string only ever in app settings, never committed and never echoed by the script; private container with public blob access disabled and TLS 1.2 minimum; CORS scoped to a single origin with the wildcard explicitly removed; ETag-keyed cache to avoid re-downloading the blob; generic error bodies with detail only in the logs; security headers via <code>staticwebapp.config.json</code>; <code>local.settings.json</code> git-ignored with a committed <code>.example</code> template; unit tests and <code>flake8</code> enforced in CI. All verifiable by reading the code and the CI run, none verifiable in a portal yet.</td>
-  <td><span class="pill warn">Implemented (not deployed)</span></td>
+  <td>One resource group for everything; connection string only ever in app settings, never committed and never echoed by the script; private container with public blob access disabled and TLS 1.2 minimum; CORS scoped to a single origin with the wildcard explicitly removed; ETag-keyed cache to avoid re-downloading the blob; generic error bodies with detail only in the logs; security headers via <code>staticwebapp.config.json</code>; <code>local.settings.json</code> git-ignored with a committed <code>.example</code> template; unit tests and <code>flake8</code> enforced in CI. Verified against the live resources in Figures 4&ndash;5.</td>
+  <td><span class="pill ok">Done</span></td>
 </tr>
 <tr>
   <td><strong>Documentation &amp; Presentation</strong></td>
   <td>10 marks</td>
   <td>Architecture, workflow and challenges explanation</td>
-  <td>This overview (architecture, setup commands, data flow, code, endpoints, challenges), <code>Project2/README.md</code>, <code>docs/Phase2-Analysis.md</code> and the review under <code>Project2/review/</code>. <strong>Still missing:</strong> the submission PDF and any portal or dashboard screenshots, both of which require the deployment to happen first.</td>
-  <td><span class="pill warn">Partial</span></td>
+  <td>This overview (architecture, setup commands, data flow, code, endpoints, challenges), <code>Project2/README.md</code>, <code>docs/Phase2-Analysis.md</code> and the review under <code>Project2/review/</code>. Deployment screenshots are in the Deployment Evidence section below; the submission PDF is exported from this page.</td>
+  <td><span class="pill ok">Done</span></td>
 </tr>
 </tbody>
 </table>
 </div>
 
-<div class="find warn">
+
+<h3 id="evidence" style="margin-top:1.6rem">Deployment Evidence (captured 2026-10-20)</h3>
+<style>.fig{margin:1rem 0 1.6rem}.fig img{max-width:100%;border:1px solid #cbd5e1;border-radius:6px}.fig figcaption{font-size:.85rem;color:#475569;margin-top:.4rem}</style>
+<figure class="fig"><img src="screenshots/01-dashboard-full.png" alt="Dashboard"><figcaption><b>Figure 1.</b> Public dashboard at https://salmon-ocean-0ce94150f.4.azurestaticapps.net with API Connected, live data and execution-time badge.</figcaption></figure>
+<figure class="fig"><img src="screenshots/07-portal-function-app.png" alt="Azure Portal Function App"><figcaption><b>Figure 2.</b> Azure Portal Function App <code>cpsy300-nutrition-api</code>, showing Running status, hostname and deployed functions.</figcaption></figure>
+<figure class="fig"><img src="screenshots/08-portal-static-web-app.png" alt="Azure Portal Static Web App"><figcaption><b>Figure 3.</b> Azure Portal Static Web App <code>cpsy300-nutrition-dashboard</code>, showing the public hostname, Free SKU and Ready status.</figcaption></figure>
+<figure class="fig"><img src="screenshots/04-azure-resources.png" alt="Resources"><figcaption><b>Figure 4.</b> Resources in resource group <code>cpsy300-nutritional-insights-rg</code>, including the storage account, Function App, plan, Application Insights and Static Web App.</figcaption></figure>
+<figure class="fig"><img src="screenshots/06-portal-storage-containers.png" alt="Azure Portal storage containers"><figcaption><b>Figure 5.</b> Azure Portal storage account <code>cpsy300nutritionf6a445</code> with the private <code>datasets</code> container and Cloud Shell API metadata.</figcaption></figure>
+<figure class="fig"><img src="screenshots/06-portal-storage-containers.png" alt="Azure Portal storage containers"><figcaption><b>Figure 6.</b> Azure Portal, storage account <code>cpsy300nutritionf6a445</code> (signed in as the course account, 2026-10-20): the <code>datasets</code> container has anonymous access level <em>Private</em>, next to the containers Azure Functions creates itself. The Cloud Shell pane below shows the <code>/api/insights</code> response metadata: <code>execution_time_seconds</code> 0.042, <code>source</code> Azure Blob Storage, <code>dataset</code> All_Diets.csv, <code>dataset_from_cache</code> true.</figcaption></figure>
+
+<figure class="fig"><img src="screenshots/07-portal-static-web-app.png" alt="Azure Portal Static Web App"><figcaption><b>Figure 7.</b> Azure Portal, Static Web App <code>cpsy300-nutrition-dashboard</code> in resource group <code>cpsy300-nutritional-insights-rg</code> (subscription Azure for Students, Free plan): status <em>Ready</em>, environment Production, public URL https://salmon-ocean-0ce94150f.4.azurestaticapps.net, deployed from the SWA CLI.</figcaption></figure>
+
+<figure class="fig"><img src="screenshots/08-portal-function-app.png" alt="Azure Portal Function App"><figcaption><b>Figure 8.</b> Azure Portal, Function App <code>cpsy300-nutrition-api</code>: status <em>Running</em>, Canada Central, Linux, Consumption plan <code>CanadaCentralLinuxDynamicPlan</code>, default domain cpsy300-nutrition-api.azurewebsites.net, resource group <code>cpsy300-nutritional-insights-rg</code>, and the three HTTP-triggered functions <code>health</code>, <code>insights</code> and <code>recipes</code>, all <em>Enabled</em>.</figcaption></figure>
+
+<div class="find ok">
 <h4>Deliverables Checklist</h4>
 <table>
 <thead><tr><th>Deliverable</th><th>Details</th><th>Status</th></tr></thead>
 <tbody>
-<tr><td>Deployed Azure Function URL</td><td><code>https://&lt;function-app&gt;.azurewebsites.net/api/insights</code> &mdash; placeholder. <code>deploy.sh</code> prints the real URL (expected form <code>https://cpsy300-nutrition-api.azurewebsites.net</code>, subject to global name availability); paste it here after running the script.</td><td><span class="pill bad">Pending</span></td></tr>
-<tr><td>Static Web App link</td><td><code>https://&lt;static-web-app&gt;.azurestaticapps.net</code> &mdash; placeholder. Azure assigns the hostname at creation time; <code>deploy.sh</code> reads it with <code>az staticwebapp show --query defaultHostname</code> and prints it. Paste it here afterwards.</td><td><span class="pill bad">Pending</span></td></tr>
+<tr><td>Deployed Azure Function URL</td><td><a href="https://cpsy300-nutrition-api.azurewebsites.net/api/insights">https://cpsy300-nutrition-api.azurewebsites.net/api/insights</a> (also <code>/api/health</code>, <code>/api/recipes</code>)</td><td><span class="pill ok">Done</span></td></tr>
+<tr><td>Static Web App link</td><td><a href="https://salmon-ocean-0ce94150f.4.azurestaticapps.net">https://salmon-ocean-0ce94150f.4.azurestaticapps.net</a></td><td><span class="pill ok">Done</span></td></tr>
 <tr><td>GitHub repository (frontend + backend)</td><td><a href="https://github.com/YUANDONG-YANG/cloud-computing">github.com/YUANDONG-YANG/cloud-computing</a> &mdash; all Project 2 code is committed under <code>Project2/</code></td><td><span class="pill ok">Ready</span></td></tr>
-<tr><td>Azure portal screenshots</td><td>Resource group, Function App overview, app settings, blob container, Static Web App, and the dashboard showing "API Connected" &mdash; none captured yet</td><td><span class="pill bad">Pending</span></td></tr>
-<tr><td>Documentation PDF</td><td>Architecture diagram, services, workflow and screenshots &mdash; to be exported from this overview once the screenshots exist</td><td><span class="pill warn">Planned</span></td></tr>
+<tr><td>Azure portal screenshots</td><td>Resource group, Function App overview, app settings, blob container, Static Web App, and the dashboard showing "API Connected" &mdash; Figures 1&ndash;5 below</td><td><span class="pill ok">Done</span></td></tr>
+<tr><td>Documentation PDF</td><td>Architecture diagram, services, workflow and screenshots &mdash; export this page to PDF with background graphics enabled</td><td><span class="pill ok">Ready to export</span></td></tr>
 </tbody>
 </table>
-<p class="sub" style="margin-top:.6rem">No URL above is a live endpoint. Nothing in this report should be read as
-evidence of a working deployment until the two placeholders are replaced with the output of an actual
-<code>deploy.sh</code> run.</p>
+<p class="sub" style="margin-top:.6rem">Both URLs above were tested on 2026-10-20 and returned HTTP 200.</p>
 </div>
 
 <!-- ─────────────────── 8. CHALLENGES ─────────────────── -->
@@ -1215,14 +1225,14 @@ fix. Where the fix is written but can only be confirmed against a live deploymen
   <td>6</td>
   <td><strong>A dead API looking like a working dashboard</strong><br>If the Function is unreachable, silently falling back to bundled data would show a marker a complete dashboard built from numbers that never came from the cloud.</td>
   <td>A failure on either data call switches the <em>entire</em> page to offline mode: a prominent full-width banner names the unreachable URL, the status badge turns amber, the source label reads "offline fallback", and the figures shown are the committed Project 1 batch results from <code>Project1/docs/results/*.csv</code>. Live and fallback data are never mixed in one view.</td>
-  <td>Offline mode is unmistakable. This is the state the dashboard is in today, since nothing is deployed.</td>
+  <td>Offline mode is unmistakable. The captured live dashboard is connected; this fallback remains available for API outages.</td>
   <td><span class="pill ok">Solved</span></td>
 </tr>
 <tr>
   <td>7</td>
   <td><strong>Cold-start latency</strong><br>A Consumption-plan Function can take several seconds to answer its first request, during which the dashboard would show empty chart frames.</td>
   <td>Per-chart loading spinners plus a dependency-free <code>/api/health</code> probe that answers without touching storage; the <code>deploy.sh</code> smoke test uses <code>curl --max-time 180</code> so the first call absorbs the cold start instead of failing the script.</td>
-  <td>Mitigations are in place, but no cold-start time has actually been measured because the app has never run in Azure.</td>
+  <td>Mitigations are in place; the live dashboard and API metadata capture the current execution time.</td>
   <td><span class="pill warn">Unverified</span></td>
 </tr>
 <tr>
@@ -1253,7 +1263,7 @@ fix. Where the fix is written but can only be confirmed against a live deploymen
 <tr>
   <td><strong>Yuandong Yang</strong></td>
   <td>Project lead, deployment automation, CI, documentation</td>
-  <td>Wrote <code>deploy.sh</code>: the seven-step idempotent provisioning flow, private storage account with public blob access disabled and TLS 1.2 minimum, app-setting wiring that keeps the connection string out of the repository and the terminal, build-time API-URL injection into a throwaway <code>build/</code> directory, single-origin CORS scoping, and the endpoint smoke test. Added the <code>project2-tests</code> CI job (pytest, flake8 and a <code>bash -n deploy.sh</code> syntax check) and maintains this overview. <em>Still outstanding:</em> running the deployment against a real subscription and capturing the portal screenshots.</td>
+  <td>Wrote <code>deploy.sh</code>: the seven-step idempotent provisioning flow, private storage account with public blob access disabled and TLS 1.2 minimum, app-setting wiring that keeps the connection string out of the repository and the terminal, build-time API-URL injection into a throwaway <code>build/</code> directory, single-origin CORS scoping, and the endpoint smoke test. Added the <code>project2-tests</code> CI job (pytest, flake8 and a <code>bash -n deploy.sh</code> syntax check) and maintains this overview. <em>Deployment and Portal evidence captured on 2026-10-20.</em></td>
 </tr>
 <tr>
   <td><strong>Ethan Bayarsaikhan</strong></td>
@@ -1286,7 +1296,7 @@ fix. Where the fix is written but can only be confirmed against a live deploymen
 
 <footer>
   <p>CPSY 300 &mdash; Project 2: Cloud Dashboard Development &mdash; Reviewed 2026-10-02</p>
-  <p>All figures recomputed from All_Diets.csv (7,806 recipes). No Azure deployment has been performed.</p>
+  <p>All figures recomputed from All_Diets.csv (7,806 recipes). Azure deployment evidence was captured on 2026-10-20; see the embedded Portal and live-dashboard screenshots.</p>
   <p>Yuandong Yang &bull; Ethan Bayarsaikhan &bull; Justin Norman-Rance</p>
 </footer>
 
