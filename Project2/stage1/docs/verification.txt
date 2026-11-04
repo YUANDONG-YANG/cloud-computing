@@ -1,0 +1,53 @@
+Stage 1 verification — 2026-11-04
+Environment: local macOS (arm64), Python 3.11.18 in isolated stage1/.venv311,
+Azure Functions Core Tools 4.16.0, Functions Runtime 4.1054.250.26428.
+
+$ python -m pytest -q
+............................................ [100%]
+44 passed in 0.49s
+
+$ python -m flake8 . --exclude=.venv,.venv311
+Exit code 0; no findings.
+
+Full dataset in-process smoke check (actual Azure Functions handlers):
+health: HTTP response object status 200
+insights: status 200; summary.total_recipes = 7806
+recipes: status 200; diet_type=keto, search=chicken, limit=2; 2 rows returned
+clusters: status 200; 7806 points; cluster_counts = {0: 1205, 1: 5681, 2: 920}
+
+$ func start --port 7071
+Worker process started and initialized; routes registered:
+clusters, health, insights, recipes — all [GET] http://localhost:7071/api/<route>
+
+$ python verify_http.py   (real HTTP through the running Functions host)
+PASS 200 GET /api/health
+PASS 200 GET /api/insights
+PASS 200 GET /api/recipes?diet_type=keto&search=chicken&page=1&limit=5
+PASS 200 GET /api/recipes?diet_type=keto&search=chicken&page=2&limit=5
+PASS 200 GET /api/recipes?search=stage1-no-match-000000
+PASS 200 GET /api/clusters?k=3
+PASS 400 GET /api/clusters?k=0
+PASS 400 GET /api/clusters?k=11
+PASS 400 GET /api/recipes?page=0
+PASS 404 GET /api/recipes?diet_type=nonexistent
+PASS payload assertions and local CORS
+Asserted beyond status codes: content-type application/json on every response;
+insights total_recipes = 7806 and a 3x3 correlation matrix; both recipe pages
+return 5 keto rows whose names contain "chicken" and the two pages differ;
+the no-match search returns total 0; clusters returns 7806 points summing to
+7806 across cluster_counts; and /api/insights answers an Origin of
+http://localhost:5500 with Access-Control-Allow-Origin: http://localhost:5500.
+Full request/response evidence: docs/http-results.json
+
+Screenshots (docs/screenshots/, captured 2026-11-04):
+api-health-browser.png, api-insights-browser.png, api-recipes-browser.png,
+api-clusters-browser.png — headless Chrome rendering the live responses from
+the running host at http://localhost:7071.
+cli-pytest-flake8.png, cli-func-start.png, cli-http-verification.png — the
+terminal output above, rendered to PNG from the real captured text (not a
+photograph of a terminal window).
+
+Scope: local verification only. No Azure resources were created, deployed to or
+modified for stage1, and no configuration outside stage1/ was changed. Blob
+Storage loading, cloud deployment, the group report and the video remain with
+stages 2 and 3.

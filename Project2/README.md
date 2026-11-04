@@ -84,6 +84,18 @@ Project2/
 │   ├── test_nutrition.py                  #   Cleaning and aggregation
 │   └── test_frontend_demo_data.py         #   Offline fallback matches Project 1 output
 │
+├── stage1/                                # Stage 1 hand-in -- self-contained local backend
+│   ├── README.md                          #   Run instructions + full API contract
+│   ├── summary.html                       #   Stage 1 summary for marking (images embedded)
+│   ├── function_app.py                    #   4 HTTP routes: health, insights, recipes, clusters
+│   ├── nutrition.py                       #   Cleaning + aggregation + correlation matrix
+│   ├── clustering.py                      #   k-means written from scratch with NumPy
+│   ├── verify_http.py                     #   10 real HTTP checks against a running `func start`
+│   ├── data/All_Diets.csv                 #   Local dataset (Stage 3 switches this to Blob)
+│   ├── tests/                             #   44 pytest tests
+│   └── docs/                              #   verification.txt, api-results.json, http-results.json,
+│                                          #   screenshots/ (7 local-run images)
+│
 ├── deploy.sh                              # Azure CLI provisioning + deploy, 7 idempotent steps
 ├── teardown.sh                            # Deletes the resource group
 ├── staticwebapp.config.json               # SWA routing + security headers
@@ -126,7 +138,8 @@ Project2/
         └── score-review-2026-10-02.md     #   Rubric scoring review (historical)
 ```
 
-Git-ignored, so not listed above: `backend/local.settings.json` (local secrets),
+Git-ignored, so not listed above: `backend/local.settings.json` and
+`stage1/local.settings.json` (local settings), `stage1/.venv311/` (local virtualenv),
 `build/` (the frontend copy `deploy.sh` injects the live API URL into), `__pycache__/`
 and `.pytest_cache/`.
 
@@ -139,6 +152,7 @@ and `.pytest_cache/`.
 | See the deployment evidence | [`docs/screenshots/`](docs/screenshots/), cited as Figures 1-7 in the master overview |
 | Reproduce the deployment | [`deploy.sh`](deploy.sh), narrated in [`docs/phase2-deployment-walkthrough.html`](docs/phase2-deployment-walkthrough.html) |
 | Read the API code | [`backend/function_app.py`](backend/function_app.py) |
+| Review the Stage 1 local backend hand-in | [`stage1/README.md`](stage1/README.md), summary in [`stage1/summary.html`](stage1/summary.html) |
 | Read the dashboard code | [`frontend/app.js`](frontend/app.js) |
 
 ### File naming conventions
