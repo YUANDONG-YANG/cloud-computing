@@ -1,33 +1,35 @@
-# Stage 1 — 本地后端交付包
+# Stage 1 — Local Backend Delivery
 
-这是 `../division.md` 中 Person 1 的工作目录。基于现有 `../backend/` 和后端测试整理，
-新增本地 CSV 加载、文字搜索、相关系数及 NumPy k-means；原有部署目录未改动。
-本目录可独立运行，包含完整的 `data/All_Diets.csv`（来自 Project1）。
+This is Person 1's working folder from `../division.md`. It builds on the existing
+`../backend/` and its tests, and adds local CSV loading, text search, a correlation
+matrix and a k-means written from scratch with NumPy. The original deployment folder
+is untouched. This folder runs on its own and carries the full
+`data/All_Diets.csv` (from Project 1).
 
-- 教师汇总材料：[summary.html](summary.html)，无需联网，支持浏览器打印为 PDF。
-- 进程内接口实测结果：[docs/api-results.json](docs/api-results.json)。
-- 真实 HTTP 实测结果：[docs/http-results.json](docs/http-results.json)。
-- 测试与验证记录：[docs/verification.txt](docs/verification.txt)。
-- 运行截图：[docs/screenshots/](docs/screenshots/)，共 7 张。
+- Summary for marking: [summary.html](summary.html) — offline, prints to PDF from the browser.
+- In-process API results: [docs/api-results.json](docs/api-results.json).
+- Real HTTP results: [docs/http-results.json](docs/http-results.json).
+- Test and verification record: [docs/verification.txt](docs/verification.txt).
+- Run screenshots: [docs/screenshots/](docs/screenshots/), 7 images.
 
-## 文件与职责
+## Files and Responsibilities
 
-| 文件 | 用途 |
+| File | Purpose |
 |---|---|
-| function_app.py | Azure Functions v2 HTTP 入口，4 个 GET 路由 |
-| nutrition.py | 文本清理、缺失值填充及统计聚合 |
-| clustering.py | NumPy 手写 k-means，固定随机种子 |
-| data/All_Diets.csv | 完整本地数据，7,806 条食谱 |
-| tests/ | 数据清洗、接口、边界条件、聚类、本地缓存测试 |
-| host.json / local.settings.json.example | Functions 主机配置和无密钥的本地配置模板 |
-| verify_http.py | 对运行中的 Functions 主机发 10 条真实 HTTP 请求并断言结果 |
-| requirements*.txt / pytest.ini / .flake8 | 依赖、测试与代码风格配置 |
+| function_app.py | Azure Functions v2 HTTP entry point, 4 GET routes |
+| nutrition.py | Text cleaning, missing-value imputation and the aggregations |
+| clustering.py | k-means written from scratch with NumPy, fixed random seed |
+| data/All_Diets.csv | The full local dataset, 7,806 recipes |
+| tests/ | Cleaning, endpoint, edge-case, clustering and local-cache tests |
+| host.json / local.settings.json.example | Functions host config and a key-free local settings template |
+| verify_http.py | Sends 10 real HTTP requests to a running Functions host and asserts the results |
+| requirements*.txt / pytest.ini / .flake8 | Dependency, test and lint configuration |
 
-## 本地运行
+## Running Locally
 
-在 `Project2/stage1` 中执行；使用 Python 3.11，与团队原有项目运行环境一致。
-下面的流程已在 Python 3.11.18 与 Azure Functions Core Tools 4.16.0 下实测通过。
-若尚未安装 Core Tools：`npm i -g azure-functions-core-tools@4`。
+Run these from `Project2/stage1` on Python 3.11, the version the team's project already
+uses. The sequence below was verified on Python 3.11.18 with Azure Functions Core Tools
+4.16.0. If Core Tools is not installed yet: `npm i -g azure-functions-core-tools@4`.
 
 ```bash
 python3.11 -m venv .venv311
@@ -37,47 +39,58 @@ cp local.settings.json.example local.settings.json
 python -m pytest -q
 python -m flake8 . --exclude=.venv,.venv311
 func start --port 7071
-# 主机起来后，另开一个终端：
+# once the host is up, in a second terminal:
 python verify_http.py
 ```
 
-本阶段只读本地 CSV，不需要 Azure 账号、Blob 密钥或 Azurite。
-可用环境变量 `DATASET_PATH` 指定另一份 CSV；相对路径基于运行目录，建议用绝对路径。
-默认读取本目录的 `data/All_Diets.csv`。缓存按文件路径、修改时间和大小更新。
-前端本地 CORS 允许 `http://localhost:5500` 和 `http://127.0.0.1:5500`。
+Stage 1 only reads the local CSV, so it needs no Azure account, Blob key or Azurite.
+`DATASET_PATH` points the loader at a different CSV; a relative path resolves against the
+working directory, so an absolute path is safer. The default is `data/All_Diets.csv` in
+this folder. The cache is keyed on file path, modification time and size.
+Local CORS allows `http://localhost:5500` and `http://127.0.0.1:5500` for the front end.
 
-## API 约定
+## API Contract
 
-基地址 `http://localhost:7071/api`。全部为 GET，返回 `application/json`。
-数据接口的 `metadata` 包含执行时间（秒）、数据来源及缓存命中状态。
-失败返回 `{"error": "..."}`；内部异常不会出现在 HTTP 响应里。
+Base URL `http://localhost:7071/api`. Every route is GET and returns `application/json`.
+The `metadata` block on each data endpoint carries the execution time in seconds, the data
+source and whether the dataset came from cache. Failures return `{"error": "..."}`;
+internal exception text never reaches the HTTP response.
 
-| 接口 | 参数 | 返回内容 |
+| Endpoint | Parameters | Returns |
 |---|---|---|
-| /health | 无 | 服务状态；不读取 CSV |
-| /insights | 无 | average_macros、correlation、summary.diet_counts、top_recipes、common_cuisines、total_protein_by_diet、metadata |
-| /recipes | diet_type, search, page, limit | recipes、count、total、page、limit、total_pages、diet_type_filter、search、metadata |
-| /clusters | k（默认 3，范围 1–10） | points、centroids、cluster_counts、features、k、seed、iterations、inertia、standardized、metadata |
+| /health | none | Service status; does not read the CSV |
+| /insights | none | average_macros, correlation, summary.diet_counts, top_recipes, common_cuisines, total_protein_by_diet, metadata |
+| /recipes | diet_type, search, page, limit | recipes, count, total, page, limit, total_pages, diet_type_filter, search, metadata |
+| /clusters | k (default 3, range 1–10) | points, centroids, cluster_counts, features, k, seed, iterations, inertia, standardized, metadata |
 
-- `diet_type` 不区分大小写；省略或 `all` 表示所有类型，未知类型返回 404。
-- `search` 在食谱名、饮食类型和菜系中作不区分大小写的字面匹配，可与饮食筛选组合；无匹配返回空列表。
-- `page` 从 1 开始，默认 1；`limit` 默认 50，最大 500；无效参数返回 400。超出末页会返回末页。
-- `correlation` 是蛋白质、碳水、脂肪的 Pearson 相关系数矩阵，常数列的未定义值返回 null。
-- `clusters` 使用全部食谱，返回全部点供散点图使用。cluster 从 0 编号；质心和点均以克为单位。
-- k-means 先进行 z-score 标准化，固定 seed=42，最多迭代 100 次；空簇保留原质心。
-  inertia 为标准化空间中的平方距离和；聚类仅为探索性分组，不是饮食建议。
-- `k` 大于不同营养向量数量时返回 400。
+- `diet_type` is case-insensitive; omitting it or passing `all` returns every type, and an
+  unknown type returns 404.
+- `search` is a case-insensitive literal match over recipe name, diet type and cuisine, and
+  combines with the diet filter; no match returns an empty list.
+- `page` is 1-based and defaults to 1; `limit` defaults to 50 and is capped at 500; invalid
+  parameters return 400. A page past the end returns the last page.
+- `correlation` is the Pearson correlation matrix over protein, carbs and fat; values that
+  are undefined for a constant column come back as null.
+- `clusters` uses every recipe and returns every point for the scatter chart. Clusters are
+  numbered from 0, and both centroids and points are in grams.
+- k-means z-score standardizes first, fixes seed=42 and runs at most 100 iterations; an
+  empty cluster keeps its previous centroid. `inertia` is the sum of squared distances in
+  the standardized space. The clustering is exploratory grouping, not dietary advice.
+- A `k` larger than the number of distinct nutrient vectors returns 400.
 
-## 数据清理
+## Data Cleaning
 
-去除列名和文本两端空格；饮食类型与菜系统一小写，缺失填为 unknown；
-缺失食谱名填 Unnamed recipe。营养数值转为数字，负数、无穷值、非法文本及缺失值
-用所在列有效数值的均值填补。缺少必需列、空数据或整列无有效数值时拒绝处理。
+Whitespace is stripped from column names and text; diet types and cuisines are lowercased
+and missing ones become `unknown`; a missing recipe name becomes `Unnamed recipe`. Nutrient
+values are converted to numbers, and negatives, infinities, invalid text and missing values
+are filled with the mean of that column's valid values. A missing required column, empty
+data, or a column with no valid value at all is rejected.
 
-## 实测 JSON 示例
+## Measured JSON Examples
 
-以下来自完整 CSV 的进程内 handler 调用，不是网络请求。insights 省略附加统计列表，
-clusters 的 points 仅展示前两条；完整返回结果见 docs/api-results.json。
+These come from in-process handler calls over the full CSV, not from network requests.
+The insights example omits the extra statistics lists and the clusters example shows only
+the first two points; the complete payloads are in docs/api-results.json.
 
 ### GET /api/health
 
@@ -277,34 +290,43 @@ clusters 的 points 仅展示前两条；完整返回结果见 docs/api-results.
 }
 ```
 
-## 验收与交接
+## Sign-Off and Hand-Off
 
-`division.md` 第一部分的完成条件已全部满足，证据见 `docs/`：
+Every completion condition for Stage 1 in `division.md` is met, with the evidence in `docs/`:
 
-| 完成条件 | 结果 | 证据 |
+| Completion condition | Result | Evidence |
 |---|---|---|
-| 44 项 pytest 通过、flake8 无报错（Python 3.11） | 通过 | docs/screenshots/cli-pytest-flake8.png |
-| `func start` 能起本地主机并注册 4 个路由 | 通过 | docs/screenshots/cli-func-start.png |
-| 4 个接口在浏览器中实际返回 | 通过 | docs/screenshots/api-*-browser.png |
-| 真实 HTTP 行为（分页、搜索、400/404、本地 CORS） | 10 条用例全通过 | docs/screenshots/cli-http-verification.png、docs/http-results.json |
-| 完整 CSV 数据量一致 | insights 与 clusters 均为 7,806 | docs/verification.txt |
+| 44 pytest tests pass, flake8 clean (Python 3.11) | Pass | docs/screenshots/cli-pytest-flake8.png |
+| `func start` brings up the local host with 4 routes | Pass | docs/screenshots/cli-func-start.png |
+| All 4 endpoints answer in the browser | Pass | docs/screenshots/api-*-browser.png |
+| Real HTTP behaviour (paging, search, 400/404, local CORS) | 10 of 10 cases pass | docs/screenshots/cli-http-verification.png, docs/http-results.json |
+| Record count consistent across the full CSV | 7,806 for both insights and clusters | docs/verification.txt |
 
-7 张截图全部由 macOS `screencapture` 对屏幕上的真实窗口截取：浏览器图为 Google Chrome 窗口
-（地址栏可见，使用独立空白配置，不含个人浏览数据），终端图为 Terminal.app 窗口中的真实命令输出。
-所有验证只在本地进行，未创建或改动任何 Azure 资源与 stage1 以外的配置。
+All 7 screenshots were taken with the macOS `screencapture` tool from real windows on
+screen: the browser images are Google Chrome windows with the address bar visible, running
+in a separate empty profile so no personal browsing data appears, and the terminal images
+are real command output in Terminal.app windows. Every check was local — no Azure resource
+was created or changed, and no configuration outside `stage1/` was touched.
 
-交接：
-1. 交给 Person 2：基地址 `http://localhost:7071/api`、上述 JSON 契约及本地 CORS 设置。
-2. Person 3 后续将本地加载替换为 Blob Storage，并保持 API 契约一致。
+Hand-off:
+1. To Person 2: the base URL `http://localhost:7071/api`, the JSON contract above, and the
+   local CORS settings.
+2. Person 3 later swaps local loading for Blob Storage while keeping the same API contract.
 
-团队现有 frontend/ 只对接原来的 3 个接口，新增搜索、相关系数图和聚类图仍需 Person 2 接入。
-不要直接运行现有 deploy.sh 来发布本目录：原部署脚本仍面向 ../backend/。
-整组提交要求包括 Azure 部署、PDF/Word 截图报告和所有成员参与的视频（约 10 分钟）；
-原项目已有部署和截图记录，不能据本次本地环境缺少工具就认定这些工作尚未完成。
-本 HTML 仅覆盖第一部分，不能替代最终整组提交。
+The team's existing `frontend/` still targets the earlier three endpoints, so the search box,
+correlation heatmap and cluster scatter chart still need Person 2 to wire them up.
+Do not run the existing `deploy.sh` to publish this folder: that script still targets
+`../backend/`. The group submission also needs the Azure deployment, the PDF/Word screenshot
+report and a video featuring every member (about 10 minutes). The original project already
+has deployment and screenshot records, so a tool missing from this local environment is not
+evidence that that work is outstanding. This folder covers Stage 1 only and does not replace
+the final group submission.
 
-## 已有截图核对
+## Existing Screenshots Checked
 
-summary.html 已内嵌原项目的 5 张证据图：Function App 运行状态、health、insights、recipes 返回结果，以及 CORS/HTTP 200/计时记录。
-这些是原版三接口部署的证据，不要求重复制作；新增的 clusters、搜索和相关系数需用当前 stage1 的验证记录补充。
-原始课程 brief 并未硬性规定 k-means 或四个接口，这些来自小组 division.md 分工。
+summary.html embeds 5 evidence images from the original project: the Function App running
+state, the health, insights and recipes responses, and the CORS / HTTP 200 / timing record.
+Those evidence the earlier three-endpoint deployment and do not need to be reproduced; the
+new clusters, search and correlation features are evidenced by the Stage 1 verification
+record instead. The course brief itself does not mandate k-means or four endpoints — those
+come from the team's own division.md.
