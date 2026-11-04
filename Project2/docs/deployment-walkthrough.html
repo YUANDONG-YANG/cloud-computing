@@ -317,7 +317,7 @@ chmod +x deploy.sh
 ./deploy.sh</pre></div>
       <p>脚本一共 7 步，会自己走完：资源组 → 存储账号并上传 CSV → Function App 和应用设置 → 发布后端 → 创建 Static Web App → 把真实 API 地址注入前端再上传 → 把 CORS 收窄到前端域名并冒烟测试三个端点。</p>
       <div class="note expect"><p><b>最后应该看到。</b> 三行 <code class="inline">OK</code> 的冒烟测试，以及打印出来的 Function App 和 Dashboard 两个地址。第一次调用要等冷启动，脚本给了 180 秒超时，<b>慢是正常的</b>。</p></div>
-      <div class="note warn"><p><b>Static Web App 在 eastus2，其他资源在 eastus</b> —— 这不是写错了，SWA 在 eastus 不提供服务。脚本已经处理好了。</p></div>
+      <div class="note warn"><p><b>Static Web App 在 eastus2，其他资源在 canadacentral</b> —— 这不是写错了，SWA 在 canadacentral 不提供服务。脚本已经处理好了。</p></div>
     </div>
   </div>
 

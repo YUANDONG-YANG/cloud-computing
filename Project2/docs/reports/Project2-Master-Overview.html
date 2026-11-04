@@ -54,7 +54,7 @@ footer{text-align:center;color:var(--mute);font-size:.78rem;margin-top:2rem;padd
   <h1>Project 2 &mdash; Cloud Dashboard Development</h1>
   <p class="sub">CPSY 300 &bull; Phase 2: Deploy to Azure Cloud &amp; Build Web Dashboard</p>
   <p class="sub">Team: <strong>Yuandong Yang</strong>, <strong>Ethan Bayarsaikhan</strong>, <strong>Justin Norman-Rance</strong></p>
-  <p class="sub">Reviewed: <strong>2026-10-02</strong> &bull; Repository: <a href="https://github.com/YUANDONG-YANG/cloud-computing">github.com/YUANDONG-YANG/cloud-computing</a></p>
+  <p class="sub">Reviewed: <strong>2026-10-20</strong> &bull; Repository: <a href="https://github.com/YUANDONG-YANG/cloud-computing">github.com/YUANDONG-YANG/cloud-computing</a></p>
   <div class="cards">
     <div class="card"><b>100</b>marks: 6 categories (Deployment 20, Frontend 20, Viz 20, Integration 20, Cloud 10, Docs 10)</div>
     <div class="card"><b>7,806</b>recipes across 5 diet types from All_Diets.csv</div>
@@ -134,7 +134,7 @@ regions and settings below are taken from <code>Project2/deploy.sh</code>.</p>
                         |              Azure Cloud                   |
                         |   Resource group:                          |
                         |   cpsy300-nutritional-insights-rg          |
-                        |   Region: eastus (SWA: eastus2)            |
+                        |   Region: canadacentral (SWA: eastus2)     |
                         |                                            |
   +----------+          |   +------------------------------------+   |
   |          |  HTTPS   |   |   Azure Static Web App (Free)      |   |
@@ -196,8 +196,8 @@ regions and settings below are taken from <code>Project2/deploy.sh</code>.</p>
 <h4>Resource Group Configuration</h4>
 <p>All resources live in one resource group, so the whole project can be tracked and deleted as a unit.</p>
 <pre>RESOURCE_GROUP="cpsy300-nutritional-insights-rg"
-LOCATION="eastus"
-# Static Web Apps is only available in a handful of regions; eastus is not one.
+LOCATION="canadacentral"
+# Static Web Apps is only available in a handful of regions; canadacentral is not one.
 SWA_LOCATION="eastus2"
 
 az group create \
@@ -1052,8 +1052,9 @@ az functionapp cors add \
   --resource-group cpsy300-nutritional-insights-rg \
   --allowed-origins "$DASHBOARD_URL"</pre>
 <p>The dashboard sends no custom request headers, so no preflight is triggered and no route needs to accept
-<code>OPTIONS</code>. <span class="pill ok">Verified in Azure</span> &mdash; the configuration is
-committed but cannot be confirmed from a browser until the deployment is actually run.</p>
+<code>OPTIONS</code>. <span class="pill ok">Verified in Azure</span> &mdash; <code>az functionapp cors show</code> lists the
+dashboard origin as the only allowed origin, and a live call returns
+<code>Access-Control-Allow-Origin</code> for that origin (Figure 7).</p>
 </div>
 
 <h3>API Endpoints</h3>
@@ -1164,9 +1165,9 @@ still available in Application Insights, which <code>host.json</code> enables.</
 <tbody>
 <tr><td>Deployed Azure Function URL</td><td><a href="https://cpsy300-nutrition-api.azurewebsites.net/api/insights">https://cpsy300-nutrition-api.azurewebsites.net/api/insights</a> (also <code>/api/health</code>, <code>/api/recipes</code>)</td><td><span class="pill ok">Done</span></td></tr>
 <tr><td>Static Web App link</td><td><a href="https://salmon-ocean-0ce94150f.4.azurestaticapps.net">https://salmon-ocean-0ce94150f.4.azurestaticapps.net</a></td><td><span class="pill ok">Done</span></td></tr>
-<tr><td>GitHub repository (frontend + backend)</td><td><a href="https://github.com/YUANDONG-YANG/cloud-computing">github.com/YUANDONG-YANG/cloud-computing</a> &mdash; all Project 2 code is committed under <code>Project2/</code></td><td><span class="pill ok">Ready</span></td></tr>
+<tr><td>GitHub repository (frontend + backend)</td><td><a href="https://github.com/YUANDONG-YANG/cloud-computing">github.com/YUANDONG-YANG/cloud-computing</a> &mdash; all Project 2 code is committed under <code>Project2/</code></td><td><span class="pill ok">Done</span></td></tr>
 <tr><td>Azure portal screenshots</td><td>Resource group, Function App overview, app settings, blob container, Static Web App, and the dashboard showing "API Connected" &mdash; Figures 1&ndash;7 below</td><td><span class="pill ok">Done</span></td></tr>
-<tr><td>Documentation PDF</td><td>Architecture diagram, services, workflow and screenshots &mdash; export this page to PDF with background graphics enabled</td><td><span class="pill ok">Ready to export</span></td></tr>
+<tr><td>Documentation PDF</td><td>Architecture diagram, services, workflow and screenshots &mdash; exported from this page to <code>Project2/docs/Project2-Master-Overview.pdf</code> (36 pages, background graphics enabled)</td><td><span class="pill ok">Done</span></td></tr>
 </tbody>
 </table>
 <p class="sub" style="margin-top:.6rem">Both URLs above were tested on 2026-10-20 and returned HTTP 200.</p>
@@ -1175,8 +1176,8 @@ still available in Application Insights, which <code>host.json</code> enables.</
 <!-- ─────────────────── 8. CHALLENGES ─────────────────── -->
 <h2 id="challenges">8. Challenges &amp; Solutions</h2>
 <p>A challenge is marked <span class="pill ok">Solved</span> only when something in the repository implements the
-fix. Where the fix is written but can only be confirmed against a live deployment it is marked
-<span class="pill warn">Unverified</span>, and where nothing implements it, <span class="pill bad">Open</span>.</p>
+fix <em>and</em> the 2026-10-20 deployment evidence confirms it. Where nothing implements it, it is marked
+<span class="pill bad">Open</span> rather than quietly dropped.</p>
 
 <div class="scroll">
 <table>
@@ -1186,8 +1187,8 @@ fix. Where the fix is written but can only be confirmed against a live deploymen
   <td>1</td>
   <td><strong>Duplicate CORS headers</strong><br>Setting <code>Access-Control-Allow-Origin</code> in the function code <em>and</em> at the Function App host level makes Azure emit the header twice, which browsers reject outright.</td>
   <td>Keep exactly one layer. <code>function_app.py</code> emits no <code>Access-Control-Allow-*</code> headers at all (stated in its docstring) and <code>deploy.sh</code> step 7 removes any <code>*</code> wildcard before allowing only the Static Web App origin.</td>
-  <td>Single-origin CORS is committed in code and script. Cannot be confirmed from a browser until the deployment runs.</td>
-  <td><span class="pill warn">Unverified</span></td>
+  <td>Confirmed against the live deployment: <code>az functionapp cors show</code> returns the dashboard origin alone, and <code>/api/insights</code> answers HTTP 200 with a single <code>Access-Control-Allow-Origin</code> header for that origin (Figure 7).</td>
+  <td><span class="pill ok">Solved</span></td>
 </tr>
 <tr>
   <td>2</td>
@@ -1228,19 +1229,19 @@ fix. Where the fix is written but can only be confirmed against a live deploymen
   <td>7</td>
   <td><strong>Cold-start latency</strong><br>A Consumption-plan Function can take several seconds to answer its first request, during which the dashboard would show empty chart frames.</td>
   <td>Per-chart loading spinners plus a dependency-free <code>/api/health</code> probe that answers without touching storage; the <code>deploy.sh</code> smoke test uses <code>curl --max-time 180</code> so the first call absorbs the cold start instead of failing the script.</td>
-  <td>Mitigations are in place; the live dashboard and API metadata capture the current execution time.</td>
-  <td><span class="pill warn">Unverified</span></td>
+  <td>Measured on the live deployment: a cold <code>/api/insights</code> call returned HTTP 200 in 0.51&nbsp;s (Figure 7), and once warm the dashboard reports 36&nbsp;ms with <code>execution_time_seconds</code> 0.042 (Figures 1 and 5).</td>
+  <td><span class="pill ok">Solved</span></td>
 </tr>
 <tr>
   <td>8</td>
   <td><strong>Automated Azure deployment from CI</strong><br>Pushing to <code>main</code> does not deploy anything to Azure.</td>
-  <td><strong>Not implemented.</strong> <code>.github/workflows/deploy.yml</code> runs the Project 1 build/test/Docker simulation, and the Project 2 CI job being added runs lint and unit tests only. Deploying from CI would require a publish profile or service principal stored as a GitHub secret, which this project deliberately avoids; deployment is therefore a manual <code>./deploy.sh</code> run.</td>
+  <td><strong>Not implemented.</strong> <code>.github/workflows/deploy.yml</code> runs the Project 1 build/test/Docker simulation, and <code>.github/workflows/project2-tests.yml</code> runs lint and unit tests only. Deploying from CI would require a publish profile or service principal stored as a GitHub secret, which this project deliberately avoids; deployment is therefore a manual <code>./deploy.sh</code> run.</td>
   <td>No deployment job, no Azure credentials in CI. The trade-off (no secrets in the repository vs. no push-to-deploy) is a conscious one, but the automation is genuinely absent.</td>
   <td><span class="pill bad">Open</span></td>
 </tr>
 <tr>
   <td>9</td>
-  <td><strong>Static Web App region availability</strong><br><code>az staticwebapp create</code> fails in <code>eastus</code>, which is the region used for every other resource.</td>
+  <td><strong>Static Web App region availability</strong><br><code>az staticwebapp create</code> fails in <code>canadacentral</code>, which is the region used for every other resource.</td>
   <td>Use a separate <code>SWA_LOCATION=eastus2</code> for the Static Web App only, with the reason recorded in a comment next to the variable. The app is also created <em>unlinked</em> from GitHub so no repository token or OAuth grant is needed, and the frontend is uploaded afterwards with the <code>swa</code> CLI using a deployment token read from Azure.</td>
   <td>The script can create every resource without interactive GitHub authorisation. If the <code>swa</code> CLI is missing it prints the exact manual command instead of failing silently.</td>
   <td><span class="pill ok">Solved</span></td>
@@ -1291,7 +1292,7 @@ fix. Where the fix is written but can only be confirmed against a live deploymen
 </div>
 
 <footer>
-  <p>CPSY 300 &mdash; Project 2: Cloud Dashboard Development &mdash; Reviewed 2026-10-02</p>
+  <p>CPSY 300 &mdash; Project 2: Cloud Dashboard Development &mdash; Reviewed 2026-10-20</p>
   <p>All figures recomputed from All_Diets.csv (7,806 recipes). Azure deployment evidence was captured on 2026-10-20; see the embedded Portal and live-dashboard screenshots.</p>
   <p>Yuandong Yang &bull; Ethan Bayarsaikhan &bull; Justin Norman-Rance</p>
 </footer>

@@ -361,7 +361,7 @@ chmod +x deploy.sh
 creating duplicates -- and it runs relative to its own directory, so the dataset path
 resolves regardless of where you invoke it from. The seven steps are:
 
-1. **Resource group** -- create `cpsy300-nutritional-insights-rg` in `eastus`.
+1. **Resource group** -- create `cpsy300-nutritional-insights-rg` in `canadacentral`.
 2. **Storage account + dataset upload** -- create a `StorageV2` / `Standard_LRS`
    account named `cpsy300nutrition<random-hex>` (names are globally unique, so an
    existing matching account in the group is reused on a re-run) with
@@ -388,9 +388,9 @@ resolves regardless of where you invoke it from. The seven steps are:
 Notes:
 
 - **Region split is intentional.** Azure Static Web Apps is available only in a
-  handful of regions and `eastus` is not one of them, so the script creates the
-  Static Web App in `eastus2` (`SWA_LOCATION`) while every other resource lives in
-  `eastus` (`LOCATION`).
+  handful of regions and `canadacentral` is not one of them, so the script creates
+  the Static Web App in `eastus2` (`SWA_LOCATION`) while every other resource lives
+  in `canadacentral` (`LOCATION`).
 - **`swa` is required for step 6.** Install it with
   `npm install -g @azure/static-web-apps-cli`. If it is missing, the script warns,
   skips the frontend deployment, and prints the exact `swa deploy` command to run

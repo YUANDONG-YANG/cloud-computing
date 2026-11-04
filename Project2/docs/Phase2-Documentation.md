@@ -5,14 +5,15 @@
 **Course:** CPSY 300 -- Cloud Computing
 **Phase:** Project Phase 2 -- Cloud Dashboard Development
 **Team:** Yuandong Yang, Ethan Bayarsaikhan, Justin Norman-Rance
-**Date:** 2026-10-02
+**Date:** 2026-10-20 (Azure deployment and evidence captured the same day)
 **Repository:** https://github.com/YUANDONG-YANG/cloud-computing/tree/main/Project2
 **Dataset:** `All_Diets.csv` -- 7,806 recipes across 5 diet types
 
 > **Deployment status verified on 2026-10-20.** The application was deployed to Azure
 > for Students and the live URLs, measured response metadata and Portal screenshots
-> are included below. Regional resources are in Canada Central; the Static Web App is
-> global and reports East US 2 in the resource list.
+> are included below. The regional resources (resource group, storage account,
+> Function App, Application Insights) are in Canada Central (`canadacentral`); the
+> Static Web App is in East US 2 (`eastus2`).
 
 ---
 
@@ -69,7 +70,7 @@ Function and renders four visualizations, interaction controls and paginated tab
             |              Azure Function App (HTTP trigger)           |
             |                  cpsy300-nutrition-api                   |
             |      Python 3.11  |  Functions v4  |  consumption plan   |
-            |                      region: eastus                      |
+            |                      region: canadacentral               |
             |                                                          |
             |   GET /api/health     liveness, no storage call          |
             |   GET /api/insights   aggregates                         |
@@ -86,15 +87,15 @@ Function and renders four visualizations, interaction controls and paginated tab
             |                   Azure Blob Storage                     |
             |            cpsy300nutrition<random-hex>                  |
             |        StorageV2 | Standard_LRS | TLS 1.2 minimum        |
-            |          public blob access disabled | eastus            |
+            |          public blob access disabled | canadacentral     |
             |                                                          |
             |     container "datasets" (PRIVATE)                       |
             |        └── All_Diets.csv   (7,806 recipes)               |
             +----------------------------------------------------------+
 
         All resources live in one resource group:
-        cpsy300-nutritional-insights-rg   (eastus; the Static Web App is in
-        eastus2 because Static Web Apps is not offered in eastus)
+        cpsy300-nutritional-insights-rg   (canadacentral; the Static Web App
+        is in eastus2 because Static Web Apps is not offered in canadacentral)
 ```
 
 ### 2.2 Mermaid equivalent
@@ -103,7 +104,7 @@ Function and renders four visualizations, interaction controls and paginated tab
 flowchart TD
     U["Browser<br/>(dashboard user)"]
     SWA["Azure Static Web Apps<br/>cpsy300-nutrition-dashboard<br/>Free SKU · eastus2"]
-    FN["Azure Function App<br/>cpsy300-nutrition-api<br/>Python 3.11 · Functions v4<br/>consumption plan · eastus"]
+    FN["Azure Function App<br/>cpsy300-nutrition-api<br/>Python 3.11 · Functions v4<br/>consumption plan · canadacentral"]
     BLOB[("Azure Blob Storage<br/>cpsy300nutrition&lt;hex&gt;<br/>private container 'datasets'<br/>All_Diets.csv")]
 
     U -->|"HTTPS: index.html, app.js, styles.css"| SWA
@@ -137,11 +138,11 @@ flowchart TD
 
 | Service | Resource name | Configuration | Why it is used |
 |---------|---------------|---------------|----------------|
-| **Resource Group** | `cpsy300-nutritional-insights-rg` | Region `eastus` | One logical container for every resource in the project, so the whole environment can be deployed, audited and deleted as a unit. |
-| **Azure Storage Account** | `cpsy300nutrition<random-hex>` | `StorageV2`, `Standard_LRS`, `--min-tls-version TLS1_2`, `--allow-blob-public-access false`, region `eastus` | Durable, cheap object store for the dataset. Storage account names are globally unique, hence the random suffix; a matching account already present in the group is reused on re-runs. Also backs the Function App's own `AzureWebJobsStorage` requirement. |
+| **Resource Group** | `cpsy300-nutritional-insights-rg` | Region `canadacentral` | One logical container for every resource in the project, so the whole environment can be deployed, audited and deleted as a unit. |
+| **Azure Storage Account** | `cpsy300nutrition<random-hex>` | `StorageV2`, `Standard_LRS`, `--min-tls-version TLS1_2`, `--allow-blob-public-access false`, region `canadacentral` | Durable, cheap object store for the dataset. Storage account names are globally unique, hence the random suffix; a matching account already present in the group is reused on re-runs. Also backs the Function App's own `AzureWebJobsStorage` requirement. |
 | **Azure Blob Storage container** | `datasets` (private) | Holds `All_Diets.csv` | Keeps the raw dataset out of the repository and out of the deployment package, so the data can be replaced without redeploying code. Private access means no anonymous URL exists. |
-| **Azure Function App** | `cpsy300-nutrition-api` | Python **3.11**, Functions runtime **v4**, Linux **consumption plan**, Python v2 programming model, anonymous HTTP auth, region `eastus` | Serverless HTTP API. Runs the Project 1 cleaning and aggregation code on demand and returns JSON. Consumption plan means pay-per-execution and automatic scale-out. |
-| **Azure Static Web Apps** | `cpsy300-nutrition-dashboard` | **Free** SKU, region `eastus2`, created **unlinked** (no GitHub repository attached), deployed with a deployment token via the `swa` CLI | Public hosting for the dashboard with HTTPS and a default hostname included. Created unlinked so no GitHub token or workflow is required. `eastus2` because Static Web Apps is not available in `eastus`. |
+| **Azure Function App** | `cpsy300-nutrition-api` | Python **3.11**, Functions runtime **v4**, Linux **consumption plan**, Python v2 programming model, anonymous HTTP auth, region `canadacentral` | Serverless HTTP API. Runs the Project 1 cleaning and aggregation code on demand and returns JSON. Consumption plan means pay-per-execution and automatic scale-out. |
+| **Azure Static Web Apps** | `cpsy300-nutrition-dashboard` | **Free** SKU, region `eastus2`, created **unlinked** (no GitHub repository attached), deployed with a deployment token via the `swa` CLI | Public hosting for the dashboard with HTTPS and a default hostname included. Created unlinked so no GitHub token or workflow is required. `eastus2` because Static Web Apps is not available in `canadacentral`. |
 | **Function App application settings** | `AZURE_STORAGE_CONNECTION_STRING`, `BLOB_CONTAINER_NAME`, `BLOB_NAME` | Set by `deploy.sh` | Externalises all configuration and the one secret. Nothing environment-specific is hard-coded, and the connection string never enters the repository. |
 | **Function App CORS configuration** | host-level allowed origins | Scoped to the Static Web App origin only | Lets the dashboard call the API from its own origin without opening the API to every website. |
 | **Application Insights** | provisioned with the Function App | Sampling enabled in `host.json`, `Request` type excluded | Captures the Function's logs and exceptions, which is where internal error detail goes instead of into HTTP responses. |
@@ -559,12 +560,12 @@ read than the misleading one was.
 
 ### 10.6 Static Web Apps region availability
 
-**Challenge.** `az staticwebapp create` fails in `eastus`, where the rest of the
-project's resources live, because Static Web Apps is offered in only a handful of
-regions.
+**Challenge.** `az staticwebapp create` fails in `canadacentral`, where the rest of
+the project's resources live, because Static Web Apps is offered in only a handful
+of regions.
 
 **Solution.** Use a separate `SWA_LOCATION` (`eastus2`) for the Static Web App while
-`LOCATION` (`eastus`) governs everything else. Both are overridable environment
+`LOCATION` (`canadacentral`) governs everything else. Both are overridable environment
 variables, and the split is documented in the script and the README so it is not
 mistaken for an inconsistency.
 
@@ -605,8 +606,8 @@ portal and the public dashboard while preserving the current date and time.
 
 **Status: Complete for the submitted evidence.** The resource group, Function App,
 storage account, Static Web App, live dashboard, and API responses are documented in
-Figures 1-8. The deployment is in Canada Central for the regional resources; the
-Static Web App is global and currently reports East US 2 in the resource list.
+Figures 1-8. The regional resources are in Canada Central (`canadacentral`) and the
+Static Web App is in East US 2 (`eastus2`), which is what Figures 1-4 show.
 
 ---
 
@@ -643,7 +644,7 @@ chmod +x deploy.sh
 
 Prerequisites: Azure CLI, Azure Functions Core Tools v4 (`func`), and the Static Web
 Apps CLI (`npm install -g @azure/static-web-apps-cli`). The script's seven steps, the
-overridable environment variables and the `eastus`/`eastus2` region split are
+overridable environment variables and the `canadacentral`/`eastus2` region split are
 documented in `../README.md`.
 
 To run the backend tests first:
@@ -689,8 +690,8 @@ cross-checked against the committed Project 1 results in `Project1/docs/results/
 | Resource | Name / value |
 |----------|--------------|
 | Resource group | `cpsy300-nutritional-insights-rg` |
-| Primary region | `eastus` |
-| Static Web App region | `eastus2` (Static Web Apps is not available in `eastus`) |
+| Primary region | `canadacentral` |
+| Static Web App region | `eastus2` (Static Web Apps is not available in `canadacentral`) |
 | Storage account | `cpsy300nutrition<random-hex>` |
 | Blob container | `datasets` (private) |
 | Blob name | `All_Diets.csv` |

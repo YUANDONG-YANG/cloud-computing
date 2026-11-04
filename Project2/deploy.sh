@@ -25,8 +25,8 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 # Configuration -- edit these values for your environment
 # ---------------------------------------------------------------------------
 RESOURCE_GROUP="${RESOURCE_GROUP:-cpsy300-nutritional-insights-rg}"
-LOCATION="${LOCATION:-eastus}"
-# Static Web Apps is only available in a handful of regions; eastus is not one.
+LOCATION="${LOCATION:-canadacentral}"
+# Static Web Apps is only available in a handful of regions; canadacentral is not one.
 SWA_LOCATION="${SWA_LOCATION:-eastus2}"
 STORAGE_ACCOUNT="${STORAGE_ACCOUNT:-}"
 FUNCTION_APP_NAME="${FUNCTION_APP_NAME:-cpsy300-nutrition-api}"

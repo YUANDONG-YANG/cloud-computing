@@ -20,3 +20,6 @@ CLAUDE.md
 .cursor/
 .github/copilot-instructions.md
 AGENTS.md
+
+# JetBrains IDE project files
+.idea/
