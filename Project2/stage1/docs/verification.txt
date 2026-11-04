@@ -39,13 +39,14 @@ the no-match search returns total 0; clusters returns 7806 points summing to
 http://localhost:5500 with Access-Control-Allow-Origin: http://localhost:5500.
 Full request/response evidence: docs/http-results.json
 
-Screenshots (docs/screenshots/, captured 2026-11-04):
+Screenshots (docs/screenshots/, captured 2026-11-04 with macOS screencapture):
 api-health-browser.png, api-insights-browser.png, api-recipes-browser.png,
-api-clusters-browser.png — headless Chrome rendering the live responses from
-the running host at http://localhost:7071.
-cli-pytest-flake8.png, cli-func-start.png, cli-http-verification.png — the
-terminal output above, rendered to PNG from the real captured text (not a
-photograph of a terminal window).
+api-clusters-browser.png — real Google Chrome windows, address bar visible,
+loading the live responses from the running host at http://localhost:7071.
+cli-pytest-flake8.png, cli-func-start.png, cli-http-verification.png — real
+Terminal.app windows running the commands shown above.
+Every image is a screenshot of an actual window on screen. Chrome ran with a
+separate empty profile so no personal browsing data appears in the images.
 
 Scope: local verification only. No Azure resources were created, deployed to or
 modified for stage1, and no configuration outside stage1/ was changed. Blob

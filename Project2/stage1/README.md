@@ -289,8 +289,9 @@ clusters 的 points 仅展示前两条；完整返回结果见 docs/api-results.
 | 真实 HTTP 行为（分页、搜索、400/404、本地 CORS） | 10 条用例全通过 | docs/screenshots/cli-http-verification.png、docs/http-results.json |
 | 完整 CSV 数据量一致 | insights 与 clusters 均为 7,806 | docs/verification.txt |
 
-浏览器截图由无界面 Chrome 直接访问运行中的主机生成；终端截图由真实输出文本渲染成 PNG，
-不是终端窗口的拍照。所有验证只在本地进行，未创建或改动任何 Azure 资源与 stage1 以外的配置。
+7 张截图全部由 macOS `screencapture` 对屏幕上的真实窗口截取：浏览器图为 Google Chrome 窗口
+（地址栏可见，使用独立空白配置，不含个人浏览数据），终端图为 Terminal.app 窗口中的真实命令输出。
+所有验证只在本地进行，未创建或改动任何 Azure 资源与 stage1 以外的配置。
 
 交接：
 1. 交给 Person 2：基地址 `http://localhost:7071/api`、上述 JSON 契约及本地 CORS 设置。

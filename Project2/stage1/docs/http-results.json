@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-11-04T22:32:53.498685+00:00",
+  "captured_at": "2026-11-04T22:49:18.662472+00:00",
   "base_url": "http://localhost:7071/api",
   "requests": [
     {
@@ -8,7 +8,7 @@
       "headers": {
         "Connection": "close",
         "Content-Type": "application/json",
-        "Date": "Wed, 04 Nov 2026 22:32:53 GMT",
+        "Date": "Wed, 04 Nov 2026 22:49:18 GMT",
         "Server": "Kestrel",
         "Access-Control-Allow-Origin": "http://localhost:5500",
         "Transfer-Encoding": "chunked",
@@ -27,7 +27,7 @@
       "headers": {
         "Connection": "close",
         "Content-Type": "application/json",
-        "Date": "Wed, 04 Nov 2026 22:32:53 GMT",
+        "Date": "Wed, 04 Nov 2026 22:49:18 GMT",
         "Server": "Kestrel",
         "Access-Control-Allow-Origin": "http://localhost:5500",
         "Transfer-Encoding": "chunked",
@@ -356,7 +356,7 @@
           "highest_total_protein_g": 177249.89
         },
         "metadata": {
-          "execution_time_seconds": 0.011,
+          "execution_time_seconds": 0.01,
           "source": "Local CSV",
           "dataset": "All_Diets.csv",
           "dataset_from_cache": true
@@ -369,7 +369,7 @@
       "headers": {
         "Connection": "close",
         "Content-Type": "application/json",
-        "Date": "Wed, 04 Nov 2026 22:32:53 GMT",
+        "Date": "Wed, 04 Nov 2026 22:49:18 GMT",
         "Server": "Kestrel",
         "Access-Control-Allow-Origin": "http://localhost:5500",
         "Transfer-Encoding": "chunked",
@@ -426,7 +426,7 @@
         "diet_type_filter": "keto",
         "search": "chicken",
         "metadata": {
-          "execution_time_seconds": 0.002,
+          "execution_time_seconds": 0.01,
           "source": "Local CSV",
           "dataset": "All_Diets.csv",
           "dataset_from_cache": true
@@ -439,7 +439,7 @@
       "headers": {
         "Connection": "close",
         "Content-Type": "application/json",
-        "Date": "Wed, 04 Nov 2026 22:32:53 GMT",
+        "Date": "Wed, 04 Nov 2026 22:49:18 GMT",
         "Server": "Kestrel",
         "Access-Control-Allow-Origin": "http://localhost:5500",
         "Transfer-Encoding": "chunked",
@@ -509,7 +509,7 @@
       "headers": {
         "Connection": "close",
         "Content-Type": "application/json",
-        "Date": "Wed, 04 Nov 2026 22:32:53 GMT",
+        "Date": "Wed, 04 Nov 2026 22:49:18 GMT",
         "Server": "Kestrel",
         "Access-Control-Allow-Origin": "http://localhost:5500",
         "Transfer-Encoding": "chunked",
@@ -538,7 +538,7 @@
       "headers": {
         "Connection": "close",
         "Content-Type": "application/json",
-        "Date": "Wed, 04 Nov 2026 22:32:53 GMT",
+        "Date": "Wed, 04 Nov 2026 22:49:18 GMT",
         "Server": "Kestrel",
         "Access-Control-Allow-Origin": "http://localhost:5500",
         "Transfer-Encoding": "chunked",
@@ -63031,7 +63031,7 @@
           }
         ],
         "metadata": {
-          "execution_time_seconds": 0.025,
+          "execution_time_seconds": 0.031,
           "source": "Local CSV",
           "dataset": "All_Diets.csv",
           "dataset_from_cache": true
@@ -63044,7 +63044,7 @@
       "headers": {
         "Connection": "close",
         "Content-Type": "application/json",
-        "Date": "Wed, 04 Nov 2026 22:32:53 GMT",
+        "Date": "Wed, 04 Nov 2026 22:49:18 GMT",
         "Server": "Kestrel",
         "Access-Control-Allow-Origin": "http://localhost:5500",
         "Transfer-Encoding": "chunked",
@@ -63060,7 +63060,7 @@
       "headers": {
         "Connection": "close",
         "Content-Type": "application/json",
-        "Date": "Wed, 04 Nov 2026 22:32:53 GMT",
+        "Date": "Wed, 04 Nov 2026 22:49:18 GMT",
         "Server": "Kestrel",
         "Access-Control-Allow-Origin": "http://localhost:5500",
         "Transfer-Encoding": "chunked",
@@ -63076,7 +63076,7 @@
       "headers": {
         "Connection": "close",
         "Content-Type": "application/json",
-        "Date": "Wed, 04 Nov 2026 22:32:53 GMT",
+        "Date": "Wed, 04 Nov 2026 22:49:18 GMT",
         "Server": "Kestrel",
         "Access-Control-Allow-Origin": "http://localhost:5500",
         "Transfer-Encoding": "chunked",
@@ -63092,7 +63092,7 @@
       "headers": {
         "Connection": "close",
         "Content-Type": "application/json",
-        "Date": "Wed, 04 Nov 2026 22:32:53 GMT",
+        "Date": "Wed, 04 Nov 2026 22:49:18 GMT",
         "Server": "Kestrel",
         "Access-Control-Allow-Origin": "http://localhost:5500",
         "Transfer-Encoding": "chunked",
