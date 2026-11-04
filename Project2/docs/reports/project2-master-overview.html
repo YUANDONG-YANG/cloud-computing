@@ -44,6 +44,28 @@ a:hover{text-decoration:underline}
 svg text{font-family:"Segoe UI",Arial,sans-serif}
 .transition-table{margin:1rem 0}
 footer{text-align:center;color:var(--mute);font-size:.78rem;margin-top:2rem;padding:1rem}
+
+/* ---- print / PDF export -------------------------------------------------
+   Keeps the on-screen palette in the exported PDF (Chrome: "Background
+   graphics"), pins the light theme so a dark-mode OS does not invert the
+   export, and stops figures, code blocks and table rows splitting across
+   pages. Export with:
+     chrome --headless --disable-gpu --no-pdf-header-footer \
+            --print-to-pdf=project2-master-overview.pdf \
+            project2-master-overview.html
+--------------------------------------------------------------------------- */
+@media print{
+  :root{--bg:#f5f7fa;--card:#fff;--ink:#172b3f;--mute:#5a6b7b;--brand:#0f766e;--accent:#0a5fb4;--line:#d5dde6;--ok:#157347;--okbg:#e3f4ea;--warn:#8a5a00;--warnbg:#fff1cc;--bad:#a4262c;--badbg:#fde7e9;--code:#0f2233;--codeink:#d7e7f5}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  @page{margin:12mm}
+  body{background:#fff}
+  main{max-width:none;padding:0}
+  h2{break-before:page;break-after:avoid}
+  h2:first-of-type{break-before:auto}
+  h3,h4{break-after:avoid}
+  pre,figure,.fig,.find,tr{break-inside:avoid}
+  a{color:var(--accent);text-decoration:none}
+}
 </style>
 </head>
 <body>
@@ -1140,7 +1162,7 @@ still available in Application Insights, which <code>host.json</code> enables.</
   <td><strong>Documentation &amp; Presentation</strong></td>
   <td>10 marks</td>
   <td>Architecture, workflow and challenges explanation</td>
-  <td>This overview (architecture, setup commands, data flow, code, endpoints, challenges), <code>Project2/README.md</code>, <code>docs/Phase2-Analysis.md</code> and the review under <code>Project2/review/</code>. Deployment screenshots are in the Deployment Evidence section below; the submission PDF is exported from this page.</td>
+  <td>This overview (architecture, setup commands, data flow, code, endpoints, challenges), <code>Project2/README.md</code>, <code>docs/phase2-analysis.md</code> and the review under <code>Project2/docs/reviews/</code>. Deployment screenshots are in the Deployment Evidence section below; the submission PDF is exported from this page.</td>
   <td><span class="pill ok">Done</span></td>
 </tr>
 </tbody>
@@ -1150,13 +1172,13 @@ still available in Application Insights, which <code>host.json</code> enables.</
 
 <h3 id="evidence" style="margin-top:1.6rem">Deployment Evidence (captured 2026-10-20)</h3>
 <style>.fig{margin:1rem 0 1.6rem}.fig img{max-width:100%;border:1px solid #cbd5e1;border-radius:6px}.fig figcaption{font-size:.85rem;color:#475569;margin-top:.4rem}</style>
-<figure class="fig"><img src="screenshots/01-dashboard-full.png" alt="Dashboard"><figcaption><b>Figure 1.</b> Public dashboard at https://salmon-ocean-0ce94150f.4.azurestaticapps.net: &ldquo;API Connected (v2.0.0)&rdquo; badge, execution-time badge, diet filter and Refresh button, bar, doughnut, heatmap and scatter charts and tables, all rendered from live Function App data.</figcaption></figure>
-<figure class="fig"><img src="screenshots/08-portal-function-app.png" alt="Azure Portal Function App"><figcaption><b>Figure 2.</b> Azure Portal, Function App <code>cpsy300-nutrition-api</code>: status <em>Running</em>, Canada Central, Linux Consumption plan, default domain cpsy300-nutrition-api.azurewebsites.net, and the HTTP functions <code>health</code>, <code>insights</code> and <code>recipes</code>, all <em>Enabled</em>.</figcaption></figure>
-<figure class="fig"><img src="screenshots/07-portal-static-web-app.png" alt="Azure Portal Static Web App"><figcaption><b>Figure 3.</b> Azure Portal, Static Web App <code>cpsy300-nutrition-dashboard</code> (Free plan, status <em>Ready</em>, environment Production) at https://salmon-ocean-0ce94150f.4.azurestaticapps.net.</figcaption></figure>
-<figure class="fig"><img src="screenshots/04-azure-resources.png" alt="Resources"><figcaption><b>Figure 4.</b> Resources in resource group <code>cpsy300-nutritional-insights-rg</code> (Storage account, Function App, Consumption plan, Application Insights, Static Web App), the app settings used instead of hard-coded values, and the private <code>datasets</code> blob container holding All_Diets.csv. The connection string is kept in app settings and deliberately not shown.</figcaption></figure>
-<figure class="fig"><img src="screenshots/06-portal-storage-containers.png" alt="Azure Portal storage containers"><figcaption><b>Figure 5.</b> Azure Portal, storage account <code>cpsy300nutritionf6a445</code>: the <code>datasets</code> container has anonymous access level <em>Private</em>. Cloud Shell shows the <code>/api/insights</code> metadata: <code>execution_time_seconds</code> 0.042, source Azure Blob Storage, <code>dataset_from_cache</code> true.</figcaption></figure>
-<figure class="fig"><img src="screenshots/03-api-insights.png" alt="Insights"><figcaption><b>Figure 6.</b> Browser test of https://cpsy300-nutrition-api.azurewebsites.net/api/insights, the JSON payload the dashboard consumes.</figcaption></figure>
-<figure class="fig"><img src="screenshots/05-cors-and-api-test.png" alt="CORS"><figcaption><b>Figure 7.</b> CORS restricted to the dashboard origin only, and a timed call to <code>/api/insights</code> (HTTP 200, 0.51 s including cold start). The response carries <code>Access-Control-Allow-Origin</code> for the dashboard origin.</figcaption></figure>
+<figure class="fig"><img src="../screenshots/dashboard-full-page.png" alt="Dashboard"><figcaption><b>Figure 1.</b> Public dashboard at https://salmon-ocean-0ce94150f.4.azurestaticapps.net: &ldquo;API Connected (v2.0.0)&rdquo; badge, execution-time badge, diet filter and Refresh button, bar, doughnut, heatmap and scatter charts and tables, all rendered from live Function App data.</figcaption></figure>
+<figure class="fig"><img src="../screenshots/portal-function-app.png" alt="Azure Portal Function App"><figcaption><b>Figure 2.</b> Azure Portal, Function App <code>cpsy300-nutrition-api</code>: status <em>Running</em>, Canada Central, Linux Consumption plan, default domain cpsy300-nutrition-api.azurewebsites.net, and the HTTP functions <code>health</code>, <code>insights</code> and <code>recipes</code>, all <em>Enabled</em>.</figcaption></figure>
+<figure class="fig"><img src="../screenshots/portal-static-web-app.png" alt="Azure Portal Static Web App"><figcaption><b>Figure 3.</b> Azure Portal, Static Web App <code>cpsy300-nutrition-dashboard</code> (Free plan, status <em>Ready</em>, environment Production) at https://salmon-ocean-0ce94150f.4.azurestaticapps.net.</figcaption></figure>
+<figure class="fig"><img src="../screenshots/cli-resource-inventory.png" alt="Resources"><figcaption><b>Figure 4.</b> Resources in resource group <code>cpsy300-nutritional-insights-rg</code> (Storage account, Function App, Consumption plan, Application Insights, Static Web App), the app settings used instead of hard-coded values, and the private <code>datasets</code> blob container holding All_Diets.csv. The connection string is kept in app settings and deliberately not shown.</figcaption></figure>
+<figure class="fig"><img src="../screenshots/portal-storage-containers.png" alt="Azure Portal storage containers"><figcaption><b>Figure 5.</b> Azure Portal, storage account <code>cpsy300nutritionf6a445</code>: the <code>datasets</code> container has anonymous access level <em>Private</em>. Cloud Shell shows the <code>/api/insights</code> metadata: <code>execution_time_seconds</code> 0.042, source Azure Blob Storage, <code>dataset_from_cache</code> true.</figcaption></figure>
+<figure class="fig"><img src="../screenshots/api-insights-browser.png" alt="Insights"><figcaption><b>Figure 6.</b> Browser test of https://cpsy300-nutrition-api.azurewebsites.net/api/insights, the JSON payload the dashboard consumes.</figcaption></figure>
+<figure class="fig"><img src="../screenshots/cli-cors-and-timing.png" alt="CORS"><figcaption><b>Figure 7.</b> CORS restricted to the dashboard origin only, and a timed call to <code>/api/insights</code> (HTTP 200, 0.51 s including cold start). The response carries <code>Access-Control-Allow-Origin</code> for the dashboard origin.</figcaption></figure>
 
 <div class="find ok">
 <h4>Deliverables Checklist</h4>
@@ -1167,7 +1189,7 @@ still available in Application Insights, which <code>host.json</code> enables.</
 <tr><td>Static Web App link</td><td><a href="https://salmon-ocean-0ce94150f.4.azurestaticapps.net">https://salmon-ocean-0ce94150f.4.azurestaticapps.net</a></td><td><span class="pill ok">Done</span></td></tr>
 <tr><td>GitHub repository (frontend + backend)</td><td><a href="https://github.com/YUANDONG-YANG/cloud-computing">github.com/YUANDONG-YANG/cloud-computing</a> &mdash; all Project 2 code is committed under <code>Project2/</code></td><td><span class="pill ok">Done</span></td></tr>
 <tr><td>Azure portal screenshots</td><td>Resource group, Function App overview, app settings, blob container, Static Web App, and the dashboard showing "API Connected" &mdash; Figures 1&ndash;7 below</td><td><span class="pill ok">Done</span></td></tr>
-<tr><td>Documentation PDF</td><td>Architecture diagram, services, workflow and screenshots &mdash; exported from this page to <code>Project2/docs/Project2-Master-Overview.pdf</code> (36 pages, background graphics enabled)</td><td><span class="pill ok">Done</span></td></tr>
+<tr><td>Documentation PDF</td><td>Architecture diagram, services, workflow and screenshots &mdash; exported from this page to <code>Project2/docs/reports/project2-master-overview.pdf</code> (36 pages, background graphics enabled)</td><td><span class="pill ok">Done</span></td></tr>
 </tbody>
 </table>
 <p class="sub" style="margin-top:.6rem">Both URLs above were tested on 2026-10-20 and returned HTTP 200.</p>
@@ -1285,8 +1307,8 @@ fix <em>and</em> the 2026-10-20 deployment evidence confirms it. Where nothing i
 <tr><td>Backend (Functions v2 app)</td><td><code>Project2/backend/function_app.py</code>, <code>Project2/backend/nutrition.py</code>, <code>Project2/backend/host.json</code></td></tr>
 <tr><td>Frontend</td><td><code>Project2/frontend/index.html</code>, <code>app.js</code>, <code>styles.css</code>, <code>Project2/staticwebapp.config.json</code></td></tr>
 <tr><td>Deployment script</td><td><code>Project2/deploy.sh</code></td></tr>
-<tr><td>Phase 2 specification</td><td><a href="https://github.com/YUANDONG-YANG/cloud-computing/blob/main/Project2/Phase2_Cloud_Dashboard_Project%201.docx">Phase2_Cloud_Dashboard_Project 1.docx</a></td></tr>
-<tr><td>Dashboard UI reference</td><td><a href="https://github.com/YUANDONG-YANG/cloud-computing/blob/main/Project2/UI-for-project2.html">UI-for-project2.html</a></td></tr>
+<tr><td>Phase 2 specification</td><td><a href="https://github.com/YUANDONG-YANG/cloud-computing/blob/main/Project2/spec/phase2-requirements.docx">spec/phase2-requirements.docx</a></td></tr>
+<tr><td>Dashboard UI reference</td><td><a href="https://github.com/YUANDONG-YANG/cloud-computing/blob/main/Project2/spec/ui-skeleton.html">spec/ui-skeleton.html</a></td></tr>
 <tr><td>Data ground truth</td><td><code>Project1/data/All_Diets.csv</code> and <code>Project1/docs/results/*.csv</code></td></tr>
 </table>
 </div>

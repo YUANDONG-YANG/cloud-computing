@@ -1,6 +1,6 @@
 # Project 2 (Phase 2) Mark-Loss Review (2026-10-02)
 
-Source of truth for marking: `Project2/Phase2_Cloud_Dashboard_Project 1.docx` (section 6 rubric, section 7 deliverables).
+Source of truth for marking: `Project2/spec/phase2-requirements.docx` (section 6 rubric, section 7 deliverables).
 Ground truth for all data claims: `Project1/data/All_Diets.csv` and `Project1/docs/results/*.csv`.
 Scope: every rubric category. Companion to `gap-review-2026-10-02.md`, which was written before the code landed and is now
 partly out of date (backend and frontend code now exist).
@@ -77,7 +77,7 @@ Real values are already committed in `Project1/docs/results/average_macros.csv`,
 `common_cuisines.csv` and `top5_protein_recipes.csv` -- copy them in and delete the misleading comment.
 This is an academic-integrity exposure, not just a defect.
 
-## Project2-Master-Overview.html contradicts the implementation
+## project2-master-overview.html contradicts the implementation
 
 The report marks all six rubric categories "Done" and both URLs "Ready", with no supporting evidence in the repository.
 It also describes a different system from the one that was built:
@@ -95,7 +95,7 @@ It also describes a different system from the one that was built:
 | 9 | Frontend has "search + dropdown, API interaction buttons" | Implemented controls are a diet dropdown and a refresh button only |
 | 10 | All six Challenges marked "Solved" | At least CORS scoping, server-side pagination and CI/CD deployment have no implementation behind them |
 
-`docs/Phase2-Analysis.md` section 7 is also wrong (keto ~1890, vegan ~1050, dash ~1561, paleo ~1553) and disagrees with
+`docs/phase2-analysis.md` section 7 is also wrong (keto ~1890, vegan ~1050, dash ~1561, paleo ~1553) and disagrees with
 the equally wrong numbers in `app.js`. Correct counts: mediterranean 1753, dash 1745, vegan 1522, keto 1512, paleo 1274.
 
 ## Backend: verified correct
@@ -134,7 +134,7 @@ columns are not included in any response. Secondary issues:
 1. Fix the `deploy.sh` sed (B1), then run one real deployment and capture portal screenshots with the clock visible. -- Deployment 20
 2. Inject the real API URL (B2); confirm the page shows "API Connected", not "Demo Mode"; capture that plus a Postman/browser test of the endpoint. -- Integration 20
 3. Replace `DEMO_DATA` with the real values from `Project1/docs/results/*.csv` and remove the false comment (B3).
-4. Rewrite `Project2-Master-Overview.html`: use the real code, drop `/api/clusters` and the server-side pagination claim, correct the pie shares and the correlation signs, align resource names/region/runtime with `deploy.sh`, and downgrade unfinished items from "Done" to "Planned".
+4. Rewrite `project2-master-overview.html`: use the real code, drop `/api/clusters` and the server-side pagination claim, correct the pie shares and the correlation signs, align resource names/region/runtime with `deploy.sh`, and downgrade unfinished items from "Done" to "Planned".
 5. Export the Documentation PDF with timestamped screenshots. -- Documentation 10
 6. Narrow CORS to the Static Web App origin and delete the connection-string echo. -- Cloud Practices 10
 

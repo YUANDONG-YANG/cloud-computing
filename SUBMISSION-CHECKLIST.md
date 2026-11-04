@@ -54,7 +54,7 @@ because SWA is not offered in eastus. If the `swa` CLI is missing the script
 warns and skips only the frontend upload; install it and re-run.
 
 Afterwards paste the two real URLs into `Project2/README.md` and
-`Project2/docs/reports/Project2-Master-Overview.html`, which currently carry
+`Project2/docs/reports/project2-master-overview.html`, which currently carry
 `<function-app>` / `<static-web-app>` placeholders on purpose.
 
 ---
@@ -75,7 +75,7 @@ Every screenshot must show the **date and time**. Do not capture any frame
 that reveals a storage connection string, an account key or a client secret.
 
 **Phase 2** — fill the nine `[PENDING SCREENSHOT]` placeholders in
-`Project2/docs/Phase2-Documentation.md`, then export that file to PDF:
+`Project2/docs/phase2-documentation.md`, then export that file to PDF:
 resource group, Function App overview, storage container showing the blob,
 Static Web App overview, the live dashboard in a browser, and the three
 endpoints answering in a browser or Postman.

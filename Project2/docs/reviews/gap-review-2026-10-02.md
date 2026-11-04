@@ -1,9 +1,9 @@
 # Project 2 (Phase 2) Gap Review - 2026-10-02
 
-Sources: `Project2/Phase2_Cloud_Dashboard_Project 1.docx`, `Project2/UI-for-project2.html`.
+Sources: `Project2/spec/phase2-requirements.docx`, `Project2/spec/ui-skeleton.html`.
 
 ## What exists in the repository
-- Requirements analysis (`docs/Phase2-Analysis.md`) and a master overview report (`docs/reports/Project2-Master-Overview.html`).
+- Requirements analysis (`docs/phase2-analysis.md`) and a master overview report (`docs/reports/project2-master-overview.html`).
 - The course UI skeleton and the specification file.
 
 ## Critical finding: report claims are not backed by the repository

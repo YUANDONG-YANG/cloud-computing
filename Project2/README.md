@@ -12,8 +12,22 @@ region canadacentral, Static Web App in eastus2) with `./deploy.sh`.
 - Dashboard: https://salmon-ocean-0ce94150f.4.azurestaticapps.net
 
 Date-stamped screenshots of the live dashboard, API responses, resources and CORS
-settings are in `docs/reports/Project2-Master-Overview.html` (section 7, Deployment
-Evidence; image files in `docs/reports/screenshots/`).
+settings are in `docs/reports/project2-master-overview.html` (section 7, Deployment
+Evidence; image files in `docs/screenshots/`).
+
+## Deliverables
+
+The four items the Phase 2 brief asks for, and where each one lives.
+
+| # | Deliverable | Where |
+|---|-------------|-------|
+| 1 | Deployed Azure Function URL | <https://cpsy300-nutrition-api.azurewebsites.net/api/insights> (also `/api/health`, `/api/recipes`) |
+| 2 | Static Web App link | <https://salmon-ocean-0ce94150f.4.azurestaticapps.net> |
+| 3 | GitHub repository (frontend + backend) | <https://github.com/YUANDONG-YANG/cloud-computing> -- this `Project2/` folder |
+| 4 | Documentation PDF | [`docs/reports/project2-master-overview.pdf`](docs/reports/project2-master-overview.pdf) (36 pages, exported from the HTML report) |
+
+Rubric mapping, deployment evidence (Figures 1-7) and the challenges log are all in
+[`docs/reports/project2-master-overview.html`](docs/reports/project2-master-overview.html).
 
 ## Overview
 
@@ -43,36 +57,105 @@ Azure Blob Storage  (private container "datasets")
     datasets/All_Diets.csv  --  7,806 recipes across 5 diet types
 ```
 
-## Project Structure
+## Repository Map
+
+Every tracked file in `Project2/`, grouped by role. Nothing here is generated at
+build time except `build/`, which is git-ignored and recreated by `deploy.sh`.
 
 ```
 Project2/
-  backend/
-    function_app.py                # Azure Functions v2 app (3 HTTP endpoints)
-    nutrition.py                   # Cleaning + aggregation, shared with Project 1
-    host.json                      # Functions host config (route prefix "api")
-    requirements.txt               # Runtime dependencies
-    local.settings.json.example    # Template for local settings -- copy and fill in
-    local.settings.json            # Local secrets; git-ignored, never committed
-    .funcignore                    # Files excluded from `func azure functionapp publish`
-  frontend/
-    index.html                     # Dashboard page (Tailwind CSS via CDN)
-    app.js                         # Chart.js visualizations and API integration
-    styles.css                     # Custom component styles
-  tests/                           # pytest suite for the backend
-  docs/
-    Phase2-Analysis.md             # Requirements analysis
-    Phase2-Documentation.md        # Source for the required Documentation PDF
-    reports/                       # Generated HTML overview report
-  review/                          # Independent audits of this project
-  staticwebapp.config.json         # Static Web App routing / headers config
-  deploy.sh                        # Azure CLI deployment script (7 steps)
-  requirements-dev.txt             # Test dependencies
-  pytest.ini                       # pytest configuration
-  .flake8                          # Lint configuration
-  UI-for-project2.html             # Provided UI skeleton (reference only)
-  README.md                        # This file
+├── README.md                              # This file -- index and entry point
+│
+├── backend/                               # Azure Function App (deployed unit)
+│   ├── function_app.py                    #   v2 programming model, 3 HTTP routes
+│   ├── nutrition.py                       #   Cleaning + aggregation, shared with Project 1
+│   ├── host.json                          #   Functions host config (route prefix "api")
+│   ├── requirements.txt                   #   Runtime dependencies
+│   ├── local.settings.json.example        #   Template -- copy to local.settings.json
+│   └── .funcignore                        #   Excluded from `func azure functionapp publish`
+│
+├── frontend/                              # Static Web App payload (deployed unit)
+│   ├── index.html                         #   Dashboard page, Tailwind via CDN
+│   ├── app.js                             #   Chart.js charts, fetch() integration, paging
+│   └── styles.css                         #   Component styles
+│
+├── tests/                                 # pytest suite (37 tests, run in CI)
+│   ├── test_function_app.py               #   HTTP handlers, paging, error paths, secrets
+│   ├── test_nutrition.py                  #   Cleaning and aggregation
+│   └── test_frontend_demo_data.py         #   Offline fallback matches Project 1 output
+│
+├── deploy.sh                              # Azure CLI provisioning + deploy, 7 idempotent steps
+├── teardown.sh                            # Deletes the resource group
+├── staticwebapp.config.json               # SWA routing + security headers
+├── pytest.ini / .flake8                   # Test and lint configuration
+├── requirements-dev.txt                   # Test dependencies
+│
+├── spec/                                  # Course-provided material -- read-only reference
+│   ├── phase2-requirements.docx           #   The Phase 2 brief and rubric
+│   ├── ui-skeleton.html                   #   Provided dashboard skeleton
+│   └── submission-requirements.md         #   Submission instructions for this phase
+│
+└── docs/
+    ├── phase2-analysis.md                 # Requirements analysis (what the brief asks for)
+    ├── phase2-documentation.md            # Architecture / services / workflow write-up
+    ├── phase2-deployment-walkthrough.html # Step-by-step runbook used for the deployment
+    ├── reports/
+    │   ├── project2-master-overview.html  #   Master report -- rubric, evidence, challenges
+    │   ├── project2-master-overview.pdf   #   Submission PDF, exported from the HTML above
+    │   ├── evidence-dashboard-print.pdf   #   Printed live dashboard (5 pages)
+    │   └── evidence-api-insights.pdf      #   Printed /api/insights JSON response (5 pages)
+    ├── screenshots/                       # All deployment evidence images (16 files)
+    │   ├── dashboard-full-page.png        #   Figure 1 -- whole dashboard, live
+    │   ├── dashboard-live.png             #   Live dashboard, above the fold
+    │   ├── portal-function-app.png        #   Figure 2 -- Function App + the 3 enabled functions
+    │   ├── portal-function-app-essentials.png
+    │   ├── portal-static-web-app.png      #   Figure 3 -- Static Web App, status Ready
+    │   ├── portal-static-web-app-essentials.png
+    │   ├── portal-resource-group.png      #   Resource group contents
+    │   ├── portal-storage-containers.png  #   Figure 5 -- containers, all Private
+    │   ├── portal-storage-container.png   #   datasets container with All_Diets.csv
+    │   ├── cli-resource-inventory.png     #   Figure 4 -- az resource list + app settings
+    │   ├── cli-cors-and-timing.png        #   Figure 7 -- CORS scope + timed API call
+    │   ├── api-insights-browser.png       #   Figure 6 -- /api/insights in the browser
+    │   ├── api-insights-response.png      #   /api/insights response body
+    │   ├── api-health-browser.png         #   /api/health response
+    │   ├── api-health-curl.png            #   /api/health via curl
+    │   └── api-recipes-response.png       #   /api/recipes response with paging fields
+    └── reviews/                           # Point-in-time audits, kept as a record
+        ├── gap-review-2026-10-02.md       #   Pre-deployment gap analysis (historical)
+        └── score-review-2026-10-02.md     #   Rubric scoring review (historical)
 ```
+
+Git-ignored, so not listed above: `backend/local.settings.json` (local secrets),
+`build/` (the frontend copy `deploy.sh` injects the live API URL into), `__pycache__/`
+and `.pytest_cache/`.
+
+### Where to start
+
+| If you want to... | Open |
+|---|---|
+| Grade the work against the rubric | [`docs/reports/project2-master-overview.html`](docs/reports/project2-master-overview.html), section 7 |
+| Read the architecture write-up | [`docs/phase2-documentation.md`](docs/phase2-documentation.md) |
+| See the deployment evidence | [`docs/screenshots/`](docs/screenshots/), cited as Figures 1-7 in the master overview |
+| Reproduce the deployment | [`deploy.sh`](deploy.sh), narrated in [`docs/phase2-deployment-walkthrough.html`](docs/phase2-deployment-walkthrough.html) |
+| Read the API code | [`backend/function_app.py`](backend/function_app.py) |
+| Read the dashboard code | [`frontend/app.js`](frontend/app.js) |
+
+### File naming conventions
+
+- **Code** keeps the conventions of its language: `snake_case.py`, `camelCase` inside
+  JavaScript, lowercase `index.html` / `app.js` / `styles.css`.
+- **Documents, reports and images** are lowercase `kebab-case` with no spaces, so they
+  stay safe in URLs, shell commands and `swa deploy` uploads.
+- **Screenshots** are named for what they show, prefixed by where the shot was taken:
+  `portal-*` (Azure Portal), `cli-*` (Azure CLI / Cloud Shell), `api-*` (an API
+  response), `dashboard-*` (the deployed dashboard). There are deliberately no numeric
+  prefixes: figure numbers belong to the documents that cite the images, so reordering
+  a report never forces a file rename.
+- **Point-in-time documents** carry an ISO date suffix, e.g. `gap-review-2026-10-02.md`.
+- One directory, one job: `backend/` and `frontend/` are the two deployed units,
+  `spec/` is read-only course material, `tests/` mirrors `backend/`, and everything the
+  team wrote about the project lives under `docs/`.
 
 ## API Endpoints
 
@@ -91,10 +174,11 @@ Every data response carries a `metadata` block with
 Invalid pagination parameters return `400`; an unknown `diet_type` returns `404`.
 Internal exception text is logged, never returned.
 
-In the sample payloads below, the field names and the dataset figures are real
-(verified against `All_Diets.csv`), but the `execution_time_seconds` values are
-illustrative placeholders -- nothing has been deployed yet, so no measured timings
-exist.
+The sample payloads below are abbreviated for readability. The field names and the
+dataset figures are real (verified against `All_Diets.csv`), and the
+`execution_time_seconds` values are representative of the deployed app: the live API
+reported 0.042 s warm and 0.51 s on a cold start on 2026-10-20
+(`docs/screenshots/cli-cors-and-timing.png`).
 
 ### `GET /api/health`
 

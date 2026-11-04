@@ -411,7 +411,7 @@ curl -s "$API_URL/api/recipes?page=1&limit=50" | python3 -c "import sys,json; d=
           <tr><td>9</td><td>分页 / diet 过滤生效的 JSON</td><td><code class="inline">$API_URL/api/recipes?diet_type=keto&page=1&limit=5</code></td></tr>
         </tbody>
       </table></div>
-      <p>存到 <code class="inline">Project2/docs/screenshots/</code>，名字就用 <code class="inline">01-resource-group.png</code> 这种顺序命名。</p>
+      <p>存到 <code class="inline">Project2/docs/screenshots/</code>，名字就用 <code class="inline">portal-resource-group.png</code> 这种顺序命名。</p>
       <div class="cmd"><button class="copy" type="button">复制</button><pre>mkdir -p ~/Desktop/claude-computing/Project2/docs/screenshots</pre></div>
     </div>
   </div>
@@ -457,15 +457,15 @@ grep -rn "&lt;function-app&gt;\|&lt;static-web-app&gt;" README.md docs/ | head -
     <div class="step-body">
       <p class="step-title">填九个截图占位，导出 PDF</p>
       <div class="cmd"><button class="copy" type="button">复制</button><pre>cd ~/Desktop/claude-computing/Project2
-grep -n "PENDING SCREENSHOT" docs/Phase2-Documentation.md</pre></div>
+grep -n "PENDING SCREENSHOT" docs/phase2-documentation.md</pre></div>
       <p>把每处 <code class="inline">[PENDING SCREENSHOT]</code> 换成 Markdown 图片引用，例如：</p>
-      <div class="cmd"><button class="copy" type="button">复制</button><pre>![图 1：资源组总览，2026-10-02 14:32](screenshots/01-resource-group.png)</pre></div>
+      <div class="cmd"><button class="copy" type="button">复制</button><pre>![图 1：资源组总览，2026-10-02 14:32](screenshots/portal-resource-group.png)</pre></div>
       <p>然后导出 PDF（任选一种）：</p>
       <div class="cmd"><button class="copy" type="button">复制</button><pre><span class="c"># 方式 A：VS Code 装 Markdown PDF 扩展，右键 Export (pdf)</span>
 
 <span class="c"># 方式 B：命令行（需要 pandoc 和 LaTeX）</span>
 sudo apt install -y pandoc texlive-xetex
-pandoc docs/Phase2-Documentation.md -o docs/Phase2-Documentation.pdf \
+pandoc docs/phase2-documentation.md -o docs/reports/phase2-documentation.pdf \
   --pdf-engine=xelatex -V CJKmainfont="Noto Sans CJK SC" -V geometry:margin=2cm</pre></div>
       <div class="note warn"><p>导完<b>翻一遍 PDF</b>：九张图都在、都看得清日期时间、没有任何密钥泄露。</p></div>
     </div>
@@ -477,7 +477,7 @@ pandoc docs/Phase2-Documentation.md -o docs/Phase2-Documentation.pdf \
       <p class="step-title">提交</p>
       <div class="cmd"><button class="copy" type="button">复制</button><pre>cd ~/Desktop/claude-computing
 git add Project2/docs/screenshots Project2/docs/*.pdf Project2/docs/api-evidence.txt \
-        Project2/README.md Project2/docs/Phase2-Documentation.md
+        Project2/README.md Project2/docs/phase2-documentation.md
 git commit -m "Add Phase 2 deployment evidence and the documentation PDF"
 git push</pre></div>
     </div>
@@ -541,7 +541,7 @@ git push</pre></div>
   </table></div>
 
   <div class="note expect">
-    <p><b>Phase 3 的手册在</b> <code class="inline">Project3/docs/deployment-walkthrough.html</code>，流程不一样（要先注册 GitHub OAuth App、用 Cosmos、还要录视频）。两个项目的资源组是分开的，互不影响，先做哪个都行 —— 但 Phase 2 更简单，建议先拿它热手。</p>
+    <p><b>Phase 3 的手册在</b> <code class="inline">Project3/docs/phase2-deployment-walkthrough.html</code>，流程不一样（要先注册 GitHub OAuth App、用 Cosmos、还要录视频）。两个项目的资源组是分开的，互不影响，先做哪个都行 —— 但 Phase 2 更简单，建议先拿它热手。</p>
   </div>
 </section>
 

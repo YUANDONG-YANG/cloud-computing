@@ -390,7 +390,7 @@ most strongly (+0.478). The diet-specific trade-offs visible in section 7.1 appe
 
 ### Figure 1 -- Azure portal: resource group overview
 
-![Figure 1: Azure portal resource group](screenshots/01-resource-group.png)
+![Figure 1: Azure portal resource group](screenshots/portal-resource-group.png)
 > **Capture:** the Azure portal **Overview** blade for the resource group
 > `cpsy300-nutritional-insights-rg`, with the resource list visible, showing the
 > storage account, the Function App, its App Service plan, Application Insights and
@@ -400,7 +400,7 @@ most strongly (+0.478). The diet-specific trade-offs visible in section 7.1 appe
 
 ### Figure 2 -- Azure portal: Function App overview
 
-![Figure 2: Azure portal Function App overview](screenshots/02-function-app.png)
+![Figure 2: Azure portal Function App overview](screenshots/portal-function-app-essentials.png)
 > **Capture:** the **Overview** blade of the Function App `cpsy300-nutrition-api`,
 > showing Status = Running, the default domain
 > (`cpsy300-nutrition-api.azurewebsites.net`), the runtime stack (Python 3.11), the
@@ -413,7 +413,7 @@ most strongly (+0.478). The diet-specific trade-offs visible in section 7.1 appe
 
 ### Figure 3 -- Azure portal: Storage container with the dataset blob
 
-![Figure 3: Azure portal storage containers](screenshots/03-storage-container.png)
+![Figure 3: Azure portal storage containers](screenshots/portal-storage-container.png)
 > **Capture:** the **Containers** view of the storage account
 > `cpsy300nutrition<random-hex>`, with the `datasets` container open, showing
 > `All_Diets.csv` with its size and last-modified timestamp, and the container's
@@ -423,7 +423,7 @@ most strongly (+0.478). The diet-specific trade-offs visible in section 7.1 appe
 
 ### Figure 4 -- Azure portal: Static Web App overview
 
-![Figure 4: Azure portal Static Web App overview](screenshots/04-static-web-app.png)
+![Figure 4: Azure portal Static Web App overview](screenshots/portal-static-web-app-essentials.png)
 > **Capture:** the **Overview** blade of the Static Web App
 > `cpsy300-nutrition-dashboard`, showing the default hostname (the public dashboard
 > URL), the Free SKU, and the region `eastus2`.
@@ -431,7 +431,7 @@ most strongly (+0.478). The diet-specific trade-offs visible in section 7.1 appe
 
 ### Figure 5 -- Browser: the live dashboard
 
-![Figure 5: Live Static Web App dashboard](screenshots/05-dashboard.png)
+![Figure 5: Live Static Web App dashboard](screenshots/dashboard-live.png)
 > **Capture:** a browser at the Static Web App URL with the dashboard fully loaded.
 > The **green "API Connected" pill** and the **execution-time badge** must be visible,
 > and the **offline banner must NOT be showing** -- that is the proof the page is
@@ -448,7 +448,7 @@ most strongly (+0.478). The diet-specific trade-offs visible in section 7.1 appe
 
 > The API response evidence was captured from Azure Cloud Shell because the local
 > browser extension blocked direct navigation to the Function host.
-![Figure 6: health endpoint response](screenshots/06-health-api.png)
+![Figure 6: health endpoint response](screenshots/api-health-browser.png)
 > **Capture:** Postman or a browser tab showing
 > `https://cpsy300-nutrition-api.azurewebsites.net/api/health` with the JSON response
 > body and the `200 OK` status.
@@ -457,7 +457,7 @@ most strongly (+0.478). The diet-specific trade-offs visible in section 7.1 appe
 
 ### Figure 7 -- `/api/insights` response
 
-![Figure 7: insights endpoint response](screenshots/07-insights-api.png)
+![Figure 7: insights endpoint response](screenshots/api-insights-response.png)
 > **Capture:** Postman or a browser tab showing
 > `https://cpsy300-nutrition-api.azurewebsites.net/api/insights`, with the response
 > body scrolled so that the `summary` and `metadata` blocks are both readable --
@@ -468,7 +468,7 @@ most strongly (+0.478). The diet-specific trade-offs visible in section 7.1 appe
 
 ### Figure 8 -- `/api/recipes` response with query parameters
 
-![Figure 8: recipes endpoint response](screenshots/08-recipes-api.png)
+![Figure 8: recipes endpoint response](screenshots/api-recipes-response.png)
 > **Capture:** Postman or a browser tab showing
 > `https://cpsy300-nutrition-api.azurewebsites.net/api/recipes?diet_type=keto&page=2&limit=50`,
 > with `count`, `total`, `page`, `limit` and `total_pages` visible in the response.
@@ -620,7 +620,7 @@ Static Web App is in East US 2 (`eastus2`), which is what Figures 1-4 show.
 | **Data Visualization** | 20 | Four distinct visualizations, all driven by the API response: grouped bar (average macros), doughnut (recipe distribution), CSS-grid heatmap (macronutrient intensity), scatter (protein vs carbs). Exceeds the required three. | **Code complete.** When the API is unreachable the charts render the real committed Project 1 results behind an explicit offline banner, not invented values. |
 | **Integration** | 20 | `app.js` calls `/api/health`, `/api/insights` and `/api/recipes` with `fetch()`; the endpoint is injected at build time; pagination and diet filtering are round-trips to the Function; `metadata.execution_time_seconds` is displayed; failures surface a prominent banner instead of silently substituting data. | **Deployed and evidenced** -- Figures 5-8 show the live dashboard and endpoint responses. |
 | **Cloud Practices** | 10 | Single resource group; all configuration and the one secret in Function App settings; private container with public blob access disabled; TLS 1.2 minimum; CORS scoped to the dashboard origin at the host level only; `local.settings.json` git-ignored with a committed `.example`; the connection string never printed; ETag-keyed caching and server-side paging; pytest suite. | **Implemented in code and script.** See section 8. |
-| **Documentation & Presentation** | 10 | This document (architecture diagram, service table, end-to-end data flow, API reference, methodology, findings, cloud practices, challenges), plus `../README.md` and `Phase2-Analysis.md`. | **Written and evidenced.** Figures 1-8 are embedded; the submission PDF is exported from the report HTML. |
+| **Documentation & Presentation** | 10 | This document (architecture diagram, service table, end-to-end data flow, API reference, methodology, findings, cloud practices, challenges), plus `../README.md` and `phase2-analysis.md`. | **Written and evidenced.** Figures 1-8 are embedded; the submission PDF is exported from the report HTML. |
 
 ### Deliverables (course document, section 7)
 

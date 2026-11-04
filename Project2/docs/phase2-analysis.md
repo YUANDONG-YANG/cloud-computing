@@ -65,12 +65,12 @@ Phase 2 builds on Phase 1 (local development). The goal is to **move the solutio
 complete and committed, and the system is **deployed to Azure**. The Function App is
 https://cpsy300-nutrition-api.azurewebsites.net and the dashboard is
 https://salmon-ocean-0ce94150f.4.azurestaticapps.net. Dated screenshots are in
-`docs/reports/Project2-Master-Overview.html` (Deployment Evidence) and
-`docs/Phase2-Documentation.md` (section 9).
+`docs/reports/project2-master-overview.html` (Deployment Evidence) and
+`docs/phase2-documentation.md` (section 9).
 
 ---
 
-## 6. UI Reference (from UI-for-project2.html)
+## 6. UI Reference (from spec/ui-skeleton.html)
 
 The provided UI skeleton includes:
 - **4 chart slots:** Bar Chart, Scatter Plot, Heatmap, Pie Chart

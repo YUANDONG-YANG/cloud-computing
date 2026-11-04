@@ -135,14 +135,14 @@ from the Windows host. The repo moved under this session twice today, once mid-t
 
 Consequences already observed:
 
-- `Project2/review/score-review-2026-10-02.md` is **stale**. All three blockers it reports were fixed
+- `Project2/docs/reviews/score-review-2026-10-02.md` is **stale**. All three blockers it reports were fixed
   by the VM session: the broken `sed` is gone (replaced by an `__FUNCTION_API_URL__` placeholder
   substituted at build time), the silent demo fallback is now an explicit `setOfflineBanner()`, and
   every fabricated `DEMO_DATA` value was replaced with the real Project 1 results (verified against
   `Project1/docs/results/` -- all now match). Anyone reading that doc may go fix what is already
   fixed.
 - What remains open for Phase 2 is unchanged and unrelated to code: no real deployment, no evidence,
-  and `Project2-Master-Overview.html` still marks all six rubric categories "Done" while describing a
+  and `project2-master-overview.html` still marks all six rubric categories "Done" while describing a
   system that does not exist (v1 function model, an `/api/clusters` endpoint, server-side pagination,
   Azure CI/CD, scoped CORS).
 
