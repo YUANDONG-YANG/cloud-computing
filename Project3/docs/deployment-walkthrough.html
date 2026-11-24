@@ -336,7 +336,7 @@ echo "${GITHUB_CLIENT_ID:+ok} ${GITHUB_CLIENT_SECRET:+ok}"</pre></div>
 export COSMOS_ACCOUNT=cpsy300-p3-cosmos-yy
 export RESOURCE_GROUP=cpsy300-project3-rg
 
-cd ~/Desktop/claude-computing/Project3
+cd ~/Desktop/cloud-computing/Project3
 chmod +x deploy.sh teardown.sh
 ./deploy.sh</pre></div>
       <div class="note expect">
@@ -420,7 +420,7 @@ curl -s $FUNC_URL/api/health | python3 -m json.tool</pre></div>
     <input type="checkbox" id="s10" />
     <div class="step-body">
       <p class="step-title">证据一：401 和健康状态（命令行，直接存文本）</p>
-      <div class="cmd"><button class="copy" type="button">复制</button><pre>cd ~/Desktop/claude-computing/Project3
+      <div class="cmd"><button class="copy" type="button">复制</button><pre>cd ~/Desktop/cloud-computing/Project3
 
 curl -i $FUNC_URL/api/insights | tee docs/evidence/401-anonymous.txt
 curl -s $FUNC_URL/api/health | python3 -m json.tool | tee docs/evidence/health.json</pre></div>
@@ -538,7 +538,7 @@ az storage blob upload \
     <input type="checkbox" id="s17" />
     <div class="step-body">
       <p class="step-title">录完立刻执行</p>
-      <div class="cmd"><button class="copy" type="button">复制</button><pre>cd ~/Desktop/claude-computing/Project3
+      <div class="cmd"><button class="copy" type="button">复制</button><pre>cd ~/Desktop/cloud-computing/Project3
 ./teardown.sh</pre></div>
       <p>它会先把要删的东西列出来让你确认。不可撤销：Cosmos 里的数据、注册的用户、上传的 blob 全都跟着消失。重跑 <code class="inline">deploy.sh</code> 能重建资源，但重建不回内容 —— 所以<b>先确认证据截图都已经存好并提交了</b>。</p>
       <div class="note warn"><p>如果 <code class="inline">RESOURCE_GROUP</code> 你改过名字，跑 teardown 时要用同一个值 <code class="inline">export</code> 一遍，否则它会去删默认名字的那个组（不存在），然后告诉你没东西可删，而你的资源还在计费。</p></div>
