@@ -22,6 +22,18 @@ class User:
     )
     last_login: str = ""
 
+    @staticmethod
+    def id_for_email(email: str) -> str:
+        """Document id for a new account with this (normalized) email.
+
+        Deriving the id from the email makes "one account per email" a
+        property of the store: Cosmos DB ids are unique within a partition,
+        and the partition key is the email, so two concurrent registrations
+        for one address produce the same id and only one create succeeds.
+        A random id let both succeed as separate documents.
+        """
+        return str(uuid.uuid5(uuid.NAMESPACE_URL, "mailto:" + email))
+
     def to_dict(self) -> dict:
         """Serialize for Cosmos DB storage."""
         d = asdict(self)

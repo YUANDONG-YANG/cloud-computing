@@ -14,6 +14,8 @@ import io
 import json
 import logging
 import os
+import secrets
+import threading
 from urllib.parse import quote
 import time
 from datetime import datetime, timezone
@@ -36,6 +38,7 @@ from cache import (
     get_cache_status,
 )
 from models import User, validate_registration, validate_login
+from ratelimit import SlidingWindowLimiter, client_ip
 
 app = func.FunctionApp()
 logger = logging.getLogger(__name__)
@@ -43,32 +46,60 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Cosmos DB users container (lazy init)
 # ---------------------------------------------------------------------------
+#
+# Two situations used to look the same here and must not:
+#
+#   * Cosmos is *not configured* (no COSMOS_ENDPOINT / COSMOS_KEY).  That is
+#     local development, and the in-memory store is the intended store.
+#   * Cosmos *is configured* but cannot be reached.  Then there is no durable
+#     store, and pretending otherwise registers accounts that exist in one
+#     process only and vanish on restart or on the next instance.  The auth
+#     handlers fail closed with a 503 instead.
+
+
+class UserStoreUnavailable(Exception):
+    """Cosmos DB is configured for users but cannot be used right now."""
+
+
+# A failed initialization is retried after this many seconds.  Retrying on
+# every request would make each one pay the connect timeout; never retrying
+# (the old behaviour) turned one transient failure into an outage for the
+# life of the process.
+_USERS_RETRY_SECONDS = 30
 
 _users_container = None
-_users_tried = False
+_users_failed_at = None       # time.monotonic() of the last failed init
+_users_unconfigured_logged = False
+
+
+def _cosmos_users_configured() -> bool:
+    return bool(os.environ.get("COSMOS_ENDPOINT", "").strip()
+                and os.environ.get("COSMOS_KEY", "").strip())
 
 
 def _get_users():
-    """Get or initialize the Cosmos DB users container.
+    """Return the Cosmos DB users container, or None for local development.
 
-    A failed or absent configuration is remembered, matching `cache.py`:
-    without that, every lookup and every save pays the connect timeout again
-    and a single login can stall for tens of seconds.
+    Returns None only when Cosmos is not configured at all.  Raises
+    UserStoreUnavailable when it is configured but initialization failed.
     """
-    global _users_container, _users_tried
+    global _users_container, _users_failed_at, _users_unconfigured_logged
     if _users_container is not None:
         return _users_container
-    if _users_tried:
+    if not _cosmos_users_configured():
+        if not _users_unconfigured_logged:
+            logger.warning("Cosmos DB not configured, using in-memory users")
+            _users_unconfigured_logged = True
         return None
-    _users_tried = True
+
+    now = time.monotonic()
+    if (_users_failed_at is not None
+            and now - _users_failed_at < _USERS_RETRY_SECONDS):
+        raise UserStoreUnavailable("Cosmos DB users container unavailable")
     try:
         from azure.cosmos import CosmosClient, PartitionKey
-        endpoint = os.environ.get("COSMOS_ENDPOINT", "")
-        key = os.environ.get("COSMOS_KEY", "")
-        if not endpoint or not key:
-            logger.warning("Cosmos DB not configured, using in-memory users")
-            return None
-        client = CosmosClient(endpoint, credential=key)
+        client = CosmosClient(os.environ["COSMOS_ENDPOINT"].strip(),
+                              credential=os.environ["COSMOS_KEY"].strip())
         db = client.create_database_if_not_exists(
             os.environ.get("COSMOS_DATABASE", "nutritiondb")
         )
@@ -76,77 +107,133 @@ def _get_users():
             id=os.environ.get("COSMOS_USERS_CONTAINER", "users"),
             partition_key=PartitionKey(path="/partitionKey"),
         )
+        _users_failed_at = None
         return _users_container
     except Exception as exc:
-        logger.warning("Cosmos DB users unavailable: %s", exc)
-        return None
+        _users_failed_at = now
+        logger.error("Cosmos DB users container unavailable: %s", exc)
+        raise UserStoreUnavailable(str(exc)) from exc
 
 
-# In-memory user store for local dev when Cosmos is not available
+# In-memory user store, used only when Cosmos is not configured (local dev).
 _memory_users: dict = {}
+_memory_lock = threading.Lock()
 
 
 def _find_user_by_email(email: str):
-    """Look up a user by email in Cosmos DB or the memory fallback."""
+    """Look up a user by email.
+
+    Raises UserStoreUnavailable when Cosmos is configured but the lookup
+    cannot be answered: "unknown" must not be reported as "no such user",
+    or registration would create a second account for an existing address.
+    """
     container = _get_users()
-    if container:
-        try:
-            items = list(container.query_items(
-                query="SELECT * FROM c WHERE c.email = @email",
-                parameters=[{"name": "@email", "value": email}],
-                partition_key=email,
-            ))
-            if items:
-                return User.from_dict(items[0])
-        except Exception as exc:
-            logger.warning("User lookup failed: %s", exc)
-    return _memory_users.get(email)
+    if container is None:
+        return _memory_users.get(email)
+    try:
+        items = list(container.query_items(
+            query="SELECT * FROM c WHERE c.email = @email",
+            parameters=[{"name": "@email", "value": email}],
+            partition_key=email,
+        ))
+    except Exception as exc:
+        logger.error("User lookup failed: %s", exc)
+        raise UserStoreUnavailable(str(exc)) from exc
+    if not items:
+        return None
+    if len(items) > 1:
+        # Possible only for documents written before ids were derived from
+        # the email.  Pick the oldest deterministically: it is the original
+        # owner of the address.
+        logger.warning("%d user documents share one email; using the oldest",
+                       len(items))
+        items.sort(key=lambda d: (d.get("created_at", ""), d.get("id", "")))
+    return User.from_dict(items[0])
 
 
 def _find_user_by_provider(provider: str, provider_id: str):
-    """Look up a user by OAuth provider + provider_id."""
+    """Look up a user by OAuth provider + provider_id.
+
+    Raises UserStoreUnavailable when Cosmos is configured but unreachable.
+    """
     container = _get_users()
-    if container:
-        try:
-            items = list(container.query_items(
-                query="SELECT * FROM c WHERE c.provider = @p AND c.provider_id = @pid",
-                parameters=[
-                    {"name": "@p", "value": provider},
-                    {"name": "@pid", "value": provider_id},
-                ],
-                enable_cross_partition_query=True,
-            ))
-            if items:
-                return User.from_dict(items[0])
-        except Exception as exc:
-            logger.warning("OAuth user lookup failed: %s", exc)
-    for u in _memory_users.values():
-        if u.provider == provider and u.provider_id == provider_id:
-            return u
-    return None
+    if container is None:
+        for u in list(_memory_users.values()):
+            if u.provider == provider and u.provider_id == provider_id:
+                return u
+        return None
+    try:
+        items = list(container.query_items(
+            query="SELECT * FROM c WHERE c.provider = @p AND c.provider_id = @pid",
+            parameters=[
+                {"name": "@p", "value": provider},
+                {"name": "@pid", "value": provider_id},
+            ],
+            enable_cross_partition_query=True,
+        ))
+    except Exception as exc:
+        logger.error("OAuth user lookup failed: %s", exc)
+        raise UserStoreUnavailable(str(exc)) from exc
+    if not items:
+        return None
+    items.sort(key=lambda d: (d.get("created_at", ""), d.get("id", "")))
+    return User.from_dict(items[0])
 
 
 def _save_user(user: User) -> bool:
-    """Persist a user. Returns False only when a durable write was attempted
-    and failed.
+    """Update an existing user.  Returns False when the write did not happen.
 
-    With Cosmos unconfigured the memory store is the intended local-development
-    path, so that returns True. When Cosmos *is* configured but the upsert
-    fails, the caller must not report success: the user would exist on this
-    instance alone, and a later login routed elsewhere would be told the
-    password is wrong.
+    Nothing is written to memory when Cosmos is configured: a copy that
+    exists on this instance alone would make the outcome depend on which
+    instance serves the next request.
     """
-    container = _get_users()
-    if container:
-        try:
-            container.upsert_item(user.to_dict())
-            return True
-        except Exception as exc:
-            logger.error("Durable user save failed for %s: %s", user.email, exc)
+    try:
+        container = _get_users()
+    except UserStoreUnavailable:
+        return False
+    if container is None:
+        with _memory_lock:
             _memory_users[user.email] = user
-            return False
-    _memory_users[user.email] = user
-    return True
+        return True
+    try:
+        container.upsert_item(user.to_dict())
+        return True
+    except Exception as exc:
+        logger.error("Durable user save failed for %s: %s", user.email, exc)
+        return False
+
+
+USER_CREATED = "created"
+USER_EXISTS = "exists"
+USER_STORE_DOWN = "unavailable"
+
+
+def _create_user(user: User) -> str:
+    """Create a new user only if no account holds the id/email yet.
+
+    Returns USER_CREATED, USER_EXISTS (another request won the race), or
+    USER_STORE_DOWN.  The check and the write are one atomic operation in
+    the store, unlike a lookup followed by an upsert.
+    """
+    try:
+        container = _get_users()
+    except UserStoreUnavailable:
+        return USER_STORE_DOWN
+    if container is None:
+        with _memory_lock:
+            if user.email in _memory_users:
+                return USER_EXISTS
+            _memory_users[user.email] = user
+        return USER_CREATED
+    from azure.cosmos.exceptions import CosmosResourceExistsError
+    try:
+        container.create_item(user.to_dict())
+        return USER_CREATED
+    except CosmosResourceExistsError:
+        return USER_EXISTS
+    except Exception as exc:
+        logger.error("Durable user create failed for %s: %s", user.email, exc)
+        return USER_STORE_DOWN
 
 
 def _cors_headers():
@@ -492,16 +579,24 @@ def health_check(req: func.HttpRequest) -> func.HttpResponse:
     if req.method == "OPTIONS":
         return func.HttpResponse(status_code=204, headers=_cors_headers())
 
-    using_cosmos = _get_users() is not None
+    try:
+        using_cosmos = _get_users() is not None
+        user_store = "Cosmos DB" if using_cosmos else "in-memory (dev)"
+        users_ok = True
+    except UserStoreUnavailable:
+        # Configured but unreachable: accounts cannot be created or checked.
+        using_cosmos = True
+        user_store = "Cosmos DB (unavailable)"
+        users_ok = False
     return _json_response({
-        "status": "healthy",
+        "status": "healthy" if users_ok else "degraded",
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "cache": get_cache_status(),
         "security": {
             # Reported from live configuration so the dashboard displays what
             # is actually in effect instead of a hardcoded claim.
             "password_hashing": "bcrypt (12 rounds)",
-            "user_store": "Cosmos DB" if using_cosmos else "in-memory (dev)",
+            "user_store": user_store,
             "encryption_at_rest": (
                 "AES-256 (Cosmos DB, service-managed)" if using_cosmos
                 else "not applicable -- no database configured"
@@ -511,6 +606,52 @@ def health_check(req: func.HttpRequest) -> func.HttpResponse:
         "version": "3.0.0",
         "phase": "Phase 3 - Improved Cloud Dashboard",
     })
+
+
+# ===================================================================
+# AUTH: Throttling shared by registration and login
+# ===================================================================
+#
+# Both endpoints are anonymous and both run bcrypt, so each request costs
+# real CPU and each login is a password guess.  Limits are per worker
+# process (see ratelimit.py for what that does and does not cover).
+
+# Any login attempt from one address.
+_login_ip_limiter = SlidingWindowLimiter(limit=20, window=300)
+# Account creations from one address.
+_register_ip_limiter = SlidingWindowLimiter(limit=10, window=3600)
+# Wrong passwords for one account, whatever address they come from.  Cleared
+# by a successful login.
+_login_failure_limiter = SlidingWindowLimiter(limit=5, window=900)
+
+_STORE_DOWN_MSG = "Accounts are temporarily unavailable. Please try again in a moment."
+
+
+def _too_many(retry_after: float) -> func.HttpResponse:
+    seconds = max(1, int(retry_after + 0.999))
+    return func.HttpResponse(
+        body=json.dumps({"error": "Too many attempts. Please try again later.",
+                         "retry_after": seconds}),
+        status_code=429,
+        mimetype="application/json",
+        headers={**_cors_headers(), "Retry-After": str(seconds)},
+    )
+
+
+# A 12-round bcrypt hash of a random value nobody knows, made once at import
+# (one bcrypt round trip of cold start) rather than on first use, so that
+# the first unknown-email login on an instance is not slower than the rest.
+_DUMMY_HASH = hash_password(secrets.token_hex(16))
+
+
+def _burn_password_check(password: str) -> None:
+    """Spend one bcrypt verification on nothing.
+
+    Run when there is no hash to check, so an unknown email takes as long to
+    reject as a wrong password and response time does not reveal which
+    addresses have accounts.
+    """
+    verify_password(password, _DUMMY_HASH)
 
 
 # ===================================================================
@@ -526,6 +667,10 @@ def register(req: func.HttpRequest) -> func.HttpResponse:
     if req.method == "OPTIONS":
         return func.HttpResponse(status_code=204, headers=_cors_headers())
 
+    wait = _register_ip_limiter.hit(client_ip(req.headers))
+    if wait:
+        return _too_many(wait)
+
     try:
         body = req.get_json()
     except ValueError:
@@ -539,20 +684,26 @@ def register(req: func.HttpRequest) -> func.HttpResponse:
     name = body["name"].strip()
     password = body["password"]
 
-    # Check if user already exists
-    existing = _find_user_by_email(email)
-    if existing:
-        return _error("An account with this email already exists.", 409)
+    # Fast path for the common case; the create below is what actually
+    # guarantees one account per email.
+    try:
+        if _find_user_by_email(email):
+            return _error("An account with this email already exists.", 409)
+    except UserStoreUnavailable:
+        return _error(_STORE_DOWN_MSG, 503)
 
-    # Create user with bcrypt-hashed password
     user = User(
+        id=User.id_for_email(email),
         email=email,
         name=name,
         password_hash=hash_password(password),
         provider="local",
         last_login=datetime.now(timezone.utc).isoformat(),
     )
-    if not _save_user(user):
+    outcome = _create_user(user)
+    if outcome == USER_EXISTS:
+        return _error("An account with this email already exists.", 409)
+    if outcome != USER_CREATED:
         return _error(
             "Your account could not be saved. Please try again in a moment.",
             503,
@@ -577,6 +728,10 @@ def login(req: func.HttpRequest) -> func.HttpResponse:
     if req.method == "OPTIONS":
         return func.HttpResponse(status_code=204, headers=_cors_headers())
 
+    wait = _login_ip_limiter.hit(client_ip(req.headers))
+    if wait:
+        return _too_many(wait)
+
     try:
         body = req.get_json()
     except ValueError:
@@ -589,14 +744,29 @@ def login(req: func.HttpRequest) -> func.HttpResponse:
     email = body["email"].strip().lower()
     password = body["password"]
 
-    user = _find_user_by_email(email)
-    if not user:
+    # Checked before bcrypt runs, so a locked account costs no hashing.
+    wait = _login_failure_limiter.retry_after(email)
+    if wait:
+        return _too_many(wait)
+
+    try:
+        user = _find_user_by_email(email)
+    except UserStoreUnavailable:
+        return _error(_STORE_DOWN_MSG, 503)
+
+    if not user or not user.password_hash:
+        # No account, or an OAuth-only account with no password to check.
+        _burn_password_check(password)
+        _login_failure_limiter.record(email)
         return _error("Invalid email or password.", 401)
 
     if not verify_password(password, user.password_hash):
+        _login_failure_limiter.record(email)
         return _error("Invalid email or password.", 401)
 
-    # Update last login
+    _login_failure_limiter.reset(email)
+
+    # Update last login (best effort: the password was already verified).
     user.last_login = datetime.now(timezone.utc).isoformat()
     _save_user(user)
 
@@ -763,43 +933,64 @@ def _handle_oauth_user(info: dict) -> func.HttpResponse:
     """Create or find an OAuth user and return a JWT in a redirect."""
     provider = info["provider"]
     provider_id = info["provider_id"]
-    email = info.get("email", "")
+    # Normalized the same way registration and login normalize it, so one
+    # address maps to one account (and one derived document id).
+    email = (info.get("email") or "").strip().lower()
     name = info.get("name", "")
-
-    # Check if user exists by provider + provider_id
-    user = _find_user_by_provider(provider, provider_id)
 
     # Only an email the provider says it verified may claim an existing
     # account; otherwise anyone able to set an unverified address at the
     # provider could take over that account.
     verified_email = bool(email) and bool(info.get("email_verified"))
-    if not user and verified_email:
-        user = _find_user_by_email(email)
-        if user:
-            # Record the provider too, not just its subject id: the
-            # provider+provider_id lookup above is how this account is found
-            # next time, and it only matches when both agree.
-            user.provider = provider
-            user.provider_id = provider_id
-            user.last_login = datetime.now(timezone.utc).isoformat()
-            _save_user(user)
 
-    if not user:
-        # An address the provider would not vouch for must not become this
-        # account's identity either.  Users are keyed by email, so reusing an
-        # unverified address that already belongs to someone would overwrite
-        # their account -- clearing its password hash and locking them out --
-        # which is the same takeover the check above refuses.
-        user = User(
-            email=email if verified_email
-            else f"{provider}_{provider_id}@oauth.local",
-            name=name or "OAuth User",
-            provider=provider,
-            provider_id=provider_id,
-            last_login=datetime.now(timezone.utc).isoformat(),
-        )
-        if not _save_user(user):
-            return _oauth_error("account_not_saved")
+    def link(account: User) -> None:
+        # Record the provider too, not just its subject id: the
+        # provider+provider_id lookup is how this account is found next
+        # time, and it only matches when both agree.
+        account.provider = provider
+        account.provider_id = provider_id
+        account.last_login = datetime.now(timezone.utc).isoformat()
+        _save_user(account)
+
+    try:
+        user = _find_user_by_provider(provider, provider_id)
+        if not user and verified_email:
+            user = _find_user_by_email(email)
+            if user:
+                link(user)
+
+        if not user:
+            # An address the provider would not vouch for must not become
+            # this account's identity either.  Users are keyed by email, so
+            # reusing an unverified address that already belongs to someone
+            # would overwrite their account -- clearing its password hash and
+            # locking them out -- which is the same takeover refused above.
+            address = (email if verified_email
+                       else f"{provider}_{provider_id}@oauth.local")
+            candidate = User(
+                id=User.id_for_email(address),
+                email=address,
+                name=name or "OAuth User",
+                provider=provider,
+                provider_id=provider_id,
+                last_login=datetime.now(timezone.utc).isoformat(),
+            )
+            outcome = _create_user(candidate)
+            if outcome == USER_CREATED:
+                user = candidate
+            elif outcome == USER_EXISTS:
+                # A concurrent sign-in or registration created it first.
+                # The address is either verified or this provider identity's
+                # own synthetic one, so the winner may be used.
+                user = _find_user_by_email(address)
+                if user is None:
+                    return _oauth_error("account_not_saved")
+                if verified_email:
+                    link(user)
+            else:
+                return _oauth_error("account_not_saved")
+    except UserStoreUnavailable:
+        return _oauth_error("account_not_saved")
 
     token = create_token(user.id, user.email, user.name)
     frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:8080")
