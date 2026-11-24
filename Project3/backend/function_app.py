@@ -258,14 +258,21 @@ def _create_user(user: User) -> str:
 
 
 def _cors_headers():
-    """Standard CORS headers for all responses."""
-    frontend = os.environ.get("FRONTEND_URL", "*")
-    return {
-        "Access-Control-Allow-Origin": frontend,
+    """CORS headers for local runs and responses not handled by the host.
+
+    Azure Functions intercepts browser preflight requests before the Python
+    handler runs. In Azure, its CORS configuration owns Allow-Origin; omitting
+    that header here avoids sending two copies on normal responses. Local runs
+    have no platform layer, so they keep the application-provided origin.
+    """
+    headers = {
         "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type, Authorization",
         "Access-Control-Max-Age": "86400",
     }
+    if os.environ.get("CORS_PLATFORM_MANAGED", "false").lower() != "true":
+        headers["Access-Control-Allow-Origin"] = os.environ.get("FRONTEND_URL", "*")
+    return headers
 
 
 def _json_response(data, status=200):

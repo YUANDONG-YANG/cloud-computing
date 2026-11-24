@@ -55,6 +55,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 #   STORAGE_ACCOUNT=cpsy300p3storage2 FUNCTION_APP=cpsy300-p3-func2 ./deploy.sh
 RESOURCE_GROUP="${RESOURCE_GROUP:-cpsy300-project3-rg}"
 LOCATION="${LOCATION:-canadacentral}"
+COSMOS_LOCATION="${COSMOS_LOCATION:-$LOCATION}"
 STORAGE_ACCOUNT="${STORAGE_ACCOUNT:-cpsy300p3storage}"
 FUNCTION_APP="${FUNCTION_APP:-cpsy300-p3-functions}"
 COSMOS_ACCOUNT="${COSMOS_ACCOUNT:-cpsy300-p3-cosmos}"
@@ -123,7 +124,7 @@ echo "[2/6] Creating storage account..."
 # say what is actually wrong.
 if ! az storage account show --name "$STORAGE_ACCOUNT" \
        --resource-group "$RESOURCE_GROUP" --output none 2>/dev/null; then
-  if [[ "$(az storage account check-name-availability --name "$STORAGE_ACCOUNT" \
+  if [[ "$(az storage account check-name --name "$STORAGE_ACCOUNT" \
             --query nameAvailable -o tsv)" != "true" ]]; then
     echo "ERROR: the storage account name '$STORAGE_ACCOUNT' is already taken" >&2
     echo "       by another Azure subscription. Names are globally unique." >&2
@@ -162,7 +163,7 @@ echo "[3/6] Creating Cosmos DB account, serverless (a few minutes)..."
 az cosmosdb create \
   --name "$COSMOS_ACCOUNT" \
   --resource-group "$RESOURCE_GROUP" \
-  --locations regionName="$LOCATION" failoverPriority=0 \
+  --locations regionName="$COSMOS_LOCATION" failoverPriority=0 \
   --default-consistency-level Session \
   --capabilities EnableServerless \
   --output none
@@ -307,7 +308,8 @@ az functionapp config appsettings set \
     "GOOGLE_REDIRECT_URI=https://$FUNCTION_APP.azurewebsites.net/api/auth/oauth/google/callback" \
   --output none
 
-# Deploy function code.
+# Deploy function code.  Explicit --python is required by Core Tools 4.16 for
+# Python v2 model projects that it does not infer from the file layout.
 # --build remote: pandas and numpy are compiled packages, so they have to be
 # built on a Linux worker matching the Function App rather than shipped from
 # this machine. Remote build is the default for Linux Consumption, but stating
@@ -315,7 +317,7 @@ az functionapp config appsettings set \
 # A subshell keeps the directory change local -- a bare `cd ..` would leave the
 # script in the wrong place if anything between the two lines exited early.
 echo "    Deploying function code..."
-( cd backend && func azure functionapp publish "$FUNCTION_APP" --build remote )
+( cd backend && func azure functionapp publish "$FUNCTION_APP" --python --build remote )
 
 # ---- 5. Deploy frontend ----
 # Done before the dataset upload so FRONTEND_URL is known: the OAuth callback
@@ -324,6 +326,7 @@ echo "    Deploying function code..."
 echo "[5/6] Deploying frontend to storage static website..."
 az storage blob service-properties update \
   --account-name "$STORAGE_ACCOUNT" \
+  --connection-string "$STORAGE_CONN" \
   --static-website \
   --index-document index.html \
   --404-document login.html \
@@ -337,7 +340,8 @@ FUNCTION_API_BASE="https://${FUNCTION_APP}.azurewebsites.net/api"
 STAGING_DIR=$(mktemp -d)
 cleanup_add "$STAGING_DIR"
 cp -R frontend/. "$STAGING_DIR"/
-sed -i "s|__API_BASE__|${FUNCTION_API_BASE}|g" "$STAGING_DIR/config.js"
+python3 -c 'import pathlib, sys; p = pathlib.Path(sys.argv[1]); p.write_text(p.read_text().replace("__API_BASE__", sys.argv[2]))' \
+  "$STAGING_DIR/config.js" "$FUNCTION_API_BASE"
 grep -q "$FUNCTION_API_BASE" "$STAGING_DIR/config.js" || {
   echo "ERROR: could not set the API base in config.js; the dashboard would" >&2
   echo "       call the storage domain and every request would 404." >&2
@@ -349,6 +353,7 @@ az storage blob upload-batch \
   --source "$STAGING_DIR" \
   --destination '$web' \
   --account-name "$STORAGE_ACCOUNT" \
+  --connection-string "$STORAGE_CONN" \
   --overwrite true \
   --output none
 
@@ -357,30 +362,25 @@ FRONTEND_URL=$(az storage account show \
   --resource-group "$RESOURCE_GROUP" \
   --query primaryEndpoints.web -o tsv)
 
-# Platform CORS is deliberately NOT configured here.
-#
-# Azure Functions platform CORS and the application are two independent layers.
-# function_app.py already emits a complete set of headers on every response --
-# _cors_headers() supplies Allow-Origin (from FRONTEND_URL), Allow-Methods,
-# Allow-Headers including Authorization, and Max-Age, and all fifteen response
-# paths go through it, including the OPTIONS pre-flight branch on every route
-# and the 401 from the auth gate. Adding `az functionapp cors add` on top makes
-# the infrastructure inject the same headers again, and a response carrying
-# Access-Control-Allow-Origin twice is rejected by every browser with "contains
-# multiple values ... but only one is allowed". That breaks every data call from
-# the deployed dashboard while working perfectly under `func start`, which has
-# no platform layer -- precisely the kind of fault that only appears in the
-# cloud. One owner only, and the app is the owner.
-#
-# This makes the FRONTEND_URL setting below load-bearing: it is the origin the
-# app echoes. Unset, _cors_headers() falls back to "*", which still works here
-# because authentication rides in an Authorization header rather than a cookie,
-# but the exact origin is the correct configuration.
+# The Functions host intercepts browser preflight requests before the Python
+# handler runs, so its CORS layer must allow the static website origin. The app
+# omits Access-Control-Allow-Origin in Azure when CORS_PLATFORM_MANAGED is true,
+# avoiding duplicate headers on ordinary API responses. Local runs keep the
+# app-provided header because they have no platform CORS layer.
 az functionapp config appsettings set \
   --name "$FUNCTION_APP" \
   --resource-group "$RESOURCE_GROUP" \
-  --settings "FRONTEND_URL=${FRONTEND_URL%/}" \
+  --settings "FRONTEND_URL=${FRONTEND_URL%/}" "CORS_PLATFORM_MANAGED=true" \
   --output none
+az functionapp cors add \
+  --name "$FUNCTION_APP" \
+  --resource-group "$RESOURCE_GROUP" \
+  --allowed-origins "${FRONTEND_URL%/}" \
+  --output none
+az functionapp restart \
+  --name "$FUNCTION_APP" \
+  --resource-group "$RESOURCE_GROUP" \
+  --only-show-errors
 
 # ---- 6. Upload the dataset, which fires the blob trigger ----
 echo "[6/6] Uploading initial dataset..."

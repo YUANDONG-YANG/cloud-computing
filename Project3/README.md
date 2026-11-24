@@ -191,7 +191,7 @@ have a `null` origin, which CORS rejects.
 
 ### Tests
 
-The backend has a 143-test suite covering cleaning and aggregation, password
+The backend has a 181-test suite covering cleaning and aggregation, password
 hashing, token and OAuth-state handling, validation, and the cache layer
 (including the chunked Cosmos path with no Cosmos account present). No Azure
 resources are needed to run it.
@@ -298,15 +298,19 @@ Consumption plan. It then publishes the function code, uploads the frontend to
 the static website, sets `FRONTEND_URL`, and finally uploads `All_Diets.csv` to
 `raw-data` to fire the blob trigger.
 
-It deliberately does **not** run `az functionapp cors add`. The application
-emits the full set of CORS headers itself from `_cors_headers()`, on every
-response path including the `OPTIONS` pre-flight and the 401 from the auth gate.
-Configuring CORS at the platform layer as well would make both emit
-`Access-Control-Allow-Origin`, and a response carrying that header twice is
-rejected by every browser. That makes the `FRONTEND_URL` app setting
-load-bearing: it is the origin the application echoes, and if it is unset the
-header falls back to `*`. It generates a random `JWT_SECRET` and
-sets `ENABLE_DEMO_FALLBACK=false`.
+`LOCATION` defaults to `canadacentral`. Set `COSMOS_LOCATION` separately when
+the subscription cannot create Cosmos DB in that region; the storage account
+and Function App remain in `LOCATION`.
+
+CORS has one owner per environment. In Azure the Functions host answers the
+browser's `OPTIONS` pre-flight before the Python handler runs, so the script
+runs `az functionapp cors add` for the static website origin and sets
+`CORS_PLATFORM_MANAGED=true`. With that setting `_cors_headers()` leaves
+`Access-Control-Allow-Origin` to the platform, because a response carrying that
+header twice is rejected by every browser. Under `func start` there is no
+platform layer, so the application emits the header itself from `FRONTEND_URL`,
+falling back to `*` when it is unset. The script also generates a random
+`JWT_SECRET` and sets `ENABLE_DEMO_FALLBACK=false`.
 
 No Redis is provisioned. Azure Cache for Redis has no free tier, and the code
 only uses Redis when `REDIS_HOST` is set.

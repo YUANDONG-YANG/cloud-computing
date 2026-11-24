@@ -67,8 +67,8 @@ footer{text-align:center;padding:2rem 1rem;color:var(--mute);font-size:.85rem;bo
   </p>
   <p class="sub" style="margin-top:.6rem">
     <strong>Document status:</strong>
-    <span class="pill warn">Code complete &middot; not deployed</span>
-    <span class="pill bad">No deployment evidence captured</span>
+    <span class="pill ok">Deployed &middot; smoke-tested 2026-11-24</span>
+    <span class="pill warn">Deployment smoke recorded; rubric screenshots pending</span>
     <span class="pill ok">181 backend tests passing</span>
     <span class="pill bad">Demo video not recorded</span>
   </p>
@@ -79,13 +79,11 @@ footer{text-align:center;padding:2rem 1rem;color:var(--mute);font-size:.85rem;bo
 <!-- ============================================================ -->
 <div class="find">
   <h3 style="margin-top:0">What this document does and does not claim</h3>
-  <p>This is a <strong>status report on source code</strong>, not a record of a running system. Every feature
-  below is implemented in this repository and can be read and reviewed. <strong>None of it has been
-  deployed.</strong> As of 2026-10-02 there are no Azure resources, no screenshots, no Azure or
-  Application&nbsp;Insights logs, no captured <code class="inline-code">curl</code> output, and no demo
-  recording anywhere in the repository. The single exception, and the only executed result in this document, is
-  <code class="inline-code">Project3/docs/evidence/tests.log</code>: a captured run of the backend test suite on
-  a developer machine, with Cosmos and Redis stubbed out (&sect;7).</p>
+  <p>This began as a <strong>source-code status report</strong>. Its original snapshot, dated 2026-10-02,
+  described a project with no Azure resources. The application was deployed and smoke-tested on 2026-11-24;
+  the current resource state and live checks are recorded in
+  <code class="inline-code">docs/evidence/deployment-smoke-2026-11-24.md</code>. Rubric screenshots, OAuth provider
+  registration and the demo recording remain outstanding.</p>
 
   <p>Three things are therefore outside what the code can establish on its own:</p>
   <ul style="font-size:.9rem">
@@ -508,7 +506,7 @@ def get_recipes() -> Optional[list]:
   <h4>Before / After Performance &mdash; <span class="pill bad">Not measured</span></h4>
   <p class="sub">Phase 2 re-parsed the 7,806-row CSV on every dashboard load; Phase 3 reads pre-computed
   results from the cache instead. That is a real structural change and it is visible in the code. <strong>The
-  size of the improvement has not been measured</strong>, because the system has never run on Azure. An earlier
+  size of the improvement has not been measured</strong>; a live deployment was smoke-tested on 2026-11-24. An earlier
   revision of this report published &ldquo;~1,850&nbsp;ms &rarr; ~8&nbsp;ms, a 231&times; improvement&rdquo;;
   those figures were never measured and have been withdrawn.</p>
   <div class="perf-grid">
@@ -841,9 +839,10 @@ function renderPagination(result) {
   <p>Users register with an email and password. The password is hashed using <strong>bcrypt</strong> with 12
   salt rounds before storage in Cosmos DB; login verifies against the stored hash. Sessions are signed JWTs
   (HS256) with a 24-hour expiry. The hashing cost factor and the fact that plaintext is never stored are
-  <strong>verifiable right now</strong> by reading <code class="inline-code">backend/auth.py</code> &mdash; that
-  part needs no deployment to check. What is unverified is everything downstream of it: no user has ever been
-  written to a real Cosmos container, because no Cosmos account exists.</p>
+  <strong>verifiable right now</strong> by reading <code class="inline-code">backend/auth.py</code>. A temporary
+  account was written to the live Cosmos users container, used for login and an authenticated identity check,
+  then deleted. The smoke result is recorded in
+  <code class="inline-code">docs/evidence/deployment-smoke-2026-11-24.md</code>.</p>
   <p>One boundary worth calling out because it is the difference between a 400 and a 500: bcrypt hashes at
   most 72 bytes. <code class="inline-code">validate_registration</code> measures the password in
   <strong>bytes, not characters</strong>, and rejects anything longer with
@@ -1013,7 +1012,7 @@ if not JWT_SECRET:
   attacker cannot set a cookie on this origin, a state they fetched from
   <code class="inline-code">/api/auth/oauth/google</code> is useless in a victim's browser &mdash; which is
   what the earlier wording said was missing. <em>What remains unverified is the deployment, not the control:
-  this has never executed against a registered OAuth client.</em></p>
+  this has not executed against a registered OAuth client.</em></p>
 
   <h4>OAuth Flow <span class="pill warn">Design diagram &middot; never executed</span></h4>
   <svg viewBox="0 0 800 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:800px;display:block;margin:.5rem auto">
@@ -1162,9 +1161,9 @@ def google_auth_url(state: str = "") -> str:
       without any infrastructure.</li>
     <li><strong>Encryption at rest is true by construction but unevidenced.</strong> Cosmos DB encrypts data at
       rest with service-managed keys by default; there is no setting to turn on and no way to turn it off. So
-      the moment a Cosmos account exists, the claim is true. <strong>No Cosmos account exists</strong>, and the
-      repository holds no screenshot or portal output showing one. Until then this is a correct statement about
-      a platform, not a demonstrated property of this system. An earlier revision backed the claim with a
+      the deployed account uses the platform default. The live health endpoint reports encryption at rest, but
+      the repository has no screenshot or portal output showing the account's encryption settings. An earlier
+      revision backed the claim with a
       hardcoded <code class="inline-code">"AES-256"</code> string in the frontend, which is not evidence of
       anything.</li>
   </ul>
@@ -1172,12 +1171,12 @@ def google_auth_url(state: str = "") -> str:
     <div class="card">
       <b style="font-size:1rem">Encryption at Rest</b>
       <p class="sub" style="font-size:.82rem">Cosmos DB encrypts data at rest with service-managed keys by default &mdash; automatic and not configurable off. True once the account exists.</p>
-      <span class="pill bad">No account provisioned</span>
+      <span class="pill warn">Live account; portal screenshot pending</span>
     </div>
     <div class="card">
       <b style="font-size:1rem">Encryption in Transit</b>
-      <p class="sub" style="font-size:.82rem">Azure Functions and Blob static hosting serve over HTTPS by default. Platform behaviour, not application code; nothing deployed to observe.</p>
-      <span class="pill bad">Not deployed</span>
+      <p class="sub" style="font-size:.82rem">The Function API and static website are live over HTTPS. The negotiated TLS version has not been recorded.</p>
+      <span class="pill warn">Live; TLS detail pending</span>
     </div>
     <div class="card">
       <b style="font-size:1rem">Password Hashing</b>
@@ -1211,7 +1210,7 @@ if not verify_password(password, user["password_hash"]):
   that.</p>
 </div>
 
-<h3>4.4 Auth Gate &mdash; Dashboard Access Control (10 marks) <span class="pill ok">Guards verified in repo</span> <span class="pill warn">Never exercised against a deployment</span></h3>
+<h3>4.4 Auth Gate &mdash; Dashboard Access Control (10 marks) <span class="pill ok">Guards verified in repo and smoke-tested live</span></h3>
 <div class="section-card">
   <p>The gate has two layers, and it is worth being precise about which one is the access control:</p>
   <ul style="font-size:.9rem">
@@ -1661,17 +1660,20 @@ def _demo_fallback_enabled() -> bool:
 <h3>6.2 What is still unproven, stated plainly</h3>
 <div class="section-card">
   <ul style="font-size:.9rem">
-    <li><strong>Nothing has been provisioned.</strong> <code class="inline-code">deploy.sh</code> creates a
+    <li><strong>The Azure environment is provisioned and smoke-tested.</strong> <code class="inline-code">deploy.sh</code> created a
       resource group, a storage account with the two containers, a serverless Cosmos account with
       <code class="inline-code">users</code> and <code class="inline-code">cache</code> containers, a
       Consumption-plan Python 3.11 Function App, the app settings and the static website upload, and then
-      uploads <code class="inline-code">All_Diets.csv</code> to fire the trigger. It deliberately does not
-      configure CORS at the platform layer: the application emits those headers itself on every response path,
-      including the <code class="inline-code">OPTIONS</code> pre-flight and the 401 from the auth gate, and a
-      response carrying <code class="inline-code">Access-Control-Allow-Origin</code> twice is rejected by every
-      browser. That makes the <code class="inline-code">FRONTEND_URL</code> setting load-bearing &mdash; it is
-      the origin the application echoes, and it falls back to <code class="inline-code">*</code> when unset.
-      The script has not been run, and the repository contains no output from it.</li>
+      uploads <code class="inline-code">All_Diets.csv</code> to fire the trigger. The Functions host answers the
+      browser's <code class="inline-code">OPTIONS</code> pre-flight before the Python handler runs, so the script configures
+      platform CORS for the static website origin and sets <code class="inline-code">CORS_PLATFORM_MANAGED=true</code>, which
+      makes the application leave <code class="inline-code">Access-Control-Allow-Origin</code> to the platform &mdash; a
+      response carrying that header twice is rejected by every browser. Under <code class="inline-code">func start</code> there
+      is no platform layer, so the application emits the header itself from <code class="inline-code">FRONTEND_URL</code>.
+      The deployment is in resource group <code class="inline-code">cpsy300-project3-rg</code>. Storage and
+      Functions are in Canada Central; Cosmos is in Central US because this student subscription could not
+      create Cosmos accounts in Canada Central. The live checks are recorded in
+      <code class="inline-code">docs/evidence/deployment-smoke-2026-11-24.md</code>.</li>
     <li><strong>The cached read path is unoptimized.</strong> <code class="inline-code">get_recipes()</code>
       pulls every chunk on every request and filters in Python; there is no server-side Cosmos query. This is
       correct but not necessarily fast, and it has never been timed.</li>
@@ -1826,8 +1828,8 @@ this preparation did not exist.</p>
   matched exactly.</p>
   <p class="sub"><strong>Why this is called out here:</strong> the demo-preparation work is complete and the
   numbers are known, but it was invisible in the rubric table and the deliverables list, which made 20 marks of
-  finished preparation read as absent. What is still missing is the upload itself &mdash; which needs the
-  deployment &mdash; and the recording.</p>
+  finished preparation read as absent. The first dataset version is deployed; uploading the second version and
+  recording the demo remain.</p>
 </div>
 
 <h3>7.3 Two endpoints the rest of this report does not mention <span class="pill ok">Verified in repo</span></h3>
@@ -1964,8 +1966,8 @@ made of the system.</p>
       <td>10</td>
       <td>Registration with validation and duplicate rejection; login via bcrypt hash comparison; HS256 JWT with 24h expiry and no default signing key. Token held in <code class="inline-code">localStorage</code> and sent as a bearer header &mdash; not an HttpOnly cookie. <code class="inline-code">auth.py</code>, the configuration block plus
       <code class="inline-code">hash_password()</code>&ndash;<code class="inline-code">verify_token()</code>.</td>
-      <td><span class="pill ok">Hashing verified in repo</span> <span class="pill warn">No database behind it</span></td>
-      <td><code class="inline-code">curl</code> transcript of register &rarr; login &rarr; authenticated request against a deployment. Without Cosmos, users live in an in-process dict and register-then-login can fail across instances.</td>
+      <td><span class="pill ok">Live smoke-tested</span></td>
+      <td>Capture a redacted register &rarr; login &rarr; authenticated request transcript. The temporary user used for the smoke test was deleted.</td>
     </tr>
     <tr>
       <td>7</td>
@@ -2036,9 +2038,9 @@ made of the system.</p>
   <p class="sub">Ordered by marks unlocked per unit of effort. Steps 1 and 2 require an Azure subscription and
   provider accounts; nothing here requires new features.</p>
   <ol style="font-size:.9rem">
-    <li><strong>Run <code class="inline-code">deploy.sh</code>.</strong> Unblocks every &ldquo;unverified&rdquo;
-      status on this page and makes items 1, 2, 8 evidenceable. Delete the resource group afterwards &mdash;
-      billing is per hour and per request.</li>
+    <li><strong>Capture deployment evidence.</strong> The live system is available; save the health response,
+      authorization checks, Cosmos encryption view and dashboard screenshots. Delete the resource group after
+      the demo &mdash; billing is per hour and per request.</li>
     <li><strong>Register the Google and GitHub OAuth applications</strong> and set the four credentials plus the
       two redirect URIs. Worth 10 marks, requires no code, and is currently a hard zero.</li>
     <li><strong>Capture the evidence listed in the table above.</strong> Roughly six screenshots and three
@@ -2081,14 +2083,14 @@ made of the system.</p>
         <td>Data breach (data at rest)</td>
         <td>Database</td>
         <td>Cosmos DB encrypts at rest with service-managed keys by default &mdash; not configurable off, so it is true the moment the account exists. Nothing in the application code implements or affects this.</td>
-        <td><span class="pill bad">No database exists</span></td>
-        <td>Portal screenshot of the Cosmos account's Data Encryption blade. There is no account to screenshot.</td>
+        <td><span class="pill warn">Live account; portal evidence pending</span></td>
+        <td>Portal screenshot of the live Cosmos account's Data Encryption blade.</td>
       </tr>
       <tr>
         <td>Data interception (data in transit)</td>
         <td>Network</td>
         <td>Azure Functions and Blob static website hosting serve over HTTPS by default. Platform behaviour; the application does not enforce or configure TLS itself.</td>
-        <td><span class="pill bad">Not deployed</span></td>
+        <td><span class="pill warn">HTTPS live; protocol detail pending</span></td>
         <td>An SSL Labs or <code class="inline-code">curl -v</code> output against the live endpoint showing the negotiated TLS version.</td>
       </tr>
       <tr>
@@ -2169,7 +2171,7 @@ made of the system.</p>
     <text x="120" y="60" text-anchor="middle" font-size="11" font-weight="600" fill="var(--bad)">At Rest</text>
     <text x="120" y="77" text-anchor="middle" font-size="9" fill="var(--mute)">Cosmos default, service-managed</text>
     <text x="120" y="91" text-anchor="middle" font-size="9" fill="var(--mute)">Automatic, cannot be disabled</text>
-    <text x="120" y="107" text-anchor="middle" font-size="9" fill="var(--bad)">No account provisioned</text>
+    <text x="120" y="107" text-anchor="middle" font-size="9" fill="var(--mute)">Live in Central US</text>
     <!-- Layer 2 -->
     <rect x="240" y="40" width="200" height="80" rx="8" fill="var(--badbg)" stroke="var(--bad)" stroke-width="1.5" stroke-dasharray="5,3"/>
     <text x="340" y="60" text-anchor="middle" font-size="11" font-weight="600" fill="var(--bad)">In Transit</text>
@@ -2367,32 +2369,32 @@ follows is traceable to the code, and the last two rows are problems that are st
   <h3 style="margin-top:0">Deliverables &mdash; what exists and what does not</h3>
   <h4 style="margin-top:.6rem">Written and reviewable in this repository</h4>
   <ul style="font-size:.9rem">
-    <li><strong>Blob Trigger Function:</strong> data cleaning fires when <code class="inline-code">All_Diets.csv</code> changes <span class="pill warn">unverified</span></li>
-    <li><strong>Durable Cache:</strong> pre-computed aggregations and chunked recipe records in Cosmos, readable from any instance <span class="pill warn">unverified</span></li>
-    <li><strong>Diet Filter, Keyword Search, Pagination:</strong> one server-side endpoint over the cached records <span class="pill warn">unverified</span></li>
+    <li><strong>Blob Trigger Function:</strong> initial upload produced the live cache with 7,806 records <span class="pill ok">smoke-tested live</span></li>
+    <li><strong>Durable Cache:</strong> insights and 7,806 chunked recipe records are served from Cosmos <span class="pill ok">smoke-tested live</span></li>
+    <li><strong>Diet Filter, Keyword Search, Pagination:</strong> paginated recipe results were checked; diet and keyword filters still need a live check <span class="pill warn">partially smoke-tested</span></li>
     <li><strong>Email/Password Auth:</strong> bcrypt-12 hashing, HS256 JWT sessions, no default signing key <span class="pill ok">verified in repo</span></li>
     <li><strong>OAuth Code:</strong> Google and GitHub authorization-code flows with signed <code class="inline-code">state</code> and verified-email gating <span class="pill warn">unverified</span></li>
-    <li><strong>Auth Gate:</strong> 401 on the data endpoints without a valid token; name and Logout in the header <span class="pill ok">verified in repo</span></li>
-    <li><strong>Deploy Script:</strong> provisions storage, Cosmos serverless, the Function App and the static site <span class="pill bad">never run</span></li>
+    <li><strong>Auth Gate:</strong> live data endpoints return 401 without a token; authenticated reads succeed <span class="pill ok">smoke-tested live</span></li>
+    <li><strong>Deploy Script:</strong> provisions storage, Cosmos serverless, the Function App and the static site <span class="pill ok">run successfully</span></li>
     <li><strong>Backend Test Suite:</strong> 181 tests over <code class="inline-code">auth</code>, <code class="inline-code">models</code>, <code class="inline-code">nutrition</code>, <code class="inline-code">cache</code>, OAuth account linking, and the user store and auth throttling; run with <code class="inline-code">python -m pytest -q</code> from <code class="inline-code">Project3/</code>, output captured in <code class="inline-code">docs/evidence/tests.log</code> <span class="pill ok">executed, passing</span></li>
     <li><strong>Second Dataset Version:</strong> <code class="inline-code">data/make_v2.py</code> + <code class="inline-code">data/All_Diets_v2.csv</code>, with every before/after chart value tabulated in <code class="inline-code">docs/demo-plan.md</code> <span class="pill ok">verified in repo</span></li>
-    <li><strong>Health and Identity Endpoints:</strong> <code class="inline-code">/api/health</code> reporting live security configuration, and <code class="inline-code">/api/auth/me</code> <span class="pill warn">unverified</span></li>
+    <li><strong>Health and Identity Endpoints:</strong> <code class="inline-code">/api/health</code> and authenticated <code class="inline-code">/api/auth/me</code> <span class="pill ok">smoke-tested live</span></li>
     <li><strong>Demo Run Sheet:</strong> <code class="inline-code">docs/demo-plan.md</code> &mdash; ordered beats, the exact figures to expect on screen, and the pre-record checklist <span class="pill ok">written</span></li>
   </ul>
-  <h4 style="margin-top:.8rem">Not yet in existence</h4>
+  <h4 style="margin-top:.8rem">Deployment state and remaining evidence</h4>
   <ul style="font-size:.9rem">
-    <li><strong>Any deployed environment.</strong> No resource group, no Cosmos account, no Function App, no live URL. <span class="pill bad">Not done</span></li>
-    <li><strong>Any evidence artefact from a running system.</strong> No screenshots, no Azure log excerpts, no <code class="inline-code">curl</code> transcripts, no measured response times. The one captured artefact in the repository, <code class="inline-code">docs/evidence/tests.log</code>, is a local test run and is evidence of coding practice, not of a deployment. <span class="pill bad">Not done</span></li>
+    <li><strong>Production-like Azure environment.</strong> A smoke deployment exists at <code class="inline-code">cpsy300-project3-rg</code>; it has not been hardened or load-tested. <span class="pill warn">Smoke deployment</span></li>
+    <li><strong>Full demo evidence.</strong> A live smoke summary is in <code class="inline-code">docs/evidence/deployment-smoke-2026-11-24.md</code>; screenshots, saved HTTP transcripts, Azure log excerpts and measured response times are still needed. <span class="pill warn">Partial</span></li>
     <li><strong>Registered OAuth applications.</strong> Third-party login cannot succeed until they exist and the credentials are set. <span class="pill bad">Not done</span></li>
-    <li><strong>Encryption-at-rest evidence.</strong> True by platform default once Cosmos exists; nothing in the repository shows it. <span class="pill bad">Not done</span></li>
+    <li><strong>Encryption-at-rest evidence.</strong> The live health endpoint reports platform-managed encryption; a portal screenshot is still needed. <span class="pill warn">Partial</span></li>
     <li><strong>The demo video.</strong> 20 of 100 marks, not started, and dependent on all of the above. <span class="pill bad">Not done</span></li>
   </ul>
 </div>
 
 <footer>
-  <p><strong>Status as of 2026-10-02:</strong> code complete, backend test suite passing locally, second
-  dataset version and demo run sheet prepared; nothing deployed, no deployment evidence captured, demo not
-  recorded. No self-assigned score.</p>
+  <p><strong>Status updated 2026-11-24:</strong> backend suite passing, Azure smoke deployment active, live
+  health/auth/data checks recorded; OAuth provider registration, rubric screenshots and demo video remain
+  outstanding. No self-assigned score.</p>
   <p>CPSY 300 &mdash; Cloud Computing &mdash; Project 3: Improve Cloud Dashboard</p>
   <p>Yuandong Yang &middot; Ethan Bayarsaikhan &middot; Justin Norman-Rance &middot; 2026-10-02</p>
   <p><a href="https://github.com/YUANDONG-YANG/cloud-computing" target="_blank">github.com/YUANDONG-YANG/cloud-computing</a></p>
