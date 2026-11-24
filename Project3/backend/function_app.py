@@ -38,7 +38,7 @@ from cache import (
     get_cache_status,
 )
 from models import User, validate_registration, validate_login
-from ratelimit import SlidingWindowLimiter, client_ip
+from ratelimit import RecentKeys, SlidingWindowLimiter, client_ip
 
 app = func.FunctionApp()
 logger = logging.getLogger(__name__)
@@ -70,27 +70,48 @@ _USERS_RETRY_SECONDS = 30
 _users_container = None
 _users_failed_at = None       # time.monotonic() of the last failed init
 _users_unconfigured_logged = False
+_users_partial_logged = False
 
 
-def _cosmos_users_configured() -> bool:
-    return bool(os.environ.get("COSMOS_ENDPOINT", "").strip()
-                and os.environ.get("COSMOS_KEY", "").strip())
+def _cosmos_users_config() -> str:
+    """"configured", "unconfigured" (both unset) or "partial" (one unset).
+
+    Only a complete absence means local development.  One setting without
+    the other is a broken deployment and must not quietly become the
+    in-memory store.
+    """
+    has_endpoint = bool(os.environ.get("COSMOS_ENDPOINT", "").strip())
+    has_key = bool(os.environ.get("COSMOS_KEY", "").strip())
+    if has_endpoint and has_key:
+        return "configured"
+    if not has_endpoint and not has_key:
+        return "unconfigured"
+    return "partial"
 
 
 def _get_users():
     """Return the Cosmos DB users container, or None for local development.
 
-    Returns None only when Cosmos is not configured at all.  Raises
-    UserStoreUnavailable when it is configured but initialization failed.
+    Returns None only when neither COSMOS_ENDPOINT nor COSMOS_KEY is set.
+    Raises UserStoreUnavailable when only one of them is set, or when both
+    are set but initialization failed.
     """
-    global _users_container, _users_failed_at, _users_unconfigured_logged
+    global _users_container, _users_failed_at
+    global _users_unconfigured_logged, _users_partial_logged
     if _users_container is not None:
         return _users_container
-    if not _cosmos_users_configured():
+    config = _cosmos_users_config()
+    if config == "unconfigured":
         if not _users_unconfigured_logged:
             logger.warning("Cosmos DB not configured, using in-memory users")
             _users_unconfigured_logged = True
         return None
+    if config == "partial":
+        if not _users_partial_logged:
+            logger.error("Only one of COSMOS_ENDPOINT and COSMOS_KEY is set; "
+                         "refusing to fall back to in-memory users")
+            _users_partial_logged = True
+        raise UserStoreUnavailable("Cosmos DB is only partly configured")
 
     now = time.monotonic()
     if (_users_failed_at is not None
@@ -620,9 +641,22 @@ def health_check(req: func.HttpRequest) -> func.HttpResponse:
 _login_ip_limiter = SlidingWindowLimiter(limit=20, window=300)
 # Account creations from one address.
 _register_ip_limiter = SlidingWindowLimiter(limit=10, window=3600)
-# Wrong passwords for one account, whatever address they come from.  Cleared
-# by a successful login.
-_login_failure_limiter = SlidingWindowLimiter(limit=5, window=900)
+#
+# Password attempts are limited per (account, client address) pair rather
+# than per account alone.  A per-account lock lets anyone who knows an email
+# lock its owner out; keyed on the pair, one source can only exhaust its own
+# allowance.  Guessing spread over many addresses is caught by a wider
+# per-account cap, which applies only to addresses that have never signed in
+# to that account, so the owner's usual address keeps working while
+# strangers are refused.
+#
+# Attempts are *reserved* before bcrypt runs and refunded on success, so the
+# check and the count are one atomic step: concurrent requests cannot all
+# pass the check before any of them is counted.
+_login_pair_limiter = SlidingWindowLimiter(limit=5, window=900)
+_login_account_limiter = SlidingWindowLimiter(limit=50, window=900)
+# (account, address) pairs that completed a login recently.
+_trusted_login_sources = RecentKeys(ttl=30 * 24 * 3600)
 
 _STORE_DOWN_MSG = "Accounts are temporarily unavailable. Please try again in a moment."
 
@@ -728,7 +762,8 @@ def login(req: func.HttpRequest) -> func.HttpResponse:
     if req.method == "OPTIONS":
         return func.HttpResponse(status_code=204, headers=_cors_headers())
 
-    wait = _login_ip_limiter.hit(client_ip(req.headers))
+    ip = client_ip(req.headers)
+    wait = _login_ip_limiter.hit(ip)
     if wait:
         return _too_many(wait)
 
@@ -743,28 +778,41 @@ def login(req: func.HttpRequest) -> func.HttpResponse:
 
     email = body["email"].strip().lower()
     password = body["password"]
+    source = f"{email}|{ip}"
 
-    # Checked before bcrypt runs, so a locked account costs no hashing.
-    wait = _login_failure_limiter.retry_after(email)
+    # Reserve the attempt before bcrypt runs; a failed attempt keeps its
+    # reservation, a successful one is refunded below.
+    wait, pair_stamp = _login_pair_limiter.reserve(source)
     if wait:
         return _too_many(wait)
+    account_stamp = None
+    if not _trusted_login_sources.seen(source):
+        wait, account_stamp = _login_account_limiter.reserve(email)
+        if wait:
+            _login_pair_limiter.release(source, pair_stamp)
+            return _too_many(wait)
+
+    def refund():
+        _login_pair_limiter.release(source, pair_stamp)
+        _login_account_limiter.release(email, account_stamp)
 
     try:
         user = _find_user_by_email(email)
     except UserStoreUnavailable:
+        refund()    # no password was checked
         return _error(_STORE_DOWN_MSG, 503)
 
     if not user or not user.password_hash:
         # No account, or an OAuth-only account with no password to check.
         _burn_password_check(password)
-        _login_failure_limiter.record(email)
         return _error("Invalid email or password.", 401)
 
     if not verify_password(password, user.password_hash):
-        _login_failure_limiter.record(email)
         return _error("Invalid email or password.", 401)
 
-    _login_failure_limiter.reset(email)
+    refund()
+    _login_pair_limiter.reset(source)
+    _trusted_login_sources.add(source)
 
     # Update last login (best effort: the password was already verified).
     user.last_login = datetime.now(timezone.utc).isoformat()
@@ -943,21 +991,24 @@ def _handle_oauth_user(info: dict) -> func.HttpResponse:
     # provider could take over that account.
     verified_email = bool(email) and bool(info.get("email_verified"))
 
-    def link(account: User) -> None:
+    def link(account: User) -> bool:
         # Record the provider too, not just its subject id: the
         # provider+provider_id lookup is how this account is found next
         # time, and it only matches when both agree.
         account.provider = provider
         account.provider_id = provider_id
         account.last_login = datetime.now(timezone.utc).isoformat()
-        _save_user(account)
+        # Without the saved provider fields the next sign-in cannot find
+        # this account by provider, so the link is not done until it is
+        # stored.
+        return _save_user(account)
 
     try:
         user = _find_user_by_provider(provider, provider_id)
         if not user and verified_email:
             user = _find_user_by_email(email)
-            if user:
-                link(user)
+            if user and not link(user):
+                return _oauth_error("account_not_saved")
 
         if not user:
             # An address the provider would not vouch for must not become
@@ -985,8 +1036,8 @@ def _handle_oauth_user(info: dict) -> func.HttpResponse:
                 user = _find_user_by_email(address)
                 if user is None:
                     return _oauth_error("account_not_saved")
-                if verified_email:
-                    link(user)
+                if verified_email and not link(user):
+                    return _oauth_error("account_not_saved")
             else:
                 return _oauth_error("account_not_saved")
     except UserStoreUnavailable:

@@ -3,7 +3,11 @@
 P1  Cosmos configured but unreachable must fail closed (503), not silently
     keep accounts in one process's memory.
 P2  Concurrent registrations for one email must produce one account.
-P2  The anonymous login/register endpoints are throttled.
+P2  The anonymous login/register endpoints are throttled, without letting
+    a stranger lock the owner out, and without a check-then-count race.
+
+Follow-up review: a half-configured Cosmos is an error, not dev mode, and
+an OAuth link that cannot be saved is not reported as a successful sign-in.
 
 bcrypt is replaced by a fast stand-in in most tests: these tests are about
 which store is written and which status is returned, not about hashing.
@@ -31,6 +35,12 @@ PASSWORD = "correct horse battery"
 # Fixtures and helpers
 # ---------------------------------------------------------------------------
 
+def LIMITERS():
+    return (fa._login_ip_limiter, fa._register_ip_limiter,
+            fa._login_pair_limiter, fa._login_account_limiter,
+            fa._trusted_login_sources)
+
+
 @pytest.fixture(autouse=True)
 def clean_state(monkeypatch):
     monkeypatch.delenv("COSMOS_ENDPOINT", raising=False)
@@ -38,14 +48,12 @@ def clean_state(monkeypatch):
     monkeypatch.setattr(fa, "_memory_users", {})
     monkeypatch.setattr(fa, "_users_container", None)
     monkeypatch.setattr(fa, "_users_failed_at", None)
-    for limiter in (fa._login_ip_limiter, fa._register_ip_limiter,
-                    fa._login_failure_limiter):
+    for limiter in LIMITERS():
         limiter.clear()
     monkeypatch.setattr(fa, "hash_password", lambda p: "h:" + p)
     monkeypatch.setattr(fa, "verify_password", lambda p, h: h == "h:" + p)
     yield
-    for limiter in (fa._login_ip_limiter, fa._register_ip_limiter,
-                    fa._login_failure_limiter):
+    for limiter in LIMITERS():
         limiter.clear()
 
 
@@ -176,6 +184,17 @@ def test_unconfigured_cosmos_still_uses_memory_for_local_dev():
     assert login().status_code == 200
 
 
+@pytest.mark.parametrize("present", ["COSMOS_ENDPOINT", "COSMOS_KEY"])
+def test_half_configured_cosmos_is_an_error_not_dev_mode(monkeypatch, present):
+    """A deployment that lost one of the two settings must not quietly
+    register accounts into one process's memory."""
+    monkeypatch.setenv(present, "set")
+
+    assert register().status_code == 503
+    assert login().status_code == 503
+    assert fa._memory_users == {}
+
+
 def test_health_reports_an_unavailable_user_store(monkeypatch):
     configure_broken_cosmos(monkeypatch)
     resp = fa.health_check(func.HttpRequest("GET", "/api/health", body=b""))
@@ -276,38 +295,152 @@ def test_oauth_sign_in_with_the_store_down_redirects_with_an_error(
     assert "error=account_not_saved" in resp.headers["Location"]
 
 
+class UnsavableUpdates(FakeContainer):
+    """Creates work; updating an existing document fails."""
+
+    def upsert_item(self, doc):
+        raise RuntimeError("503 from Cosmos")
+
+
+def test_oauth_link_that_cannot_be_saved_is_not_a_successful_sign_in(
+        monkeypatch):
+    container = UnsavableUpdates()
+    monkeypatch.setattr(fa, "_users_container", container)
+    assert register().status_code == 201
+
+    resp = fa._handle_oauth_user({"provider": "github", "provider_id": "42",
+                                  "email": EMAIL, "email_verified": True})
+
+    assert resp.status_code == 302
+    assert "error=account_not_saved" in resp.headers["Location"]
+    assert "#token=" not in resp.headers["Location"]
+
+
+def test_oauth_link_after_losing_a_create_race_must_also_be_saved(
+        monkeypatch):
+    container = UnsavableUpdates()
+    monkeypatch.setattr(fa, "_users_container", container)
+    assert register().status_code == 201
+    # Simulate the race: the email lookup ran before the account existed.
+    real_find = fa._find_user_by_email
+    calls = []
+
+    def find_after_race(email):
+        calls.append(email)
+        return None if len(calls) == 1 else real_find(email)
+
+    monkeypatch.setattr(fa, "_find_user_by_email", find_after_race)
+    resp = fa._handle_oauth_user({"provider": "github", "provider_id": "42",
+                                  "email": EMAIL, "email_verified": True})
+
+    assert "error=account_not_saved" in resp.headers["Location"]
+
+
 # ---------------------------------------------------------------------------
 # P2: throttling of the anonymous auth endpoints
 # ---------------------------------------------------------------------------
 
-def test_repeated_wrong_passwords_lock_the_account():
-    register()
-    for _ in range(fa._login_failure_limiter.limit):
-        assert login(password="wrong password").status_code == 401
+ATTACKER = "198.51.100.66"
+OWNER = "203.0.113.7"
 
-    resp = login()          # even the right password, from another address
+
+def test_repeated_wrong_passwords_block_that_source():
+    register()
+    for _ in range(fa._login_pair_limiter.limit):
+        assert login(password="wrong password", ip=ATTACKER).status_code == 401
+
+    resp = login(ip=ATTACKER)     # even the right password, from that source
     assert resp.status_code == 429
     assert int(resp.headers["Retry-After"]) > 0
 
 
-def test_lockout_is_checked_before_bcrypt_runs(monkeypatch):
+def test_a_stranger_cannot_lock_the_owner_out():
     register()
-    for _ in range(fa._login_failure_limiter.limit):
-        login(password="wrong password")
+    for _ in range(fa._login_pair_limiter.limit + 3):
+        login(password="wrong password", ip=ATTACKER)
+
+    assert login(ip=OWNER).status_code == 200
+
+
+def test_distributed_guessing_hits_the_account_cap_but_not_a_known_source():
+    register()
+    assert login(ip=OWNER).status_code == 200          # owner's known source
+    per_source = fa._login_pair_limiter.limit
+    sources = fa._login_account_limiter.limit // per_source
+    for n in range(sources):
+        for _ in range(per_source):
+            login(password="wrong password", ip=f"192.0.2.{n + 1}")
+
+    assert login(ip="192.0.2.200").status_code == 429  # new source refused
+    assert login(ip=OWNER).status_code == 200          # owner unaffected
+
+
+def test_the_limit_is_checked_before_bcrypt_runs(monkeypatch):
+    register()
+    for _ in range(fa._login_pair_limiter.limit):
+        login(password="wrong password", ip=ATTACKER)
     calls = []
     monkeypatch.setattr(fa, "verify_password",
                         lambda p, h: calls.append(1) or False)
 
-    assert login().status_code == 429
+    assert login(ip=ATTACKER).status_code == 429
     assert calls == []
+
+
+def test_concurrent_guesses_cannot_exceed_the_limit(monkeypatch):
+    """With check-then-record, every request that arrived before the first
+    failure was counted would pass the check.  Reservation admits at most
+    `limit` password checks however many requests are in flight."""
+    register()
+    in_flight = threading.Event()
+    checks = []
+
+    def slow_wrong(p, h):
+        checks.append(1)
+        in_flight.wait(0.2)        # stay "mid-bcrypt" while others arrive
+        return False
+
+    monkeypatch.setattr(fa, "verify_password", slow_wrong)
+    statuses = []
+
+    def guess():
+        statuses.append(login(password="wrong password",
+                              ip=ATTACKER).status_code)
+
+    threads = [threading.Thread(target=guess) for _ in range(15)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert len(checks) == fa._login_pair_limiter.limit
+    assert statuses.count(429) == 15 - fa._login_pair_limiter.limit
 
 
 def test_a_successful_login_clears_earlier_failures():
     register()
-    for _ in range(fa._login_failure_limiter.limit - 1):
+    for _ in range(fa._login_pair_limiter.limit - 1):
         login(password="wrong password")
     assert login().status_code == 200
-    assert login(password="wrong password").status_code == 401
+    for _ in range(fa._login_pair_limiter.limit - 1):
+        assert login(password="wrong password").status_code == 401
+    assert login().status_code == 200
+
+
+def test_a_store_outage_does_not_use_up_attempts(monkeypatch):
+    register()
+    real_find = fa._find_user_by_email
+    outage = [True]
+
+    def find(email):
+        if outage[0]:
+            raise fa.UserStoreUnavailable("down")
+        return real_find(email)
+
+    monkeypatch.setattr(fa, "_find_user_by_email", find)
+    for _ in range(fa._login_pair_limiter.limit + 2):
+        assert login().status_code == 503
+    outage[0] = False
     assert login().status_code == 200
 
 
@@ -353,6 +486,30 @@ def test_blocked_attempts_do_not_extend_the_block():
     for t in range(1, 10):
         lim.hit("k", now=t)
     assert lim.hit("k", now=10.5) == 0
+
+
+def test_reserve_counts_immediately_and_release_refunds():
+    lim = ratelimit.SlidingWindowLimiter(limit=2, window=10)
+    wait, a = lim.reserve("k", now=0)
+    assert wait == 0
+    wait, b = lim.reserve("k", now=1)
+    assert wait == 0
+    wait, c = lim.reserve("k", now=2)
+    assert wait > 0 and c is None
+    lim.release("k", a)
+    assert lim.reserve("k", now=3)[0] == 0
+    lim.release("k", None)                  # a no-op, not an error
+
+
+def test_recent_keys_expire_and_are_bounded():
+    keys = ratelimit.RecentKeys(ttl=10, max_keys=3)
+    keys.add("a", now=0)
+    assert keys.seen("a", now=5)
+    assert not keys.seen("a", now=11)
+    for k in "bcde":
+        keys.add(k, now=20)
+    assert not keys.seen("b", now=20)       # evicted, oldest first
+    assert keys.seen("e", now=20)
 
 
 def test_limiter_memory_is_bounded():

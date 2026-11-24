@@ -69,7 +69,7 @@ footer{text-align:center;padding:2rem 1rem;color:var(--mute);font-size:.85rem;bo
     <strong>Document status:</strong>
     <span class="pill warn">Code complete &middot; not deployed</span>
     <span class="pill bad">No deployment evidence captured</span>
-    <span class="pill ok">171 backend tests passing</span>
+    <span class="pill ok">181 backend tests passing</span>
     <span class="pill bad">Demo video not recorded</span>
   </p>
 </header>
@@ -859,8 +859,8 @@ function renderPagination(result) {
   <code class="inline-code">curl</code> transcript of register &rarr; login &rarr; authenticated request. With
   Cosmos unset the code uses an in-process user dict (<code class="inline-code">_memory_users</code>), which is meant for
   <code class="inline-code">func start</code> only: register-then-login can fail across instances, which is another reason the
-  database has to actually exist before recording. With Cosmos <em>configured but unreachable</em> the code no
-  longer falls back to that dict: registration and login return 503 and <code class="inline-code">/api/health</code> reports the
+  database has to actually exist before recording. With Cosmos <em>configured but unreachable</em>, or only half configured
+  (one of <code class="inline-code">COSMOS_ENDPOINT</code> / <code class="inline-code">COSMOS_KEY</code> missing), the code no longer falls back to that dict: registration and login return 503 and <code class="inline-code">/api/health</code> reports the
   user store as unavailable (fixed after the 2026-11-23 review, <code class="inline-code">review/audit-2026-11-23.md</code>).</p>
 
   <h4>Password Hashing and Token Issue <span class="sub" style="font-weight:400;font-size:.8rem">&mdash; actual source, <code class="inline-code">backend/auth.py</code>, <code class="inline-code">hash_password()</code>, <code class="inline-code">verify_password()</code>, <code class="inline-code">create_token()</code></span></h4>
@@ -1683,10 +1683,12 @@ def _demo_fallback_enabled() -> bool:
       against XSS. It is a deliberate trade-off, not a solved problem, and earlier revisions of this report
       incorrectly claimed HttpOnly cookies were in use.</li>
     <li><strong>Login throttling is per instance.</strong> <code class="inline-code">backend/ratelimit.py</code> limits logins per
-      client address and locks an account after repeated wrong passwords, but the counters live in one worker
-      process: a scaled-out app counts separately on each instance and a restart clears them. A global limit
-      needs a shared store or a gateway in front of the Function App. The per-account lockout can also be
-      triggered deliberately to lock someone out for 15 minutes.</li>
+      client address and per (account, address) pair, but the counters live in one worker process: a
+      scaled-out app counts separately on each instance and a restart clears them. A global limit needs a
+      shared store or a gateway in front of the Function App. The wider per-account cap exempts addresses
+      that have signed in to the account before, so a stranger cannot lock the owner out of their usual
+      address; an owner signing in from a <em>new</em> address during a distributed attack can still be
+      refused until the window passes.</li>
   </ul>
 </div>
 
@@ -1702,14 +1704,14 @@ mentioned anywhere in an earlier revision of this report &mdash; the word &ldquo
 it once, which left the deliverables list and the &ldquo;evidence still needed&rdquo; blocks reading as though
 this preparation did not exist.</p>
 
-<h3>7.1 Backend test suite &mdash; 171 tests, passing <span class="pill ok">Executed, not inferred</span></h3>
+<h3>7.1 Backend test suite &mdash; 181 tests, passing <span class="pill ok">Executed, not inferred</span></h3>
 <div class="section-card">
-  <p><code class="inline-code">Project3/tests/</code> holds <strong>171 tests</strong>. They were run for this
+  <p><code class="inline-code">Project3/tests/</code> holds <strong>181 tests</strong>. They were run for this
   report with <code class="inline-code">python -m pytest -q</code> from
-  <code class="inline-code">Project3/</code> and all 171 passed in <strong>4.4&nbsp;seconds</strong>; the
+  <code class="inline-code">Project3/</code> and all 181 passed in <strong>4.4&nbsp;seconds</strong>; the
   captured output is committed at <code class="inline-code">Project3/docs/evidence/tests.log</code>, which is
   regenerated from a real run rather than hand-written. This is the <em>only</em> measured runtime number in
-  this document. The count moves as the suite grows &mdash; earlier runs recorded 109 and 143 &mdash; so quote
+  this document. The count moves as the suite grows &mdash; earlier runs recorded 109, 143 and 171 &mdash; so quote
   <code class="inline-code">tests.log</code> rather than this paragraph if the two ever disagree.</p>
   <div class="scroll">
   <table>
@@ -1725,8 +1727,8 @@ this preparation did not exist.</p>
         <td>Chunk boundaries, stale-chunk cleanup, the missing-chunk and failed-write paths, the Redis connection cache, and <code class="inline-code">get_cache_status</code>.</td></tr>
       <tr><td><code class="inline-code">tests/test_oauth_accounts.py</code></td><td>8</td>
         <td>Account linking and the verified-email gate: what an unverified provider email may and may not claim.</td></tr>
-      <tr><td><code class="inline-code">tests/test_user_store.py</code></td><td>28</td>
-        <td>The user store and auth throttling from the 2026-11-23 review: an unreachable Cosmos fails closed with 503, racing registrations create one account, the login/registration limits and account lockout, and <code class="inline-code">ratelimit.py</code> itself.</td></tr>
+      <tr><td><code class="inline-code">tests/test_user_store.py</code></td><td>38</td>
+        <td>The user store and auth throttling from the 2026-11-23 review: an unreachable Cosmos fails closed with 503, racing registrations create one account, a half-configured Cosmos, OAuth links that cannot be saved, the login/registration limits including concurrent guesses and a stranger trying to lock the owner out, and <code class="inline-code">ratelimit.py</code> itself.</td></tr>
     </tbody>
   </table>
   </div>
@@ -1783,9 +1785,12 @@ this preparation did not exist.</p>
       <tr><td>Concurrent registrations for one email create one account</td>
         <td>A check-then-upsert with random ids let both requests succeed, leaving two passwords for one address.</td>
         <td><code class="inline-code">test_racing_registrations_in_cosmos_create_one_document</code>, <code class="inline-code">test_concurrent_registrations_in_memory_create_one_account</code></td></tr>
-      <tr><td>Repeated wrong passwords lock the account before bcrypt runs</td>
-        <td>Bounds online guessing and the CPU an anonymous caller can spend.</td>
-        <td><code class="inline-code">test_repeated_wrong_passwords_lock_the_account</code>, <code class="inline-code">test_lockout_is_checked_before_bcrypt_runs</code></td></tr>
+      <tr><td>A stranger's wrong passwords cannot lock the owner out</td>
+        <td>A per-account lock is itself a denial-of-service: anyone who knows the email can trigger it.</td>
+        <td><code class="inline-code">test_a_stranger_cannot_lock_the_owner_out</code>, <code class="inline-code">test_distributed_guessing_hits_the_account_cap_but_not_a_known_source</code></td></tr>
+      <tr><td>Concurrent guesses cannot exceed the limit</td>
+        <td>With check-then-record, requests in flight together all pass the check. Attempts are reserved atomically before bcrypt runs.</td>
+        <td><code class="inline-code">test_concurrent_guesses_cannot_exceed_the_limit</code>, <code class="inline-code">test_the_limit_is_checked_before_bcrypt_runs</code></td></tr>
     </tbody>
   </table>
   </div>
@@ -2138,7 +2143,7 @@ made of the system.</p>
       <tr>
         <td>Brute-force / credential stuffing</td>
         <td>Application</td>
-        <td><strong>Throttled per instance.</strong> <code class="inline-code">backend/ratelimit.py</code>: 20 login attempts per client address per 5 minutes, 10 registrations per address per hour, and an account locks for 15 minutes after 5 wrong passwords (checked before bcrypt runs, cleared by a successful login). Blocked requests get 429 with <code class="inline-code">Retry-After</code>. The client address is the right-most <code class="inline-code">X-Forwarded-For</code> entry, the one the Azure front end appends. Counters are per worker process, so a scaled-out app or a restart weakens them. There is no CAPTCHA.</td>
+        <td><strong>Throttled per instance.</strong> <code class="inline-code">backend/ratelimit.py</code>: 20 login attempts per client address per 5 minutes and 10 registrations per address per hour. Password attempts are limited to 5 per (account, address) pair per 15 minutes, so one source cannot lock out anyone but itself; guessing spread over many addresses meets a cap of 50 per account per 15 minutes, which does not apply to addresses that have signed in to that account before. Each attempt is reserved atomically before bcrypt runs and refunded on success, so concurrent requests cannot exceed the limits. Blocked requests get 429 with <code class="inline-code">Retry-After</code>. The client address is the right-most <code class="inline-code">X-Forwarded-For</code> entry, the one the Azure front end appends. Counters are per worker process, so a scaled-out app or a restart weakens them. There is no CAPTCHA.</td>
         <td><span class="pill ok">Implemented, tested</span> <span class="pill warn">Per instance</span></td>
         <td>A 429 <code class="inline-code">curl</code> transcript against the deployed API. For a global limit, put Front Door or API Management in front of the Function App.</td>
       </tr>
@@ -2337,7 +2342,7 @@ follows is traceable to the code, and the last two rows are problems that are st
     <span class="sub">Diet Types</span>
   </div>
   <div class="card">
-    <b>171</b>
+    <b>181</b>
     <span class="sub">Backend Tests Passing</span>
   </div>
   <div class="card">
@@ -2369,7 +2374,7 @@ follows is traceable to the code, and the last two rows are problems that are st
     <li><strong>OAuth Code:</strong> Google and GitHub authorization-code flows with signed <code class="inline-code">state</code> and verified-email gating <span class="pill warn">unverified</span></li>
     <li><strong>Auth Gate:</strong> 401 on the data endpoints without a valid token; name and Logout in the header <span class="pill ok">verified in repo</span></li>
     <li><strong>Deploy Script:</strong> provisions storage, Cosmos serverless, the Function App and the static site <span class="pill bad">never run</span></li>
-    <li><strong>Backend Test Suite:</strong> 171 tests over <code class="inline-code">auth</code>, <code class="inline-code">models</code>, <code class="inline-code">nutrition</code>, <code class="inline-code">cache</code>, OAuth account linking, and the user store and auth throttling; run with <code class="inline-code">python -m pytest -q</code> from <code class="inline-code">Project3/</code>, output captured in <code class="inline-code">docs/evidence/tests.log</code> <span class="pill ok">executed, passing</span></li>
+    <li><strong>Backend Test Suite:</strong> 181 tests over <code class="inline-code">auth</code>, <code class="inline-code">models</code>, <code class="inline-code">nutrition</code>, <code class="inline-code">cache</code>, OAuth account linking, and the user store and auth throttling; run with <code class="inline-code">python -m pytest -q</code> from <code class="inline-code">Project3/</code>, output captured in <code class="inline-code">docs/evidence/tests.log</code> <span class="pill ok">executed, passing</span></li>
     <li><strong>Second Dataset Version:</strong> <code class="inline-code">data/make_v2.py</code> + <code class="inline-code">data/All_Diets_v2.csv</code>, with every before/after chart value tabulated in <code class="inline-code">docs/demo-plan.md</code> <span class="pill ok">verified in repo</span></li>
     <li><strong>Health and Identity Endpoints:</strong> <code class="inline-code">/api/health</code> reporting live security configuration, and <code class="inline-code">/api/auth/me</code> <span class="pill warn">unverified</span></li>
     <li><strong>Demo Run Sheet:</strong> <code class="inline-code">docs/demo-plan.md</code> &mdash; ordered beats, the exact figures to expect on screen, and the pre-record checklist <span class="pill ok">written</span></li>

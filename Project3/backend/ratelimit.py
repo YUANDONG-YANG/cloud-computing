@@ -15,7 +15,7 @@ shared store or a gateway (Front Door / API Management) in front of the app.
 """
 import threading
 import time
-from collections import deque
+from collections import OrderedDict, deque
 
 
 class SlidingWindowLimiter:
@@ -90,6 +90,34 @@ class SlidingWindowLimiter:
             events.append(now)
             return 0.0
 
+    def reserve(self, key: str, now: float | None = None):
+        """Atomically check and count one attempt that has not finished yet.
+
+        Returns (0, stamp) when the attempt may go ahead; the stamp can later
+        be passed to `release` to refund it.  Returns (seconds, None) when the
+        limit is reached.  Counting *before* the work starts means concurrent
+        requests cannot all pass the check while earlier ones are still
+        running: at most `limit` attempts per window are ever admitted.
+        """
+        now = time.monotonic() if now is None else now
+        wait = self.hit(key, now)
+        return (wait, None) if wait else (0.0, now)
+
+    def release(self, key: str, stamp) -> None:
+        """Refund an attempt counted by `reserve` (e.g. it turned out fine)."""
+        if stamp is None:
+            return
+        with self._lock:
+            events = self._events.get(key)
+            if not events:
+                return
+            try:
+                events.remove(stamp)
+            except ValueError:
+                return
+            if not events:
+                del self._events[key]
+
     def reset(self, key: str) -> None:
         with self._lock:
             self._events.pop(key, None)
@@ -97,6 +125,39 @@ class SlidingWindowLimiter:
     def clear(self) -> None:
         with self._lock:
             self._events.clear()
+
+
+class RecentKeys:
+    """Keys seen within the last `ttl` seconds, bounded to `max_keys`."""
+
+    def __init__(self, ttl: float, max_keys: int = 50_000):
+        self.ttl = ttl
+        self.max_keys = max_keys
+        self._seen: OrderedDict[str, float] = OrderedDict()
+        self._lock = threading.Lock()
+
+    def add(self, key: str, now: float | None = None) -> None:
+        now = time.monotonic() if now is None else now
+        with self._lock:
+            self._seen.pop(key, None)
+            self._seen[key] = now
+            while len(self._seen) > self.max_keys:
+                self._seen.popitem(last=False)   # least recently added
+
+    def seen(self, key: str, now: float | None = None) -> bool:
+        now = time.monotonic() if now is None else now
+        with self._lock:
+            added = self._seen.get(key)
+            if added is None:
+                return False
+            if now - added > self.ttl:
+                del self._seen[key]
+                return False
+            return True
+
+    def clear(self) -> None:
+        with self._lock:
+            self._seen.clear()
 
 
 def client_ip(headers) -> str:

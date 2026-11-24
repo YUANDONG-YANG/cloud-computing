@@ -1,5 +1,5 @@
 # Project 3 (Phase 3) backend test run
-# Date:    2026-11-24 17:12 UTC
+# Date:    2026-11-24 17:17 UTC
 # Runtime: Python 3.11.18  (matches the Function App: deploy.sh --runtime-version 3.11)
 # pytest:  8.3.5
 # Command: python3.11 -m venv venv && venv/bin/pip install -q -r backend/requirements-dev.txt && \
@@ -9,7 +9,7 @@
 #
 # Captured output. Do not hand-edit: regenerate with the command above.
 
-........................................................................ [ 42%]
-........................................................................ [ 84%]
-...........................                                              [100%]
-171 passed, 44 warnings in 4.38s
+........................................................................ [ 39%]
+........................................................................ [ 79%]
+.....................................                                    [100%]
+181 passed, 50 warnings in 4.40s
